@@ -53,6 +53,10 @@ export const updateQuestionSchema = z.object({
     url: z.string().url(),
     publicId: z.string()
   })).optional(),
+  options: z.array(optionSchema.extend({ id: z.string().optional() }))
+    .min(2, { message: "MCQ must have at least 2 options" })
+    .max(5, { message: "MCQ cannot have more than 5 options" })
+    .optional(),
 })
 
 export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>

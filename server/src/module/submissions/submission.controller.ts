@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
-import * as submissionsService from "./submissions.service.js";
+import * as submissionsService from "./submission.service.js";
 
 export const joinExam = async (req: Request, res: Response) => {
     const result = await submissionsService.joinExam(req.body.joinCode, req.user!.id);

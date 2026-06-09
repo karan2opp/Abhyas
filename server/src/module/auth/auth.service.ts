@@ -25,7 +25,6 @@ const register = async (data: RegisterDto) => {
         ...data,
         password: hashedPassword,
         verificationToken: hashedToken,
-        role: "user",
         isVerified: false,
     }).returning();
 

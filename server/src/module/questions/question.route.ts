@@ -12,7 +12,7 @@ router.post("/",
     validate(createQuestionSchema),
     controller.createQuestion
 );
-router.get("/section/:sectionId", authenticate, authorize("teacher"), validate(createQuestionSchema), controller.getQuestionsBySection);
+router.get("/section/:sectionId", authenticate, authorize("teacher"), controller.getQuestionsBySection);
 router.get("/:id", authenticate, authorize("teacher"), controller.getQuestionById);
 router.patch("/:id", authenticate, authorize("teacher"), validate(updateQuestionSchema), controller.updateQuestion);
 router.delete("/:id", authenticate, authorize("teacher"), controller.deleteQuestion);

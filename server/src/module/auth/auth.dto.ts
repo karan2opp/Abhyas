@@ -15,6 +15,8 @@ export const registerSchema = z.object({
         .regex(/(?=.*[A-Z])/, "Password must contain at least one uppercase letter")
         .regex(/(?=.*\d)/, "Password must contain at least one number"),
 
+    role: z.enum(["student", "teacher", "admin"]).optional().default("student"),
+
     phone: z.string()
         .length(10, "Phone must be 10 digits")
         .regex(/^[0-9]+$/, "Phone must contain only numbers")

@@ -15,7 +15,7 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     if (err instanceof ZodError) {
         return res.status(400).json({
             success: false,
-            message: err.errors.map(e => e.message).join(", "),
+            message: err.issues.map(e => e.message).join(", "),
         });
     }
 

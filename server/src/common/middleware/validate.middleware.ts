@@ -6,7 +6,7 @@ import { ApiError } from "../utils/ApiError.js"
 const validate = (schema: ZodSchema) => (req: Request, _res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body)
     if (!result.success) {
-        const errors = (result.error as any).errors.map((e: any) => e.message).join(", ")
+        const errors = result.error.issues.map((e: any) => e.message).join(", ")
         throw ApiError.badRequest(errors)
     }
     req.body = result.data  // replace req.body with parsed/cleaned data

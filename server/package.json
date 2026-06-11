@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsc-watch --onSuccess \"node ./dist/src/index.js\"",
+    "build": "tsc",
+    "start": "node ./dist/src/index.js",
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"

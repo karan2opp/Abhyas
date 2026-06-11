@@ -118,14 +118,24 @@ export default function TeacherDashboard() {
                     <span className="text-[10px] font-bold px-2 py-1 rounded bg-white/5 text-gray-300 uppercase tracking-wider border border-white/5">
                       {exam.joinCode ? `CODE: ${exam.joinCode}` : "DRAFT"}
                     </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
-                      onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}`)}
-                    >
-                      Manage
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
+                        onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}/results`)}
+                      >
+                        Results
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="bg-transparent border-white/10 text-purple-400 border-purple-500/30 hover:text-purple-300 hover:bg-purple-500/10"
+                        onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}`)}
+                      >
+                        Manage
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

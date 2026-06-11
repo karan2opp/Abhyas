@@ -1,6 +1,6 @@
 import { eq, and, isNull, desc } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { submissions, exams, answers, options, questions, sections } from "../../common/db/schema.js";
+import { submissions, exams, answers, options, questions, sections, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 
 // ── Join Exam ──────────────────────────────────────────────────────────────────
@@ -151,19 +151,28 @@ const getSubmissionsByExam = async (examId: string, teacherId: string) => {
     );
     if (!exam) throw ApiError.notFound("Exam not found");
 
-    const result = await db.select().from(submissions).where(
+    const result = await db.select({
+        submission: submissions,
+        user: {
+            id: users.id,
+            name: users.name,
+            email: users.email
+        }
+    }).from(submissions)
+    .innerJoin(users, eq(submissions.userId, users.id))
+    .where(
         and(eq(submissions.examId, examId), isNull(submissions.deletedAt))
     );
 
     const now = new Date();
-    for (let i = 0; i < result.length; i++) {
-        const sub = result[i];
+    for (const row of result) {
+        const sub = row.submission;
         if (sub && sub.status === "inprogress" && exam.duration) {
             const endTime = new Date(sub.createdAt.getTime() + exam.duration * 60000);
             if (now >= endTime) {
                 try {
                     const updated = await submitExam(sub.id, sub.userId);
-                    if (updated) result[i] = updated;
+                    if (updated) row.submission = updated;
                 } catch (e) {
                     console.error("Auto-submit failed", e);
                 }

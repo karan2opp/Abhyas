@@ -7,8 +7,8 @@ export const submissionStatusEnum = pgEnum("submission_status", ["inprogress", "
 
 export const submissions = pgTable("submissions", {
   id: text("id").primaryKey().$defaultFn(() => createId()),
-  userId: text("user_id").references(() => users.id).notNull(),
-  examId: text("exam_id").references(() => exams.id).notNull(),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  examId: text("exam_id").references(() => exams.id, { onDelete: "cascade" }).notNull(),
   status: submissionStatusEnum("status").notNull(),
   score: doublePrecision("score"),
   submittedAt: timestamp("submitted_at"),

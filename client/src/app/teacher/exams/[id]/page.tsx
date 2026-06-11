@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb } from "lucide-react";
+import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, BarChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -105,6 +105,14 @@ export default function EditExamBuilder() {
         </div>
         
         <div className="flex items-center gap-5">
+          <Button 
+            variant="outline"
+            className="bg-purple-600/20 text-purple-400 border-purple-500/50 hover:bg-purple-500/30 hover:text-white transition-colors"
+            onClick={() => window.location.href = `/teacher/exams/${examId}/results`}
+          >
+            <BarChart className="mr-2 h-4 w-4" />
+            View Results
+          </Button>
           <Avatar className="h-10 w-10 cursor-pointer border-2 border-white/10 hover:border-purple-500/50 transition-all">
             <AvatarImage src="" />
             <AvatarFallback className="bg-green-900/50 text-green-300 text-xs font-semibold">JD</AvatarFallback>

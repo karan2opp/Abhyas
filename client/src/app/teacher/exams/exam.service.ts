@@ -98,3 +98,9 @@ export const deleteOptionService = async (id: string) => {
   const res = await api.delete(`/options/${id}`);
   return res.data;
 };
+
+// ------------- SUBMISSIONS -------------
+export const getExamSubmissionsService = async (examId: string) => {
+  const res = await api.get(`/submissions/exam/${examId}`);
+  return res.data;
+};

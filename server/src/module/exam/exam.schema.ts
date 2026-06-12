@@ -5,6 +5,7 @@ import { users } from "../auth/user.schema.js";
 export const exams = pgTable("exams", {
   id: text("id").primaryKey().$defaultFn(() => createId()),
   title: text("title").notNull(),
+  instructions: text("instructions").array(),
   duration: integer("duration").notNull(), // in minutes
   createdBy: text("created_by").references(() => users.id).notNull(),
   joinCode: text("join_code").unique().notNull(),

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, BarChart } from "lucide-react";
+import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, BarChart, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ export default function EditExamBuilder() {
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [totalMarks, setTotalMarks] = useState("100");
+  const [instructions, setInstructions] = useState<string[]>([""]);
   const [joinCode, setJoinCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,6 +45,9 @@ export default function EditExamBuilder() {
         const data = res.data || res;
         setTitle(data.title || "");
         setTotalMarks(data.totalMarks?.toString() || "100");
+        if (data.instructions && Array.isArray(data.instructions)) {
+          setInstructions(data.instructions.length > 0 ? data.instructions : [""]);
+        }
         if (data.joinCode) setJoinCode(data.joinCode);
         
         // Format dates for datetime-local input
@@ -74,6 +78,7 @@ export default function EditExamBuilder() {
     try {
       const payload = {
         title,
+        instructions: instructions.filter(i => i.trim() !== ""),
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
         totalMarks: parseInt(totalMarks)
@@ -189,6 +194,43 @@ export default function EditExamBuilder() {
                       placeholder="100" 
                       className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full"
                     />
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label className="text-sm font-semibold text-gray-300">Exam Instructions</label>
+                  <div className="space-y-3">
+                    {instructions.map((inst, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input 
+                          value={inst}
+                          onChange={(e) => {
+                            const newInst = [...instructions];
+                            newInst[idx] = e.target.value;
+                            setInstructions(newInst);
+                          }}
+                          placeholder={`Instruction ${idx + 1}`}
+                          className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-purple-500/50 h-10 rounded-lg flex-1"
+                        />
+                        {instructions.length > 1 && (
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => setInstructions(instructions.filter((_, i) => i !== idx))}
+                            className="bg-transparent border-white/10 text-red-400 hover:bg-red-500/10 h-10 w-10 shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setInstructions([...instructions, ""])}
+                      className="w-full bg-transparent border-dashed border-white/10 text-gray-400 hover:text-white hover:bg-white/5"
+                    >
+                      <Plus className="h-4 w-4 mr-2" /> Add Instruction
+                    </Button>
                   </div>
                 </div>
 

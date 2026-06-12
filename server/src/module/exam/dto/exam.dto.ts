@@ -4,6 +4,7 @@ export const createExamSchema = z.object({
   title: z.string({ message: "Title is required" })
     .min(3, { message: "Title must be at least 3 characters long" })
     .max(100, { message: "Title cannot exceed 100 characters" }),
+  instructions: z.array(z.string()).optional(),
   duration: z.number({ message: "Duration is required" })
     .min(1, { message: "Duration must be at least 1 minute" })
     .max(180, { message: "Duration cannot exceed 180 minutes" }).optional(),
@@ -23,6 +24,7 @@ export const updateExamSchema = z.object({
     .min(3, { message: "Title must be at least 3 characters long" })
     .max(100, { message: "Title cannot exceed 100 characters" })
     .optional(),
+  instructions: z.array(z.string()).optional(),
   duration: z.number({ message: "Duration must be a number" })
     .min(1, { message: "Duration must be at least 1 minute" })
     .max(180, { message: "Duration cannot exceed 180 minutes" })

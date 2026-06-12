@@ -311,7 +311,7 @@ export default function ExamAttemptPage() {
 
           {/* Question Content */}
           <div className="flex-1 px-8 py-8 space-y-8 max-w-4xl">
-            <h1 className="text-2xl font-bold text-white leading-snug">
+            <h1 className="text-2xl font-bold text-white leading-snug whitespace-pre-wrap">
               {currentQuestion.description}
             </h1>
 

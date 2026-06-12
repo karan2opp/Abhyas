@@ -66,40 +66,20 @@ export default function StudentDashboard() {
   };
 
   return (
-    <div className="p-10 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
+    <div className="p-4 sm:p-10 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
       <header>
         <h2 className="text-3xl font-bold text-white tracking-tight">Student Dashboard</h2>
         <p className="text-gray-400 mt-1">Join new assessments and view your past performance.</p>
       </header>
 
       {/* Join Exam Section */}
-      <Card className="bg-[#111520] border-white/5 border-l-4 border-l-blue-500">
-        <CardHeader>
-          <CardTitle className="text-xl text-white">Join an Assessment</CardTitle>
-          <CardDescription className="text-gray-400">
-            Enter the 6-character code provided by your teacher to start your exam.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleJoinExam} className="flex gap-4 items-center max-w-md">
-            <Input
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="e.g. A1B2C3"
-              className="bg-black/20 border-white/10 text-white uppercase tracking-widest text-lg font-mono placeholder:normal-case placeholder:tracking-normal placeholder:font-sans"
-              maxLength={6}
-              required
-            />
-            <Button 
-              type="submit" 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold min-w-[120px]"
-              disabled={isJoining || joinCode.length < 3}
-            >
-              {isJoining ? "Joining..." : "Join Exam"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      <div className="flex gap-4">
+        <input type="text" value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
+          placeholder="enter the join code"
+          className="outline-none bg-gray-900 p-2 rounded-lg "
+        />
+        <button className="bg-blue-500 hover:bg-blue-600 px-4 py-2 rounded-lg" onClick={handleJoinExam}>Join Exam</button>
+      </div>
 
       {/* Submissions Section */}
       <div>
@@ -118,7 +98,7 @@ export default function StudentDashboard() {
             {submissions.map((item) => {
               const { submission, exam } = item;
               const isCompleted = submission.status === "submitted" || submission.status === "timeout";
-              
+
               return (
                 <Card key={submission.id} className="bg-[#111520] border-white/5 hover:border-blue-500/30 transition-colors shadow-lg overflow-hidden group">
                   <div className={`h-2 ${isCompleted ? "bg-gradient-to-r from-emerald-500 to-green-600" : "bg-gradient-to-r from-blue-500 to-indigo-600"}`}></div>
@@ -126,7 +106,7 @@ export default function StudentDashboard() {
                     <h3 className="text-lg font-bold text-white leading-tight mb-2 line-clamp-2">
                       {exam.title}
                     </h3>
-                    
+
                     <div className="space-y-2 mt-4 text-sm text-gray-400">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-blue-400" />
@@ -141,16 +121,16 @@ export default function StudentDashboard() {
                         <span>Status: <span className={isCompleted ? "text-emerald-400" : "text-blue-400"}>{submission.status.toUpperCase()}</span></span>
                       </div>
                     </div>
-                    
+
                     <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
                       {isCompleted ? (
                         <>
                           <div className="text-sm font-semibold text-white">
                             Score: <span className="text-emerald-400">{submission.score ?? 0} / {exam.totalMarks}</span>
                           </div>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
                             onClick={() => router.push(`/student/results/${submission.id}`)}
                           >
@@ -160,8 +140,8 @@ export default function StudentDashboard() {
                       ) : (
                         <>
                           <div className="text-sm text-gray-400">Not submitted yet</div>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={() => router.push(`/student/exams/${submission.id}`)}
                           >

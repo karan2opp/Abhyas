@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Hourglass, CalendarDays, Loader2, ArrowRight } from "lucide-react";
+import { Clock, Hourglass, CalendarDays, Loader2, ArrowRight, ListChecks, Flag, CheckCircle } from "lucide-react";
 import { verifyJoinCodeService, joinExamService } from "../../student.service";
 
 export default function WaitingRoomPage() {
@@ -189,6 +189,49 @@ export default function WaitingRoomPage() {
                   <div>
                     <p className="text-xs text-gray-500">Duration</p>
                     <p className="font-medium">{examData.duration} Minutes</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              {examData.instructions && examData.instructions.length > 0 && (
+                <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-5 space-y-3">
+                  <div className="flex items-center gap-2 text-white font-bold">
+                    <ListChecks className="h-5 w-5 text-purple-400" />
+                    Instructions
+                  </div>
+                  <ul className="space-y-2">
+                    {examData.instructions.map((inst: string, idx: number) => (
+                      <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
+                        <span className="text-purple-400 mt-0.5">•</span>
+                        <span>{inst}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Color Scheme Legend */}
+              <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-5 space-y-3">
+                <div className="text-white font-bold text-sm mb-2">Exam Legend</div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 rounded bg-emerald-600 flex items-center justify-center shrink-0">
+                      <CheckCircle className="h-3 w-3 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-400">Answered</p>
+                      <p className="text-[11px] text-gray-400 leading-snug">Indicates you have selected an answer.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 rounded bg-orange-500/20 border border-orange-500/50 flex items-center justify-center shrink-0">
+                      <Flag className="h-3 w-3 text-orange-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-orange-400">Flagged</p>
+                      <p className="text-[11px] text-gray-400 leading-snug">Flag questions to review them later. They will be submitted with your other answers.</p>
+                    </div>
                   </div>
                 </div>
               </div>

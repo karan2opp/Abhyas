@@ -10,7 +10,12 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
     const result = await authService.login(req.body)
 
-    res.cookie("refreshToken", result.refreshToken, { httpOnly: true, secure: true, sameSite: "strict", maxAge: 7 * 24 * 60 * 60 * 1000 })
+    res.cookie("refreshToken", result.refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",  // ← change this
+        maxAge: 7 * 24 * 60 * 60 * 1000
+    })
     return ApiResponse.ok(res, "User logged in successfully", { accessToken: result.accessToken, user: result.safeUser })
 }
 export const logout = async (req: Request, res: Response) => {

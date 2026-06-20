@@ -85,6 +85,7 @@ export const generateQuestionConfigSchema = z.object({
     .min(1, { message: "At least one topic is required" }),
   textMarks: z.number().min(0.5).optional(),
   customInstructions: z.string().optional(),
+  includeExplanation: z.boolean().optional(),
 })
 
 export type GenerateQuestionConfig = z.infer<typeof generateQuestionConfigSchema>

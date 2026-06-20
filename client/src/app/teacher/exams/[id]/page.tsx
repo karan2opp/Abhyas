@@ -12,13 +12,23 @@ import { useParams } from "next/navigation";
 
 import { getExamByIdService, updateExamService } from "../exam.service";
 import { QuestionBuilder } from "../new/QuestionBuilder";
+import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
 export default function EditExamBuilder() {
   const params = useParams();
   const examId = params.id as string;
   
-  const [step, setStep] = useState<1 | 2>(1);
+  const { step, setStep, examId: storeExamId, setExamId } = useExamBuilderStore();
+  const [isMounted, setIsMounted] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (storeExamId !== examId) {
+       setExamId(examId);
+       setStep(1); // Reset step if opening a different exam
+    }
+  }, [examId, storeExamId, setExamId, setStep]);
 
   // Form State for Step 1
   const [title, setTitle] = useState("");
@@ -95,6 +105,8 @@ export default function EditExamBuilder() {
   };
 
   if (loadingInitial) return <div className="p-10 text-white text-center">Loading exam...</div>;
+
+  if (!isMounted) return null;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">

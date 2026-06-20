@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Edit2, Check, X, CheckCircle2, Circle, Settings2, Zap } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Edit2, Check, X, CheckCircle2, Circle, Settings2, Zap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   createQuestionService, updateQuestionService, deleteQuestionService,
   createOptionService, updateOptionService, deleteOptionService
 } from "../exam.service";
+import { AIGeneratorView } from "./AIGeneratorView";
 
 export type EditorConfig = {
   isOpen: boolean;
@@ -28,12 +29,44 @@ export function QuestionBuilder({ examId }: { examId: string }) {
   
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [aiModeSectionId, setAiModeSectionId] = useState<string | null>(null);
 
   const [editorConfig, setEditorConfig] = useState<EditorConfig>({
     isOpen: false,
     sectionId: null,
     question: null
   });
+
+  const [sidebarWidth, setSidebarWidth] = useState(400);
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingSidebar) return;
+      // Calculate width from the right edge of the screen
+      // Assuming the sidebar is anchored to the right, new width is window width - mouseX
+      const newWidth = window.innerWidth - e.clientX;
+      setSidebarWidth(Math.max(350, Math.min(800, newWidth)));
+    };
+    const handleMouseUp = () => setIsDraggingSidebar(false);
+
+    if (isDraggingSidebar) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    } else {
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "auto";
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "default";
+      document.body.style.userSelect = "auto";
+    };
+  }, [isDraggingSidebar]);
 
   const fetchSections = async () => {
     try {
@@ -112,7 +145,7 @@ export function QuestionBuilder({ examId }: { examId: string }) {
         <div className="flex items-start gap-6 pb-20 relative">
           
           {/* Main List Area */}
-          <div className="flex-1 space-y-8 transition-all duration-300">
+          <div className="flex-1 space-y-8 transition-all duration-300 min-w-0">
             {sections.map((section, idx) => (
               <SectionItem 
                 key={section._id || section.id} 
@@ -120,13 +153,27 @@ export function QuestionBuilder({ examId }: { examId: string }) {
                 index={idx} 
                 refresh={fetchSections} 
                 onOpenEditor={(q) => setEditorConfig({ isOpen: true, sectionId: section._id || section.id, question: q })}
+                onOpenAI={() => setAiModeSectionId(section._id || section.id)}
               />
             ))}
           </div>
 
+          {/* Resizable Splitter */}
+          {editorConfig.isOpen && editorConfig.sectionId && (
+            <div 
+              className="w-4 bg-transparent hover:bg-purple-500/20 active:bg-purple-500/40 cursor-col-resize shrink-0 transition-colors flex items-center justify-center group"
+              onMouseDown={() => setIsDraggingSidebar(true)}
+            >
+              <div className="w-0.5 h-full min-h-[500px] bg-white/10 group-hover:bg-purple-400 rounded-full transition-colors" />
+            </div>
+          )}
+
           {/* Right Sidebar Editor */}
           {editorConfig.isOpen && editorConfig.sectionId && (
-            <div className="w-[420px] shrink-0 sticky top-0 bg-[#151a28] border border-purple-500/40 rounded-xl shadow-[0_0_40px_rgba(147,51,234,0.15)] flex flex-col animate-in slide-in-from-right-8 h-[calc(100vh-250px)] overflow-hidden">
+            <div 
+              className="shrink-0 sticky top-0 bg-[#151a28] border border-purple-500/40 rounded-xl shadow-[0_0_40px_rgba(147,51,234,0.15)] flex flex-col animate-in slide-in-from-right-8 h-[calc(100vh-250px)] overflow-hidden"
+              style={{ width: `${sidebarWidth}px` }}
+            >
                <SidebarQuestionEditor 
                  config={editorConfig} 
                  onClose={() => setEditorConfig({ isOpen: false, sectionId: null, question: null })}
@@ -138,6 +185,18 @@ export function QuestionBuilder({ examId }: { examId: string }) {
 
         </div>
       )}
+
+      {aiModeSectionId && (
+        <div className="fixed inset-0 z-[100] pointer-events-none">
+          {/* Overlay background */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto" onClick={() => setAiModeSectionId(null)} />
+          <AIGeneratorView 
+            sectionId={aiModeSectionId} 
+            onBack={() => setAiModeSectionId(null)} 
+            refresh={fetchSections} 
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -145,7 +204,7 @@ export function QuestionBuilder({ examId }: { examId: string }) {
 // -------------------------------------------------------------
 // SECTION COMPONENT
 // -------------------------------------------------------------
-function SectionItem({ section, index, refresh, onOpenEditor }: { section: any, index: number, refresh: () => void, onOpenEditor: (q: any) => void }) {
+function SectionItem({ section, index, refresh, onOpenEditor, onOpenAI }: { section: any, index: number, refresh: () => void, onOpenEditor: (q: any) => void, onOpenAI: () => void }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(section.title || "");
   const sectionId = section._id || section.id;
@@ -229,13 +288,16 @@ function SectionItem({ section, index, refresh, onOpenEditor }: { section: any, 
           <QuestionItem key={q._id || q.id} question={q} index={qIdx} refresh={refresh} onEdit={() => onOpenEditor(q)} />
         ))}
         
-        <div className="flex items-center gap-4">
-          <Button onClick={() => onOpenEditor(null)} variant="outline" className="flex-1 bg-transparent border-dashed border-white/20 text-gray-400 hover:text-white hover:bg-white/5 py-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <Button onClick={() => onOpenEditor(null)} variant="outline" className="flex-1 min-w-[180px] bg-transparent border-dashed border-white/20 text-gray-400 hover:text-white hover:bg-white/5 py-6">
             <Plus className="h-4 w-4 mr-2" /> Custom Question
           </Button>
-          <div className="flex-1 flex items-center bg-purple-500/10 border border-dashed border-purple-500/30 rounded-md overflow-hidden">
-            <div className="px-4 py-3 text-sm text-purple-400 font-medium flex items-center border-r border-purple-500/30">
-              <Zap className="h-4 w-4 mr-2" /> Quick Add:
+          <Button onClick={onOpenAI} variant="outline" className="flex-1 min-w-[180px] bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500/20 hover:text-white py-6 shadow-[0_0_15px_rgba(147,51,234,0.15)]">
+            <Sparkles className="h-4 w-4 mr-2" /> Generate with AI
+          </Button>
+          <div className="flex-1 min-w-[250px] flex items-center bg-purple-500/10 border border-dashed border-purple-500/30 rounded-md overflow-hidden">
+            <div className="px-3 py-3 text-[13px] text-purple-400 font-bold flex items-center border-r border-purple-500/30 whitespace-nowrap">
+              <Zap className="h-4 w-4 mr-1.5" /> Quick Add
             </div>
             <button onClick={() => handleQuickAdd(1)} className="flex-1 py-3 text-sm text-purple-300 hover:bg-purple-500/20 hover:text-white transition-colors border-r border-purple-500/30 font-bold">+1</button>
             <button onClick={() => handleQuickAdd(5)} className="flex-1 py-3 text-sm text-purple-300 hover:bg-purple-500/20 hover:text-white transition-colors border-r border-purple-500/30 font-bold">+5</button>
@@ -396,7 +458,7 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
         onClose();
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Failed to save question");
+      toast.error(err.message || "Failed to save question");
     } finally {
       setIsSaving(false);
     }

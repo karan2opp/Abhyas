@@ -43,6 +43,20 @@
       "when": 1781261444913,
       "tag": "0005_complex_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781938731972,
+      "tag": "0006_closed_umar",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781947601267,
+      "tag": "0007_fair_deathbird",
+      "breakpoints": true
     }
   ]
 }

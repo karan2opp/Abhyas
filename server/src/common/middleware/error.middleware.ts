@@ -39,7 +39,7 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
     console.error("Unhandled error:", err);
     return res.status(500).json({
         success: false,
-        message: "Something went wrong",
+        message: err instanceof Error ? err.message : "Something went wrong",
     });
 };
 

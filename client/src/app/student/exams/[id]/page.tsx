@@ -33,7 +33,9 @@ export default function ExamAttemptPage() {
 
   // Map of questionId -> selectedOptionIds[]
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
   const [savedAnswers, setSavedAnswers] = useState<Record<string, string[]>>({});
+  const [savedTextAnswers, setSavedTextAnswers] = useState<Record<string, string>>({});
   
   // Navigation State
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -63,13 +65,17 @@ export default function ExamAttemptPage() {
 
         // Populate initial answers
         const initialAnswers: Record<string, string[]> = {};
+        const initialTextAnswers: Record<string, string> = {};
         if (sub.answers && Array.isArray(sub.answers)) {
           sub.answers.forEach((ans: any) => {
-            initialAnswers[ans.questionId] = ans.options || [];
+            if (ans.options) initialAnswers[ans.questionId] = ans.options;
+            if (ans.textAnswer) initialTextAnswers[ans.questionId] = ans.textAnswer;
           });
         }
         setAnswers(initialAnswers);
         setSavedAnswers(initialAnswers);
+        setTextAnswers(initialTextAnswers);
+        setSavedTextAnswers(initialTextAnswers);
 
         // Setup timer based on submission createdAt
         if (sub.createdAt && exam.duration) {
@@ -131,6 +137,13 @@ export default function ExamAttemptPage() {
     }));
   };
 
+  const handleTextAnswerChange = (questionId: string, text: string) => {
+    setTextAnswers(prev => ({
+      ...prev,
+      [questionId]: text
+    }));
+  };
+
   const toggleFlag = (questionId: string) => {
     setFlaggedQuestions(prev => {
       const newSet = new Set(prev);
@@ -157,9 +170,15 @@ export default function ExamAttemptPage() {
   const handleSaveAndNext = async () => {
     const currentQ = flattenedQuestions[currentIndex];
     const selectedOptions = answers[currentQ.id];
+    const textAns = textAnswers[currentQ.id];
 
-    if (!selectedOptions || selectedOptions.length === 0) {
+    if (currentQ.type === "mcq" && (!selectedOptions || selectedOptions.length === 0)) {
       toast.error("Please select an answer to save, or use 'Next' to skip.");
+      return;
+    }
+    
+    if (currentQ.type !== "mcq" && (!textAns || textAns.trim() === "")) {
+      toast.error("Please write your answer to save, or use 'Next' to skip.");
       return;
     }
 
@@ -168,11 +187,16 @@ export default function ExamAttemptPage() {
       await submitAnswerService({
         submissionId,
         questionId: currentQ.id,
-        options: selectedOptions
+        options: currentQ.type === "mcq" ? selectedOptions : undefined,
+        textAnswer: currentQ.type !== "mcq" ? textAns : undefined
       });
 
       // Update saved answers state
-      setSavedAnswers(prev => ({ ...prev, [currentQ.id]: selectedOptions }));
+      if (currentQ.type === "mcq") {
+        setSavedAnswers(prev => ({ ...prev, [currentQ.id]: selectedOptions }));
+      } else {
+        setSavedTextAnswers(prev => ({ ...prev, [currentQ.id]: textAns }));
+      }
       
       if (currentIndex < flattenedQuestions.length - 1) {
         setCurrentIndex(currentIndex + 1);
@@ -192,12 +216,18 @@ export default function ExamAttemptPage() {
       const currentQ = flattenedQuestions[currentIndex];
       if (currentQ) {
         const selectedOptions = answers[currentQ.id];
-        if (selectedOptions && selectedOptions.length > 0) {
+        const textAns = textAnswers[currentQ.id];
+        
+        const hasMcqAns = currentQ.type === "mcq" && selectedOptions && selectedOptions.length > 0;
+        const hasTextAns = currentQ.type !== "mcq" && textAns && textAns.trim() !== "";
+        
+        if (hasMcqAns || hasTextAns) {
           try {
              await submitAnswerService({
               submissionId,
               questionId: currentQ.id,
-              options: selectedOptions
+              options: currentQ.type === "mcq" ? selectedOptions : undefined,
+              textAnswer: currentQ.type !== "mcq" ? textAns : undefined
             });
           } catch(e) {
             console.error("Failed to save final answer before submission", e);
@@ -233,21 +263,17 @@ export default function ExamAttemptPage() {
     const [timeLeft, setTimeLeft] = useState(() => Math.max(0, Math.floor((endTime - Date.now()) / 1000)));
 
     useEffect(() => {
-      if (timeLeft <= 0) return;
+      if (timeLeft <= 0) {
+        onTimeUp();
+        return;
+      }
 
       const timer = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            onTimeUp();
-            return 0;
-          }
-          return prev - 1;
-        });
+        setTimeLeft(prev => Math.max(0, prev - 1));
       }, 1000);
 
       return () => clearInterval(timer);
-    }, [timeLeft, onTimeUp]);
+    }, [timeLeft]);
 
     return (
       <div className={`font-mono text-2xl font-bold tracking-wider ${timeLeft < 300 ? 'text-red-400' : 'text-gray-200'}`}>
@@ -262,6 +288,7 @@ export default function ExamAttemptPage() {
 
   const currentQuestion = flattenedQuestions[currentIndex];
   const selectedOptions = answers[currentQuestion.id] || [];
+  const textAnswer = textAnswers[currentQuestion.id] || "";
 
   return (
     <div className="flex flex-col h-full bg-[#0b0f19]">
@@ -320,14 +347,19 @@ export default function ExamAttemptPage() {
               {currentQuestion.description}
             </h1>
 
-            {currentQuestion.type !== "mcq" && (
-              <p className="text-yellow-500 text-sm">Note: Only MCQ questions are fully supported right now.</p>
-            )}
-
-            {/* Options */}
-            <div className="space-y-4">
-              {currentQuestion.options?.map((opt: any, idx: number) => {
-                const isSelected = selectedOptions.includes(opt.id);
+            {currentQuestion.type !== "mcq" ? (
+              <div className="space-y-4">
+                <textarea
+                  value={textAnswer}
+                  onChange={(e) => handleTextAnswerChange(currentQuestion.id, e.target.value)}
+                  placeholder="Type your descriptive answer here..."
+                  className="w-full h-64 bg-[#111520] text-white border border-white/10 rounded-xl p-6 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currentQuestion.options?.map((opt: any, idx: number) => {
+                  const isSelected = selectedOptions.includes(opt.id);
                 // Map index 0->A, 1->B, etc.
                 const letter = String.fromCharCode(65 + idx);
                 
@@ -362,6 +394,7 @@ export default function ExamAttemptPage() {
                 );
               })}
             </div>
+            )}
           </div>
 
           {/* Question Footer Actions */}
@@ -396,7 +429,7 @@ export default function ExamAttemptPage() {
 
               <Button 
                 onClick={handleSaveAndNext}
-                disabled={isSavingAnswer || selectedOptions.length === 0}
+                disabled={isSavingAnswer || (currentQuestion.type === "mcq" ? selectedOptions.length === 0 : (!textAnswer || textAnswer.trim() === ""))}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold min-w-[140px]"
               >
                 {isSavingAnswer ? "Saving..." : "Save & Next"}
@@ -448,7 +481,9 @@ export default function ExamAttemptPage() {
                 .map((q) => {
                 const idx = q.globalIndex;
                 const isCurrent = idx === currentIndex;
-                const isAnswered = savedAnswers[q.id] && savedAnswers[q.id].length > 0;
+                const isAnswered = q.type === "mcq" 
+                  ? (savedAnswers[q.id] && savedAnswers[q.id].length > 0)
+                  : (savedTextAnswers[q.id] && savedTextAnswers[q.id].trim() !== "");
                 const isFlagged = flaggedQuestions.has(q.id);
 
                 let bgColor = "bg-transparent";

@@ -41,12 +41,16 @@ export default function TeacherDashboard() {
           <h2 className="text-3xl font-bold text-white tracking-tight">Overview</h2>
           <p className="text-gray-400 mt-1">Welcome back to your Institutional Portal.</p>
         </div>
-        <Link href="/teacher/exams/new">
-          <Button className="bg-purple-600 hover:bg-purple-700 text-white font-semibold">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Create New Assessment
-          </Button>
-        </Link>
+        <Button 
+          onClick={() => {
+            import('@/store/useExamBuilderStore').then(m => m.useExamBuilderStore.getState().resetStore());
+            router.push('/teacher/exams/new');
+          }}
+          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+        >
+          <PlusCircle className="mr-2 h-5 w-5" />
+          Create New Assessment
+        </Button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

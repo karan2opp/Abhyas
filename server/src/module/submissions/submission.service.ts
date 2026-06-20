@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { submissions, exams, answers, options, questions, sections, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -101,19 +101,51 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
 
     // --- Text/Code evaluation (AI, batched) ---
     if (textAnswersToEvaluate.length > 0) {
-        const textResults = await evaluateTextAnswersBatched(textAnswersToEvaluate, mode as EvaluationMode);
+        // --- Update submission to evaluating first ---
+        const [updated] = await db.update(submissions)
+            .set({
+                status: "evaluating",
+                score: totalScore,
+                submittedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(submissions.id, submissionId))
+            .returning();
 
-        for (const result of textResults) {
-            totalScore += result.score;
+        // --- Run AI Evaluation in Background ---
+        (async () => {
+            try {
+                const textResults = await evaluateTextAnswersBatched(textAnswersToEvaluate, mode as EvaluationMode);
+                let additionalScore = 0;
 
-            await db.update(answers)
-                .set({
-                    isCorrect: result.score === result.maxScore,
-                    marksAwarded: result.score,
-                    feedback: result.feedback ?? null
-                })
-                .where(eq(answers.id, result.answerId));
-        }
+                for (const result of textResults) {
+                    additionalScore += result.score;
+                    await db.update(answers)
+                        .set({
+                            isCorrect: result.score === result.maxScore,
+                            marksAwarded: result.score,
+                            feedback: result.feedback ?? null
+                        })
+                        .where(eq(answers.id, result.answerId));
+                }
+
+                await db.update(submissions)
+                    .set({
+                        status: "submitted",
+                        score: totalScore + additionalScore,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(submissions.id, submissionId));
+            } catch (error) {
+                console.error("Background evaluation failed", error);
+                // Even on failure, mark as submitted so student isn't stuck
+                await db.update(submissions)
+                    .set({ status: "submitted" })
+                    .where(eq(submissions.id, submissionId));
+            }
+        })();
+
+        return updated;
     }
 
     // --- Update submission ---
@@ -131,15 +163,24 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
 };
 
 // ── Get Submission by ID (student sees own) ────────────────────────────────────
-const getSubmissionById = async (submissionId: string, studentId: string, mode: string = "detailed") => {
-    let [submission] = await db.select().from(submissions).where(
+const getSubmissionById = async (submissionId: string, userId: string, mode: string = "detailed") => {
+    let [result] = await db.select({
+        submission: submissions,
+        exam: exams
+    }).from(submissions)
+    .innerJoin(exams, eq(submissions.examId, exams.id))
+    .where(
         and(
             eq(submissions.id, submissionId),
-            eq(submissions.userId, studentId),
-            isNull(submissions.deletedAt)
+            isNull(submissions.deletedAt),
+            or(
+                eq(submissions.userId, userId),
+                eq(exams.createdBy, userId)
+            )
         )
     );
-    if (!submission) throw ApiError.notFound("Submission not found");
+    if (!result) throw ApiError.notFound("Submission not found");
+    let submission = result.submission;
 
     if (submission.status === "inprogress") {
         const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
@@ -147,7 +188,7 @@ const getSubmissionById = async (submissionId: string, studentId: string, mode: 
             const endTime = new Date(submission.createdAt.getTime() + exam.duration * 60000);
             if (new Date() >= endTime) {
                 try {
-                    const updated = await submitExam(submissionId, studentId, mode);
+                    const updated = await submitExam(submissionId, userId, mode);
                     if (updated) submission = updated;
                 } catch (e) {
                     console.error("Auto-submit failed", e);
@@ -255,18 +296,24 @@ const getMySubmissions = async (studentId: string, mode: string = "simple") => {
 };
 
 // ── Get Exam For Submission ────────────────────────────────────────────────────
-const getExamForSubmission = async (submissionId: string, studentId: string) => {
-    const [submission] = await db.select().from(submissions).where(
+const getExamForSubmission = async (submissionId: string, userId: string) => {
+    let [result] = await db.select({
+        submission: submissions,
+        exam: exams
+    }).from(submissions)
+    .innerJoin(exams, eq(submissions.examId, exams.id))
+    .where(
         and(
             eq(submissions.id, submissionId),
-            eq(submissions.userId, studentId),
-            isNull(submissions.deletedAt)
+            isNull(submissions.deletedAt),
+            or(
+                eq(submissions.userId, userId),
+                eq(exams.createdBy, userId)
+            )
         )
     );
-    if (!submission) throw ApiError.notFound("Submission not found");
-
-    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
-    if (!exam) throw ApiError.notFound("Exam not found");
+    if (!result) throw ApiError.notFound("Submission not found");
+    const { submission, exam } = result;
 
     const examSections = await db.select().from(sections).where(eq(sections.examId, exam.id));
 
@@ -274,11 +321,14 @@ const getExamForSubmission = async (submissionId: string, studentId: string) => 
         const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id));
 
         const questionsWithOptions = await Promise.all(sectionQuestions.map(async (question) => {
-            const questionOptions = await db.select({
-                id: options.id,
-                questionId: options.questionId,
-                value: options.value
-            }).from(options).where(eq(options.questionId, question.id));
+            const questionOptions = await (submission.status === "inprogress" 
+                ? db.select({
+                    id: options.id,
+                    questionId: options.questionId,
+                    value: options.value
+                }).from(options).where(eq(options.questionId, question.id))
+                : db.select().from(options).where(eq(options.questionId, question.id))
+            );
 
             return { ...question, options: questionOptions };
         }));

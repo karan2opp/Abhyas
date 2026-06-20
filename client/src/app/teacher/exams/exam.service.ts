@@ -63,6 +63,11 @@ export const createQuestionService = async (data: any) => {
   return res.data;
 };
 
+export const generateQuestionService = async (data: any) => {
+  const res = await api.post("/questions/generate", data);
+  return res.data;
+};
+
 export const getQuestionsBySectionService = async (sectionId: string) => {
   const res = await api.get(`/questions/section/${sectionId}`);
   return res.data;

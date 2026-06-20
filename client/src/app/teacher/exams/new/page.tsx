@@ -12,10 +12,15 @@ import { toast } from "sonner";
 
 import { createExamService, updateExamService } from "../exam.service";
 import { QuestionBuilder } from "./QuestionBuilder";
+import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
 export default function NewExamBuilder() {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [examId, setExamId] = useState<string | null>(null);
+  const { step, setStep, examId, setExamId } = useExamBuilderStore();
+  const [isMounted, setIsMounted] = useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const [title, setTitle] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -68,6 +73,8 @@ export default function NewExamBuilder() {
     }
   };
 
+  if (!isMounted) return null;
+
   return (
     <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
       {/* Dynamic Header */}
@@ -90,7 +97,7 @@ export default function NewExamBuilder() {
       </header>
 
       {/* Main Builder Content */}
-      <div className="flex-1 p-10 max-w-[1100px] mx-auto w-full">
+      <div className="flex-1 p-10 max-w-[1400px] mx-auto w-full">
         {/* Stepper */}
         <div className="flex items-center gap-8 mb-10 pl-2">
           <div className="flex items-center gap-4">

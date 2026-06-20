@@ -3,7 +3,7 @@ import { createId } from "@paralleldrive/cuid2";
 import { users } from "../auth/user.schema.js";
 import { exams } from "../exam/exam.schema.js";
 
-export const submissionStatusEnum = pgEnum("submission_status", ["inprogress", "submitted", "timeout"]);
+export const submissionStatusEnum = pgEnum("submission_status", ["inprogress", "submitted", "timeout", "evaluating"]);
 
 export const submissions = pgTable("submissions", {
   id: text("id").primaryKey().$defaultFn(() => createId()),

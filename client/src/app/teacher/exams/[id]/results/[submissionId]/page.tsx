@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot } from "lucide-react";
-import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
+import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
 import { toast } from "sonner";
 import Link from "next/link";
 
 export default function ResultsPage() {
   const params = useParams();
-  const submissionId = params.id as string;
+  const submissionId = params.submissionId as string;
+  const examId = params.id as string;
   const router = useRouter();
 
   const [submission, setSubmission] = useState<any>(null);
@@ -120,9 +121,9 @@ export default function ResultsPage() {
   return (
     <div className="p-10 h-full overflow-y-auto custom-scrollbar flex flex-col items-center">
       <div className="w-full max-w-3xl">
-        <Link href="/student" className="inline-flex items-center text-gray-400 hover:text-white mb-8 transition-colors">
+        <Link href={`/teacher/exams/${examId}/results`} className="inline-flex items-center text-gray-400 hover:text-white mb-8 transition-colors">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
+          Back to All Results
         </Link>
 
         <Card className="bg-[#111520] border-white/5 shadow-2xl overflow-hidden relative">

@@ -100,18 +100,14 @@ export default function WaitingRoomPage() {
     const [seconds, setSeconds] = useState(initialSeconds);
 
     useEffect(() => {
-      if (seconds <= 0) return;
-      const timer = setInterval(() => {
-        setSeconds(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            onReady();
-            return 0;
-          }
-          return prev - 1;
-        });
+      if (seconds <= 0) {
+        onReady();
+        return;
+      }
+      const timer = setTimeout(() => {
+        setSeconds(seconds - 1);
       }, 1000);
-      return () => clearInterval(timer);
+      return () => clearTimeout(timer);
     }, [seconds, onReady]);
 
     return <>{formatTime(seconds)}</>;

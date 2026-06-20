@@ -124,6 +124,7 @@ export default function ExamResultsPage() {
                     <th className="px-6 py-4">Status</th>
                     <th className="px-6 py-4">Score</th>
                     <th className="px-6 py-4">Submitted At</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -133,8 +134,9 @@ export default function ExamResultsPage() {
                       <td className="px-6 py-4 text-gray-400">{row.user.email}</td>
                       <td className="px-6 py-4">
                         {row.submission.status === "submitted" && <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs font-bold uppercase tracking-wider border border-green-500/20">Submitted</span>}
+                        {row.submission.status === "evaluating" && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs font-bold uppercase tracking-wider border border-blue-500/20">Evaluating</span>}
                         {row.submission.status === "timeout" && <span className="px-2 py-1 bg-yellow-500/10 text-yellow-400 rounded text-xs font-bold uppercase tracking-wider border border-yellow-500/20">Timeout</span>}
-                        {row.submission.status === "inprogress" && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs font-bold uppercase tracking-wider border border-blue-500/20">In Progress</span>}
+                        {row.submission.status === "inprogress" && <span className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded text-xs font-bold uppercase tracking-wider border border-purple-500/20">In Progress</span>}
                       </td>
                       <td className="px-6 py-4 font-bold text-white">
                         {row.submission.score !== null ? row.submission.score : "-"}
@@ -143,6 +145,16 @@ export default function ExamResultsPage() {
                         {row.submission.submittedAt 
                           ? new Date(row.submission.submittedAt).toLocaleString() 
                           : "Not yet"}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          onClick={() => router.push(`/teacher/exams/${examId}/results/${row.submission.id}`)}
+                        >
+                          View Details
+                        </Button>
                       </td>
                     </tr>
                   ))}

@@ -8,7 +8,7 @@ export const joinExam = async (req: Request, res: Response) => {
 };
 
 export const submitExam = async (req: Request, res: Response) => {
-    const result = await submissionsService.submitExam(req.params.id as string, req.user!.id, req.body.mode as string);
+    const result = await submissionsService.submitExam(req.params.id as string, req.user!.id, req.body?.mode as string);
     return ApiResponse.ok(res, "Exam submitted successfully", result);
 };
 

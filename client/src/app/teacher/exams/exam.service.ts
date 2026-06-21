@@ -109,3 +109,8 @@ export const getExamSubmissionsService = async (examId: string) => {
   const res = await api.get(`/submissions/exam/${examId}`);
   return res.data;
 };
+
+export const getExamLeaderboardService = async (examId: string) => {
+  const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
+  return res.data;
+};

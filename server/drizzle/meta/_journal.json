@@ -57,6 +57,13 @@
       "when": 1781947601267,
       "tag": "0007_fair_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782021530088,
+      "tag": "0008_wild_slipstream",
+      "breakpoints": true
     }
   ]
 }

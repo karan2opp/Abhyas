@@ -19,7 +19,8 @@ export const getQuestionById = async (req: Request, res: Response) => {
 };
 
 export const updateQuestion = async (req: Request, res: Response) => {
-    const question = await questionsService.updateQuestion(req.params.id as string, req.body, req.user!.id);
+    const files = req.files as Express.Multer.File[] | undefined;
+    const question = await questionsService.updateQuestion(req.params.id as string, req.body, req.user!.id, files);
     return ApiResponse.ok(res, "Question updated successfully", question);
 };
 

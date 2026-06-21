@@ -17,6 +17,7 @@ type FlattenedQuestion = {
   marks: number;
   type: string;
   options: any[];
+  images: any[];
 };
 
 export default function ExamAttemptPage() {
@@ -39,7 +40,6 @@ export default function ExamAttemptPage() {
   
   // Navigation State
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!submissionId) return;
@@ -115,6 +115,7 @@ export default function ExamAttemptPage() {
             marks: q.marks,
             type: q.type,
             options: q.options || [],
+            images: q.images || [],
           });
           globalIndex++;
         });
@@ -144,17 +145,6 @@ export default function ExamAttemptPage() {
     }));
   };
 
-  const toggleFlag = (questionId: string) => {
-    setFlaggedQuestions(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(questionId)) {
-        newSet.delete(questionId);
-      } else {
-        newSet.add(questionId);
-      }
-      return newSet;
-    });
-  };
 
   // Button Handlers
   const handlePrevious = () => {
@@ -167,7 +157,7 @@ export default function ExamAttemptPage() {
     }
   };
 
-  const handleSaveAndNext = async () => {
+  const handleSaveAction = async (moveToNext: boolean) => {
     const currentQ = flattenedQuestions[currentIndex];
     const selectedOptions = answers[currentQ.id];
     const textAns = textAnswers[currentQ.id];
@@ -198,10 +188,14 @@ export default function ExamAttemptPage() {
         setSavedTextAnswers(prev => ({ ...prev, [currentQ.id]: textAns }));
       }
       
-      if (currentIndex < flattenedQuestions.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+      if (moveToNext) {
+        if (currentIndex < flattenedQuestions.length - 1) {
+          setCurrentIndex(currentIndex + 1);
+        } else {
+          toast.success("All questions answered! You can now submit the exam.");
+        }
       } else {
-        toast.success("All questions answered! You can now submit the exam.");
+        toast.success("Answer saved successfully.");
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save answer");
@@ -343,9 +337,16 @@ export default function ExamAttemptPage() {
 
           {/* Question Content */}
           <div className="flex-1 px-8 py-8 space-y-8 max-w-4xl">
-            <h1 className="text-2xl font-bold text-white leading-snug whitespace-pre-wrap">
-              {currentQuestion.description}
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-white leading-snug whitespace-pre-wrap">
+                {currentQuestion.description}
+              </h1>
+              {currentQuestion.images && currentQuestion.images.length > 0 && (
+                <div className="mt-6 mb-2">
+                  <img src={currentQuestion.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-black/50" />
+                </div>
+              )}
+            </div>
 
             {currentQuestion.type !== "mcq" ? (
               <div className="space-y-4">
@@ -353,7 +354,7 @@ export default function ExamAttemptPage() {
                   value={textAnswer}
                   onChange={(e) => handleTextAnswerChange(currentQuestion.id, e.target.value)}
                   placeholder="Type your descriptive answer here..."
-                  className="w-full h-64 bg-[#111520] text-white border border-white/10 rounded-xl p-6 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                  className="w-full min-h-[400px] bg-[#111520] text-white border border-white/10 rounded-xl p-6 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
                 />
               </div>
             ) : (
@@ -398,16 +399,7 @@ export default function ExamAttemptPage() {
           </div>
 
           {/* Question Footer Actions */}
-          <div className="shrink-0 p-6 px-8 border-t border-white/5 bg-[#111520]/50 flex items-center justify-between">
-            <Button 
-              variant="outline"
-              onClick={() => toggleFlag(currentQuestion.id)}
-              className={`bg-transparent border-white/10 transition-colors ${flaggedQuestions.has(currentQuestion.id) ? 'text-orange-400 border-orange-500/50 hover:bg-orange-500/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
-            >
-              <Flag className={`mr-2 h-4 w-4 ${flaggedQuestions.has(currentQuestion.id) ? 'fill-orange-400' : ''}`} /> 
-              {flaggedQuestions.has(currentQuestion.id) ? 'Flagged' : 'Flag for Review'}
-            </Button>
-
+          <div className="shrink-0 p-6 px-8 border-t border-white/5 bg-[#111520]/50 flex items-center justify-end">
             <div className="flex gap-4">
               <Button 
                 variant="outline" 
@@ -428,18 +420,27 @@ export default function ExamAttemptPage() {
               </Button>
 
               <Button 
-                onClick={handleSaveAndNext}
+                variant="outline"
+                onClick={() => handleSaveAction(false)}
                 disabled={isSavingAnswer || (currentQuestion.type === "mcq" ? selectedOptions.length === 0 : (!textAnswer || textAnswer.trim() === ""))}
+                className="bg-emerald-600/10 border-emerald-500/50 hover:bg-emerald-600 hover:text-white text-emerald-400 font-semibold min-w-[100px]"
+              >
+                {isSavingAnswer ? "Saving..." : "Save"}
+              </Button>
+
+              <Button 
+                onClick={() => handleSaveAction(true)}
+                disabled={isSavingAnswer || currentIndex === flattenedQuestions.length - 1 || (currentQuestion.type === "mcq" ? selectedOptions.length === 0 : (!textAnswer || textAnswer.trim() === ""))}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold min-w-[140px]"
               >
-                {isSavingAnswer ? "Saving..." : "Save & Next"}
+                Save & Next
               </Button>
             </div>
           </div>
         </div>
 
         {/* Right Pane: Navigator */}
-        <aside className="w-80 border-l border-white/5 bg-[#111520] shrink-0 flex flex-col">
+        <aside className="w-56 md:w-64 lg:w-80 border-l border-white/5 bg-[#111520] shrink-0 flex flex-col">
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <h3 className="text-lg font-bold text-white">Navigator</h3>
             {/* Compute answered count based on local state */}
@@ -484,8 +485,6 @@ export default function ExamAttemptPage() {
                 const isAnswered = q.type === "mcq" 
                   ? (savedAnswers[q.id] && savedAnswers[q.id].length > 0)
                   : (savedTextAnswers[q.id] && savedTextAnswers[q.id].trim() !== "");
-                const isFlagged = flaggedQuestions.has(q.id);
-
                 let bgColor = "bg-transparent";
                 let borderColor = "border-white/10";
                 let textColor = "text-gray-400";
@@ -495,11 +494,7 @@ export default function ExamAttemptPage() {
                   textColor = "text-white";
                 }
                 
-                if (isFlagged) {
-                  bgColor = "bg-orange-500/20";
-                  borderColor = isCurrent ? "border-orange-400 ring-2 ring-orange-500 ring-offset-2 ring-offset-[#111520]" : "border-orange-500/50";
-                  textColor = "text-orange-100";
-                } else if (isAnswered) {
+                if (isAnswered) {
                   bgColor = "bg-emerald-600";
                   borderColor = isCurrent ? "border-emerald-400 ring-2 ring-emerald-500 ring-offset-2 ring-offset-[#111520]" : "border-emerald-500";
                   textColor = "text-white";
@@ -531,9 +526,7 @@ export default function ExamAttemptPage() {
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <div className="w-3 h-3 border border-white/20 rounded-sm"></div> Unanswered
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <div className="w-3 h-3 bg-orange-500/20 border border-orange-500/50 rounded-sm"></div> Flagged
-              </div>
+
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <div className="w-3 h-3 border border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0b0f19] rounded-sm"></div> Current
               </div>

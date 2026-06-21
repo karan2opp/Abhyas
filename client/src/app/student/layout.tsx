@@ -1,23 +1,36 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, LayoutDashboard, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X } from "lucide-react";
+import { GraduationCap, LayoutDashboard, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/student", icon: LayoutDashboard },
+  { name: "Profile", href: "/student/profile", icon: User },
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore(state => state.logout);
+  const user = useAuthStore(state => state.user);
+  const isInitialized = useAuthStore(state => state.isInitialized);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInitialized) {
+      if (!user) {
+        router.push("/auth/login");
+      } else if (user.role !== "student") {
+        router.replace(`/${user.role}`);
+      }
+    }
+  }, [user, isInitialized, router]);
 
   const isExamMode = pathname.includes('/exams/') || pathname.includes('/waiting/');
 

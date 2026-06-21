@@ -1,23 +1,36 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ShieldCheck, LayoutDashboard, LogOut, Users, ChevronsLeft, ChevronsRight, Menu, X } from "lucide-react";
+import { GraduationCap, Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldCheck, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sidebarLinks = [
-  { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { name: "Manage Teachers", href: "/admin", icon: Users },
+  { name: "Profile", href: "/admin/profile", icon: User },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore(state => state.logout);
+  const user = useAuthStore(state => state.user);
+  const isInitialized = useAuthStore(state => state.isInitialized);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInitialized) {
+      if (!user) {
+        router.push("/auth/login");
+      } else if (user.role !== "admin") {
+        router.replace(`/${user.role}`);
+      }
+    }
+  }, [user, isInitialized, router]);
 
   return (
     <TooltipProvider>
@@ -52,7 +65,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}>
           
-          {/* Close button for mobile inside sidebar */}
           <button 
             className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white z-10"
             onClick={() => setIsMobileOpen(false)}
@@ -75,8 +87,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden whitespace-nowrap">
-                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">Abiyaas</h1>
-                <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Admin Portal</p>
+                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">Admin Portal</h1>
+                <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Abiyaas</p>
               </div>
             )}
           </div>
@@ -84,7 +96,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1">
             {sidebarLinks.map((link) => {
-              const isActive = pathname === link.href || (pathname.startsWith(link.href + "/") && link.href !== "/admin");
+              const isActive = pathname === link.href || pathname.startsWith(link.href + "/") && link.href !== "/admin";
               const Icon = link.icon;
               
               return (

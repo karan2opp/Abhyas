@@ -341,6 +341,11 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
               </span>
             </div>
             <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">{question.description}</p>
+            {question.images && question.images.length > 0 && (
+              <div className="mt-4 mb-2">
+                <img src={question.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-black/50" />
+              </div>
+            )}
 
             {/* Display Read-Only Options */}
             {question.type === 'mcq' && question.options && question.options.length > 0 && (
@@ -391,6 +396,8 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
   );
   
   const [isSaving, setIsSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(config.question?.images?.[0]?.url || null);
 
   // Sync state if config changes (e.g. Save & Another clicked)
   useEffect(() => {
@@ -407,7 +414,21 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
             { value: "", isCorrect: false }
           ]
     );
+    setImageFile(null);
+    setImagePreview(config.question?.images?.[0]?.url || null);
   }, [config]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+      setImagePreview(URL.createObjectURL(e.target.files[0]));
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   const handleSave = async (addAnother: boolean = false) => {
     if (description.trim().length < 10) {
@@ -432,21 +453,23 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
 
     setIsSaving(true);
     try {
+      const formData = new FormData();
+      if (!isEditMode) formData.append("sectionId", config.sectionId!);
+      if (!isEditMode) formData.append("type", type);
+      formData.append("description", description);
+      formData.append("marks", marks);
+      if (type === "mcq" && payloadOptions) {
+        formData.append("options", JSON.stringify(payloadOptions));
+      }
+      if (imageFile) {
+        formData.append("images", imageFile);
+      }
+
       if (isEditMode) {
-        await updateQuestionService(questionId, {
-          description,
-          marks: Number(marks),
-          ...(type === 'mcq' && { options: payloadOptions })
-        });
+        await updateQuestionService(questionId, formData);
         toast.success("Question updated successfully");
       } else {
-        await createQuestionService({
-          sectionId: config.sectionId!,
-          type,
-          description,
-          marks: Number(marks),
-          ...(type === 'mcq' && { options: payloadOptions })
-        });
+        await createQuestionService(formData);
         toast.success("Question created successfully");
       }
       
@@ -514,6 +537,37 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
             className="bg-[#0b0f19] border-white/10 text-white min-h-[140px]"
           />
           <p className="text-xs text-gray-500 text-right">{description.length} chars (min 10)</p>
+        </div>
+
+        {/* Image Upload Area */}
+        <div className="space-y-2">
+          <label className="text-sm font-semibold text-gray-300">Question Image (Optional)</label>
+          {imagePreview ? (
+            <div className="relative inline-block border border-white/10 rounded-lg overflow-hidden bg-black/50">
+              <img src={imagePreview} alt="Question preview" className="max-h-48 object-contain" />
+              <Button 
+                type="button"
+                size="icon" 
+                variant="destructive" 
+                onClick={removeImage} 
+                className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-80 hover:opacity-100"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center w-full">
+              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-white/10 border-dashed rounded-lg cursor-pointer bg-[#0b0f19] hover:bg-white/5 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <svg className="w-6 h-6 mb-2 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                  </svg>
+                  <p className="mb-2 text-xs text-gray-400"><span className="font-semibold">Click to upload image</span></p>
+                </div>
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+              </label>
+            </div>
+          )}
         </div>
 
         {type === "mcq" && (

@@ -1,7 +1,7 @@
 import { pgTable, text, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 
-export const roleEnum = pgEnum("role", ["student", "teacher", "admin"]);
+export const roleEnum = pgEnum("role", ["student", "teacher", "admin", "superadmin"]);
 
 export const users = pgTable("users", {
     id: text("id").primaryKey().$defaultFn(() => createId()),
@@ -16,6 +16,7 @@ export const users = pgTable("users", {
     avatarPublicId: text("avatar_public_id"),
 
     verificationToken: text("verification_token"),
+    verificationExpires: timestamp("verification_expires"),
     refreshToken: text("refresh_token"),
     resetPasswordToken: text("reset_password_token"),
     resetPasswordExpires: timestamp("reset_password_expires"),

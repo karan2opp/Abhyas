@@ -18,12 +18,20 @@ export const createQuestionSchema = z.object({
   })).optional(),
   description: z.string({ message: "Description is required" })
     .min(10, { message: "Description must be at least 10 characters long" }),
-  marks: z.number({ message: "Marks are required" })
+  marks: z.coerce.number({ message: "Marks are required" })
     .min(0.5, { message: "Marks must be at least 0.5" }),
-  options: z.array(optionSchema)
-    .min(2, { message: "MCQ must have at least 2 options" })
-    .max(5, { message: "MCQ cannot have more than 5 options" })
-    .optional(),
+  options: z.preprocess(
+    (val) => {
+      if (typeof val === "string") {
+        try { return JSON.parse(val); } catch (e) { return val; }
+      }
+      return val;
+    },
+    z.array(optionSchema)
+      .min(2, { message: "MCQ must have at least 2 options" })
+      .max(5, { message: "MCQ cannot have more than 5 options" })
+      .optional()
+  ),
 })
   .refine((data) => {
     if (data.type === "mcq" && (!data.options || data.options.length === 0)) return false
@@ -46,17 +54,25 @@ export const updateQuestionSchema = z.object({
   description: z.string()
     .min(10, { message: "Description must be at least 10 characters long" })
     .optional(),
-  marks: z.number()
+  marks: z.coerce.number()
     .min(0.5, { message: "Marks must be at least 0.5" })
     .optional(),
   images: z.array(z.object({
     url: z.string().url(),
     publicId: z.string()
   })).optional(),
-  options: z.array(optionSchema.extend({ id: z.string().optional() }))
-    .min(2, { message: "MCQ must have at least 2 options" })
-    .max(5, { message: "MCQ cannot have more than 5 options" })
-    .optional(),
+  options: z.preprocess(
+    (val) => {
+      if (typeof val === "string") {
+        try { return JSON.parse(val); } catch (e) { return val; }
+      }
+      return val;
+    },
+    z.array(optionSchema.extend({ id: z.string().optional() }))
+      .min(2, { message: "MCQ must have at least 2 options" })
+      .max(5, { message: "MCQ cannot have more than 5 options" })
+      .optional()
+  ),
 })
 
 export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>

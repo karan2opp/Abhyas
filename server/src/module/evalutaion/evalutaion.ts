@@ -9,6 +9,7 @@ export interface TextAnswer {
     modelAnswer: string;
     studentAnswer: string;
     maxMarks: number;
+    questionImages?: { url: string; publicId: string }[] | null;
 }
 
 export type EvaluationMode = "detailed" | "simple";
@@ -16,20 +17,34 @@ export type EvaluationMode = "detailed" | "simple";
 const BATCH_SIZE = 10;
 
 const buildEvaluationPrompt = (answers: TextAnswer[], mode: EvaluationMode) => {
-    let prompt = `Evaluate the following student answers.\n\n`
+    const contentParts: any[] = [];
+    let textPrompt = `Evaluate the following student answers.\n\n`;
 
     answers.forEach((a, i) => {
-        prompt += `Question ${i + 1}: ${a.question}\n`
-        prompt += `Model/Expected Answer: ${a.modelAnswer}\n`
-        prompt += `Student Answer: ${a.studentAnswer}\n`
-        prompt += `Max Marks: ${a.maxMarks}\n\n`
-    })
+        textPrompt += `Question ${i + 1}: ${a.question}\n`;
+        textPrompt += `Model/Expected Answer: ${a.modelAnswer}\n`;
+        textPrompt += `Student Answer: ${a.studentAnswer}\n`;
+        textPrompt += `Max Marks: ${a.maxMarks}\n\n`;
+        
+        if (a.questionImages && a.questionImages.length > 0) {
+            contentParts.push({ type: "text", text: textPrompt });
+            textPrompt = `Image for Question ${i + 1} provided above.\n\n`;
+            a.questionImages.forEach(img => {
+                contentParts.push({
+                    type: "image_url",
+                    image_url: { url: img.url }
+                });
+            });
+        }
+    });
 
-    prompt += mode === "detailed"
+    textPrompt += mode === "detailed"
         ? `For each question, provide: score out of max marks, and a brief feedback explaining the score.`
-        : `For each question, provide: score out of max marks only.`
+        : `For each question, provide: score out of max marks only.`;
+        
+    contentParts.push({ type: "text", text: textPrompt });
 
-    return prompt
+    return contentParts;
 }
 const SYSTEM_PROMPT = `You are an expert exam evaluator for a computer training institute.
 

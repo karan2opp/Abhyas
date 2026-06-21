@@ -86,9 +86,9 @@ export const forgotPasswordService = async (email: string) => {
   }
 };
 
-export const resetPasswordService = async (token: string, password: string) => {
+export const resetPasswordService = async (email: string, otp: string, password: string) => {
   try {
-    await api.put(`/auth/resetPassword/${token}`, { password });
+    await api.put(`/auth/resetPassword`, { email, otp, password });
     return { success: true };
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Failed to reset password");
@@ -111,5 +111,27 @@ export const registerService = async (userData: any) => {
     return res.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.message || "Failed to register");
+  }
+};
+
+export const verifyOtpService = async (data: { email: string; otp: string }) => {
+  try {
+    const res = await api.post("/auth/verify-otp", data);
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to verify OTP");
+  }
+};
+
+export const updateProfileService = async (formData: FormData) => {
+  try {
+    const res = await api.put("/auth/me", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to update profile");
   }
 };

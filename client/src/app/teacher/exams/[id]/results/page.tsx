@@ -1,8 +1,8 @@
-"use client";
+"use client"; 
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Users, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { ChevronLeft, Users, CheckCircle, Clock, AlertCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExamByIdService, getExamSubmissionsService } from "../../exam.service";
@@ -62,6 +62,13 @@ export default function ExamResultsPage() {
               onClick={() => router.push(`/teacher/exams/${examId}`)}
             >
               <ChevronLeft className="mr-1 h-4 w-4" /> Back to Exam
+            </Button>
+            <Button 
+              size="sm" 
+              className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold"
+              onClick={() => router.push(`/teacher/exams/${examId}/leaderboard`)}
+            >
+              <Trophy className="mr-2 h-4 w-4" /> View Leaderboard
             </Button>
           </div>
           <h2 className="text-3xl font-bold text-white tracking-tight">{exam?.title || "Exam"} Results</h2>

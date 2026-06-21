@@ -1,7 +1,17 @@
 import api from "@/utils/axios";
 
-export const assignRoleService = async (data: { email: string; role: string }) => {
-  const res = await api.post("/admin/assign-role", data);
+export const getTeachersService = async () => {
+  const res = await api.get("/admin/teachers");
+  return res.data;
+};
+
+export const assignTeacherService = async (email: string) => {
+  const res = await api.post("/admin/assign-teacher", { email });
+  return res.data;
+};
+
+export const revokeTeacherService = async (email: string) => {
+  const res = await api.post("/admin/revoke-teacher", { email });
   return res.data;
 };
 

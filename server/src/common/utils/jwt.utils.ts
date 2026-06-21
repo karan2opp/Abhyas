@@ -34,3 +34,13 @@ export const generateRefreshToken = (payload: string | object | Buffer) => {
 export const verifyRefreshToken = (token: string) => {
   return jwt.verify(token, process.env.JWT_REFRESH_SECRET as string);
 };
+
+export const generateOTP = () => {
+  const rawToken = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(rawToken)
+    .digest("hex");
+
+  return { rawToken, hashedToken };
+};

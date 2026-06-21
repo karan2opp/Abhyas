@@ -44,3 +44,8 @@ export const verifyJoinCode = async (req: Request, res: Response) => {
     const exam = await submissionsService.verifyJoinCode(req.params.joinCode as string, req.user!.id);
     return ApiResponse.ok(res, "Join code verified successfully", exam);
 };
+
+export const getExamLeaderboard = async (req: Request, res: Response) => {
+    const leaderboard = await submissionsService.getExamLeaderboard(req.params.examId as string, req.user!.id, req.user!.role);
+    return ApiResponse.ok(res, "Leaderboard fetched successfully", leaderboard);
+};

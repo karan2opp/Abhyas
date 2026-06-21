@@ -5,7 +5,7 @@ interface User {
   _id: string;
   name: string;
   email: string;
-  role: 'student' | 'teacher' | 'admin';
+  role: 'student' | 'teacher' | 'admin' | 'superadmin';
 }
 
 interface AuthState {
@@ -13,6 +13,7 @@ interface AuthState {
   accessToken: string | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   loading: boolean;
   error: string | null;
   isInitialized: boolean;
@@ -32,6 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,       // 🔐 Memory-only (no persist)
   isLoggedIn: false,
   isAdmin: false,          // Will be computed on setUser/getMe
+  isSuperAdmin: false,
   loading: false,
   error: null,
   isInitialized: false,
@@ -43,11 +45,13 @@ export const useAuthStore = create<AuthState>((set) => ({
    */
   setUser: (userData, token) => {
     const isAdmin = userData?.role === "admin";
+    const isSuperAdmin = userData?.role === "superadmin";
     set({
       user: userData,
       accessToken: token,
       isLoggedIn: true,
       isAdmin,
+      isSuperAdmin,
       isInitialized: false,
       loading: false,
       error: null,

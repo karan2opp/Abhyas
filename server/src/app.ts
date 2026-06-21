@@ -9,6 +9,7 @@ import optionsRouter from "./module/options/option.route.js";
 import submissionsRouter from "./module/submissions/submission.route.js";
 import answersRouter from "./module/answers/answer.route.js";
 import adminRouter from "./module/admin/admin.route.js";
+import superadminRouter from "./module/superadmin/superadmin.route.js";
 import errorHandler from "./common/middleware/error.middleware.js";
 import 'dotenv/config'
 const app = express();
@@ -30,6 +31,7 @@ app.use("/api/options", optionsRouter)
 app.use("/api/submissions", submissionsRouter)
 app.use("/api/answers", answersRouter)
 app.use("/api/admin", adminRouter)
+app.use("/api/superadmin", superadminRouter)
 app.use(errorHandler)
 
 export default app;

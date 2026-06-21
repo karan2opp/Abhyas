@@ -34,3 +34,8 @@ export const getSubmissionByIdService = async (id: string) => {
   const res = await api.get(`/submissions/${id}`);
   return res.data;
 };
+
+export const getExamLeaderboardService = async (examId: string) => {
+  const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
+  return res.data;
+};

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, LayoutDashboard, FileText, Database, BarChart, Settings, HelpCircle, LogOut, ChevronsLeft, ChevronsRight, Menu, X } from "lucide-react";
+import { GraduationCap, LayoutDashboard, FileText, Database, BarChart, Settings, HelpCircle, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,14 +12,27 @@ const sidebarLinks = [
   { name: "Overview", href: "/teacher", icon: LayoutDashboard },
   { name: "Exams", href: "/teacher/exams", icon: FileText },
   { name: "Results", href: "/teacher/results", icon: BarChart },
+  { name: "Profile", href: "/teacher/profile", icon: User },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore(state => state.logout);
+  const user = useAuthStore(state => state.user);
+  const isInitialized = useAuthStore(state => state.isInitialized);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  useEffect(() => {
+    if (isInitialized) {
+      if (!user) {
+        router.push("/auth/login");
+      } else if (user.role !== "teacher") {
+        router.replace(`/${user.role}`);
+      }
+    }
+  }, [user, isInitialized, router]);
 
   return (
     <TooltipProvider>
@@ -28,10 +41,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-purple-600 p-1.5 rounded-md shadow-lg shadow-purple-900/50">
-              <GraduationCap className="h-5 w-5 text-white" />
+            <div className="bg-indigo-600 p-1.5 rounded-md shadow-lg shadow-indigo-900/50">
+              <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg text-white tracking-tight">Abiyaas Pro</span>
+            <span className="font-bold text-lg text-white tracking-tight">Abiyaas</span>
           </div>
           <button onClick={() => setIsMobileOpen(true)} className="p-2 -mr-2 text-gray-400 hover:text-white">
             <Menu className="h-6 w-6" />
@@ -72,13 +85,13 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
           {/* Logo */}
           <div className={cn("p-6 flex items-center gap-3", isCollapsed ? "justify-center p-4" : "")}>
-            <div className="bg-purple-600 p-2 rounded-lg shadow-lg shadow-purple-900/50 shrink-0">
-              <GraduationCap className="h-6 w-6 text-white" />
+            <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-900/50 shrink-0">
+              <BookOpen className="h-6 w-6 text-white" />
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden whitespace-nowrap">
-                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">Abiyaas Pro</h1>
-                <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Institutional Portal</p>
+                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">Abiyaas</h1>
+                <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Teacher Portal</p>
               </div>
             )}
           </div>

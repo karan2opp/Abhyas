@@ -114,8 +114,18 @@ const getQuestionById = async (questionId: string, teacherId: string) => {
 };
 
 // ── Update Question (with smart options merge) ─────────────────────────────────
-const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teacherId: string) => {
+const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teacherId: string, imageFiles?: Express.Multer.File[]) => {
     await verifyQuestionOwnership(questionId, teacherId);
+
+    const uploadedImages: { url: string; publicId: string }[] = [];
+
+    if (imageFiles && imageFiles.length > 0) {
+        const uploadPromises = imageFiles.map((file) =>
+            uploadToCloudinary(file.buffer, "questions")
+        );
+        const results = await Promise.all(uploadPromises);
+        uploadedImages.push(...results.map((r) => ({ url: r.url, publicId: r.publicId })));
+    }
 
     const result = await db.transaction(async (tx) => {
         // update question fields
@@ -123,6 +133,7 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teach
             .set({
                 ...(data.description && { description: data.description }),
                 ...(data.marks && { marks: data.marks }),
+                ...(uploadedImages.length > 0 && { images: uploadedImages }),
                 updatedAt: new Date(),
             })
             .where(eq(questions.id, questionId))

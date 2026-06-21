@@ -37,13 +37,36 @@ export const forgotPasswordSchema = z.object({
 })
 
 export const resetPasswordSchema = z.object({
+    email: z.string({ message: "Email is required" })
+        .email("Invalid email address")
+        .toLowerCase(),
+    otp: z.string({ message: "OTP is required" })
+        .length(6, "OTP must be exactly 6 digits")
+        .regex(/^\d+$/, "OTP must contain only numbers"),
     password: z.string({ message: "Password is required" })
         .min(8, "Password must be at least 8 characters")
         .regex(/(?=.*[A-Z])/, "Password must contain at least one uppercase letter")
         .regex(/(?=.*\d)/, "Password must contain at least one number"),
 })
 
+export const updateProfileSchema = z.object({
+    phone: z.string()
+        .length(10, "Phone must be 10 digits")
+        .regex(/^[0-9]+$/, "Phone must contain only numbers")
+        .optional(),
+})
+
+export const verifyOtpSchema = z.object({
+    email: z.string({ message: "Email is required" })
+        .email("Invalid email address")
+        .toLowerCase(),
+    otp: z.string({ message: "OTP is required" })
+        .length(6, "OTP must be exactly 6 digits")
+        .regex(/^\d+$/, "OTP must contain only numbers"),
+})
+
 export type RegisterDto = z.infer<typeof registerSchema>
 export type LoginDto = z.infer<typeof loginSchema>
+export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>

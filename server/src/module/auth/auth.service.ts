@@ -8,10 +8,11 @@ import {
     generateAccessToken,
     generateRefreshToken,
     generateResetToken,
+    generateOTP,
     verifyRefreshToken,
     hashToken,
 } from "../../common/utils/jwt.utils.js";
-import type { RegisterDto, LoginDto } from "./auth.dto.js";
+import type { RegisterDto, LoginDto, VerifyOtpDto } from "./auth.dto.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 const register = async (data: RegisterDto) => {
@@ -19,12 +20,13 @@ const register = async (data: RegisterDto) => {
     if (existing) throw ApiError.conflict("User already exists");
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
-    const { rawToken, hashedToken } = generateResetToken();
+    const { rawToken, hashedToken } = generateOTP();
 
     const [newUser] = await db.insert(users).values({
         ...data,
         password: hashedPassword,
         verificationToken: hashedToken,
+        verificationExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
         isVerified: false,
     }).returning();
 
@@ -68,23 +70,23 @@ const logout = async (userId: string) => {
         .where(eq(users.id, userId));
 };
 
-// ── Verify email ──────────────────────────────────────────────────────────────
-const verifyEmail = async (token: string) => {
-    const trimmed = String(token).trim();
-    if (!trimmed) throw ApiError.badRequest("Invalid or expired verification token");
+// ── Verify OTP ──────────────────────────────────────────────────────────────
+const verifyOtp = async (data: VerifyOtpDto) => {
+    const hashedInput = hashToken(data.otp);
+    
+    const [user] = await db.select().from(users).where(
+        and(
+            eq(users.email, data.email),
+            eq(users.verificationToken, hashedInput),
+            isNotNull(users.verificationExpires),
+            gt(users.verificationExpires!, new Date()),
+        )
+    );
 
-    const hashedInput = hashToken(trimmed);
-    let [user] = await db.select().from(users).where(eq(users.verificationToken, hashedInput));
-
-    // fallback: direct match for dev/Postman convenience
-    if (!user) {
-        [user] = await db.select().from(users).where(eq(users.verificationToken, trimmed));
-    }
-
-    if (!user) throw ApiError.badRequest("Invalid or expired verification token");
+    if (!user) throw ApiError.badRequest("Invalid or expired verification code");
 
     const [updatedUser] = await db.update(users)
-        .set({ isVerified: true, verificationToken: null })
+        .set({ isVerified: true, verificationToken: null, verificationExpires: null })
         .where(eq(users.id, user.id))
         .returning();
 
@@ -96,7 +98,7 @@ const forgotPassword = async (email: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     if (!user) throw ApiError.notFound("No account with that email");
 
-    const { rawToken, hashedToken } = generateResetToken();
+    const { rawToken, hashedToken } = generateOTP();
 
     await db.update(users)
         .set({
@@ -113,18 +115,19 @@ const forgotPassword = async (email: string) => {
 };
 
 // ── Reset password ────────────────────────────────────────────────────────────
-const resetPassword = async (token: string, newPassword: string) => {
-    const hashedToken = hashToken(token);
+const resetPassword = async (email: string, otp: string, newPassword: string) => {
+    const hashedToken = hashToken(otp);
 
     const [user] = await db.select().from(users).where(
         and(
+            eq(users.email, email),
             eq(users.resetPasswordToken, hashedToken),
             isNotNull(users.resetPasswordExpires),
             gt(users.resetPasswordExpires!, new Date()),
         ),
     );
 
-    if (!user) throw ApiError.badRequest("Invalid or expired reset token");
+    if (!user) throw ApiError.badRequest("Invalid or expired reset code");
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
@@ -163,4 +166,34 @@ const getMe = async (userId: string) => {
     return safeUser;
 };
 
-export { register, login, logout, verifyEmail, forgotPassword, resetPassword, refresh, getMe };
+// ── Update Profile ────────────────────────────────────────────────────────────
+const updateProfile = async (userId: string, data: { phone?: string }, file?: Express.Multer.File) => {
+    const updateData: Partial<typeof users.$inferInsert> = {};
+
+    if (data.phone !== undefined) {
+        updateData.phone = data.phone;
+    }
+
+    if (file) {
+        const { uploadToCloudinary } = await import("../../common/config/cloudinary.js");
+        const uploadResult = await uploadToCloudinary(file.buffer, "abiyaas/avatars");
+        updateData.avatarUrl = uploadResult.url;
+        updateData.avatarPublicId = uploadResult.publicId;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+        return getMe(userId);
+    }
+
+    const [updatedUser] = await db.update(users)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+
+    if (!updatedUser) throw ApiError.notFound("User not found during update");
+
+    const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = updatedUser;
+    return safeUser;
+};
+
+export { register, login, logout, verifyOtp, forgotPassword, resetPassword, refresh, getMe, updateProfile };

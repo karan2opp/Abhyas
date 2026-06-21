@@ -10,13 +10,16 @@ const router = Router();
 // student routes
 router.post("/join", authenticate, authorize("student"), validate(joinExamSchema), controller.joinExam);
 router.get("/me", authenticate, authorize("student"), controller.getMySubmissions);
-router.get("/:id/exam", authenticate, authorize("student"), controller.getExamForSubmission);
+router.get("/:id/exam", authenticate, authorize("student", "teacher"), controller.getExamForSubmission);
 router.patch("/:id/submit", authenticate, authorize("student"), controller.submitExam);
-router.get("/:id", authenticate, authorize("student"), controller.getSubmissionById);
+router.get("/:id", authenticate, authorize("student", "teacher"), controller.getSubmissionById);
 router.delete("/:id", authenticate, authorize("student"), controller.deleteSubmission);
 router.get("/verify/:joinCode", authenticate, authorize("student"), controller.verifyJoinCode);
 
 // teacher routes
 router.get("/exam/:examId", authenticate, authorize("teacher"), controller.getSubmissionsByExam);
+
+// leaderboard route
+router.get("/exam/:examId/leaderboard", authenticate, authorize("teacher", "student"), controller.getExamLeaderboard);
 
 export default router;

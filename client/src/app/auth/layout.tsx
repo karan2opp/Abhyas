@@ -1,45 +1,67 @@
-import React from 'react';
+"use client";
+
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const user = useAuthStore(state => state.user);
+  const isInitialized = useAuthStore(state => state.isInitialized);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialized && user && pathname !== '/auth/forgot-password') {
+      router.replace(`/${user.role}`);
+    }
+  }, [isInitialized, user, router, pathname]);
+
+  // Don't render the auth layout if we're going to redirect or haven't mounted
+  if (!mounted || (isInitialized && user && pathname !== '/auth/forgot-password')) return null;
+
   return (
-    <div className="flex min-h-screen">
-      {/* Left side (branding) */}
-      <div className="hidden w-1/2 bg-background lg:flex flex-col justify-center px-12 xl:px-24 border-r border-border relative overflow-hidden">
-        {/* Subtle grid background pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        
-        <div className="relative z-10 max-w-md mx-auto">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center shadow-lg">
-              <div className="w-4 h-4 border-2 border-white rounded-sm" />
-            </div>
-            <span className="text-xl font-bold text-foreground">Platform</span>
-          </div>
-          
-          <h1 className="text-4xl xl:text-5xl font-extrabold text-foreground mb-6 leading-tight">
-            The gold standard in <span className="text-primary">academic integrity.</span>
-          </h1>
-          
-          <p className="text-muted-foreground text-lg mb-12 leading-relaxed">
-            Secure, sophisticated, and seamless assessment management designed for high-stakes environments.
-          </p>
-          
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex -space-x-2">
-              <div className="w-8 h-8 rounded-full bg-secondary border-2 border-background" />
-              <div className="w-8 h-8 rounded-full bg-tertiary border-2 border-background" />
-              <div className="w-8 h-8 rounded-full bg-primary border-2 border-background" />
-            </div>
-            <span className="font-medium">Trusted by 500+ Institutions worldwide</span>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-black relative overflow-hidden font-sans">
       
-      {/* Right side (form) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center bg-background p-8">
-        <div className="w-full max-w-md">
+      {/* Sleek Black Grid Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#333_1px,transparent_1px),linear-gradient(to_bottom,#333_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_20%,transparent_100%)] opacity-20 pointer-events-none"></div>
+
+      {/* Subtle Spotlight Effect */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-white/5 blur-[120px] rounded-full pointer-events-none"></div>
+
+      <div className="relative z-10 w-full max-w-md p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="bg-[#09090b] border border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/50"
+        >
+          {/* Logo / Header inside the card */}
+          <div className="flex flex-col items-center justify-center mb-8">
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-white/5 font-extrabold text-2xl text-black">
+              A
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Abiyaas</h1>
+            <p className="text-sm text-gray-400 mt-1">Institutional Assessment Platform</p>
+          </div>
+
           {children}
-        </div>
+
+        </motion.div>
+
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-center text-xs text-gray-600 mt-6"
+        >
+          &copy; {new Date().getFullYear()} Abiyaas. All rights reserved.
+        </motion.p>
       </div>
     </div>
   );

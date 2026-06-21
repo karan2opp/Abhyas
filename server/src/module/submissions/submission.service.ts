@@ -94,7 +94,8 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
                 question: question.description,
                 modelAnswer: question.modelAnswer || "",
                 studentAnswer: answer.textAnswer ?? "",
-                maxMarks: question.marks
+                maxMarks: question.marks,
+                questionImages: question.images as any
             });
         }
     }
@@ -370,4 +371,42 @@ const verifyJoinCode = async (joinCode: string, studentId: string) => {
     return exam;
 };
 
-export { joinExam, submitExam, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getExamForSubmission, verifyJoinCode };
+// ── Get Exam Leaderboard ─────────────────────────────────────────────────────────
+const getExamLeaderboard = async (examId: string, userId: string, role: string) => {
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
+    if (!exam) throw ApiError.notFound("Exam not found");
+
+    if (role === "student") {
+        const [sub] = await db.select().from(submissions).where(
+            and(eq(submissions.examId, examId), eq(submissions.userId, userId), isNull(submissions.deletedAt))
+        );
+        if (!sub) throw ApiError.forbidden("You must participate in the exam to view the leaderboard.");
+    } else if (role === "teacher") {
+        if (exam.createdBy !== userId) throw ApiError.forbidden("You do not have permission to view this leaderboard.");
+    }
+
+    const result = await db.select({
+        id: submissions.id,
+        score: submissions.score,
+        submittedAt: submissions.submittedAt,
+        user: {
+            id: users.id,
+            name: users.name,
+            email: users.email
+        }
+    })
+    .from(submissions)
+    .innerJoin(users, eq(submissions.userId, users.id))
+    .where(
+        and(
+            eq(submissions.examId, examId),
+            eq(submissions.status, "submitted"),
+            isNull(submissions.deletedAt)
+        )
+    )
+    .orderBy(desc(submissions.score), submissions.submittedAt);
+
+    return result;
+};
+
+export { joinExam, submitExam, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getExamForSubmission, verifyJoinCode, getExamLeaderboard };

@@ -7,10 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { motion } from 'framer-motion';
 
 import { loginService } from '../auth.service';
 import { useAuthStore } from '@/store/authStore';
@@ -47,7 +44,9 @@ export default function LoginPage() {
       toast.success("Successfully logged in");
       
       // Navigate based on role
-      if (userData?.role === "teacher") {
+      if (userData?.role === "superadmin") {
+        router.push('/superadmin');
+      } else if (userData?.role === "teacher") {
         router.push('/teacher');
       } else if (userData?.role === "admin") {
         router.push('/admin');
@@ -62,55 +61,73 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-2 text-center lg:text-left">
-        <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
-        <p className="text-muted-foreground">Please enter your credentials to access your dashboard.</p>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex flex-col space-y-6"
+    >
+      <div className="text-center">
+        <h2 className="text-xl font-semibold text-white">Welcome Back</h2>
+        <p className="text-sm text-gray-400 mt-1">Sign in to your account to continue</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="email">Institutional Email</Label>
-          <Input 
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="text-xs font-medium text-gray-300 ml-1">Institutional Email</label>
+          <input 
             id="email" 
             type="email" 
             placeholder="name@university.edu" 
+            className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
             {...register('email')}
           />
           {errors.email && (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
+            <p className="text-xs text-red-400 ml-1">{errors.email.message}</p>
           )}
         </div>
         
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link href="#" className="text-sm font-medium text-primary hover:underline">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between ml-1">
+            <label htmlFor="password" className="text-xs font-medium text-gray-300">Password</label>
+            <Link href="/auth/forgot-password" className="text-xs text-gray-400 hover:text-white hover:underline transition-colors">
               Forgot password?
             </Link>
           </div>
-          <Input 
+          <input 
             id="password" 
             type="password" 
             placeholder="••••••••" 
+            className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
             {...register('password')}
           />
           {errors.password && (
-            <p className="text-sm text-destructive">{errors.password.message}</p>
+            <p className="text-xs text-red-400 ml-1">{errors.password.message}</p>
           )}
         </div>
         
-        <Button type="submit" className="w-full h-11 text-base font-semibold mt-4" disabled={isLoading}>
-          {isLoading ? "Signing in..." : "Sign In"}
-        </Button>
+        <button 
+          type="submit" 
+          disabled={isLoading}
+          className="w-full bg-white text-black hover:bg-gray-200 font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+        >
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Signing in...
+            </div>
+          ) : "Sign In"}
+        </button>
       </form>
 
-      <div className="text-center text-sm text-muted-foreground">
+      <div className="text-center text-sm text-gray-400">
         Don't have an account?{' '}
-        <Link href="/auth/register" className="text-primary font-semibold hover:underline">
-          Sign Up
+        <Link href="/auth/register" className="text-white font-semibold hover:underline transition-colors">
+          Create one now
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }

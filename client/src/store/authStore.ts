@@ -6,6 +6,7 @@ interface User {
   name: string;
   email: string;
   role: 'student' | 'teacher' | 'admin' | 'superadmin';
+  avatarUrl?: string;
 }
 
 interface AuthState {

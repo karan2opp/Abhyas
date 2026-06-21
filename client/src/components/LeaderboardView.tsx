@@ -129,7 +129,7 @@ export function LeaderboardView({
               let titleText = "";
               let icon = null;
               let rankTextClass = "text-blue-500";
-              let heightClass = "h-[180px]";
+              let heightClass = "h-[260px]";
 
               if (isFirst) {
                 cardBg = "bg-[#0b0f19]";
@@ -138,27 +138,27 @@ export function LeaderboardView({
                 titleText = "CHAMPION";
                 icon = <Trophy className="h-10 w-10 text-yellow-500 mb-2" />;
                 rankTextClass = "text-blue-400";
-                heightClass = "h-[220px] z-10 scale-105 sm:scale-110 shadow-[0_0_30px_rgba(59,130,246,0.15)]";
+                heightClass = "h-[300px] z-10 scale-105 sm:scale-110 shadow-[0_0_30px_rgba(59,130,246,0.15)]";
               } else if (isSecond) {
                 borderClass = "border-white/5";
                 titleColor = "text-blue-500";
                 titleText = "RUNNER-UP";
                 icon = <Trophy className="h-8 w-8 text-gray-300 mb-2" />;
                 rankTextClass = "text-blue-500";
-                heightClass = "h-[180px]";
+                heightClass = "h-[280px]";
               } else if (isThird) {
                 borderClass = "border-white/5";
                 titleColor = "text-blue-500";
                 titleText = "THIRD PLACE";
                 icon = <Trophy className="h-8 w-8 text-amber-600 mb-2" />;
                 rankTextClass = "text-blue-500";
-                heightClass = "h-[160px]";
+                heightClass = "h-[260px]";
               }
 
               return (
                 <div
                   key={entry.id}
-                  className={`flex flex-col items-center justify-center p-6 rounded-2xl border transition-all w-full sm:w-[240px] ${cardBg} ${borderClass} ${heightClass}`}
+                  className={`flex flex-col items-center justify-between p-6 rounded-2xl border transition-all w-full sm:w-[240px] ${cardBg} ${borderClass} ${heightClass}`}
                 >
                   {icon}
                   <div className={`text-[10px] font-black tracking-widest uppercase mb-3 ${titleColor}`}>

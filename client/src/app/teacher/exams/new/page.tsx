@@ -23,6 +23,8 @@ export default function NewExamBuilder() {
   }, []);
 
   const [title, setTitle] = useState("");
+  const [type, setType] = useState("SCHEDULED");
+  const [duration, setDuration] = useState("60");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [totalMarks, setTotalMarks] = useState("100");
@@ -39,20 +41,36 @@ export default function NewExamBuilder() {
   }, [startTime, endTime]);
 
   const handleProceedToQuestions = async () => {
-    if (!title || !startTime || !endTime || !totalMarks) {
+    if (!title || !totalMarks) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+    
+    if (type === "SCHEDULED" && (!startTime || !endTime)) {
+      toast.error("Please provide start and end times for scheduled exams");
+      return;
+    }
+    
+    if (type === "ON_DEMAND" && !duration) {
+      toast.error("Please provide duration for on-demand exams");
       return;
     }
 
     setIsLoading(true);
     try {
-      const payload = {
+      const payload: any = {
         title,
+        type,
         instructions: instructions.filter(i => i.trim() !== ""),
-        startTime: new Date(startTime).toISOString(),
-        endTime: new Date(endTime).toISOString(),
         totalMarks: parseInt(totalMarks)
       };
+
+      if (type === "SCHEDULED") {
+        payload.startTime = new Date(startTime).toISOString();
+        payload.endTime = new Date(endTime).toISOString();
+      } else {
+        payload.duration = parseInt(duration);
+      }
 
       if (!examId) {
         // Create new exam
@@ -145,15 +163,46 @@ export default function NewExamBuilder() {
                     className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 h-12 rounded-lg"
                   />
                 </div>
+                
+                <div className="space-y-2.5">
+                  <label className="text-sm font-semibold text-gray-300">Exam Type</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setType("SCHEDULED")}
+                      className={cn("h-12 border-white/10 transition-all", type === "SCHEDULED" ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
+                    >
+                      Scheduled (Fixed Time)
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setType("ON_DEMAND")}
+                      className={cn("h-12 border-white/10 transition-all", type === "ON_DEMAND" ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
+                    >
+                      On-Demand (Flexible)
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2.5">
                     <label className="text-sm font-semibold text-gray-300">Duration (Minutes)</label>
-                    <Input 
-                      type="text"
-                      value={calculatedDuration}
-                      readOnly
-                      className="bg-[#0b0f19]/50 border-white/5 text-gray-500 h-12 rounded-lg w-full cursor-not-allowed"
-                    />
+                    {type === "SCHEDULED" ? (
+                      <Input 
+                        type="text"
+                        value={calculatedDuration}
+                        readOnly
+                        className="bg-[#0b0f19]/50 border-white/5 text-gray-500 h-12 rounded-lg w-full cursor-not-allowed"
+                      />
+                    ) : (
+                      <Input 
+                        type="number"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        placeholder="60"
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full"
+                      />
+                    )}
                   </div>
                   <div className="space-y-2.5">
                     <label className="text-sm font-semibold text-gray-300">Total Marks</label>
@@ -204,26 +253,28 @@ export default function NewExamBuilder() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2.5">
-                    <label className="text-sm font-semibold text-gray-300">Start Time</label>
-                    <Input 
-                      type="datetime-local"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
-                    />
+                {type === "SCHEDULED" && (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2.5">
+                      <label className="text-sm font-semibold text-gray-300">Start Time</label>
+                      <Input 
+                        type="datetime-local"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                      />
+                    </div>
+                    <div className="space-y-2.5">
+                      <label className="text-sm font-semibold text-gray-300">End Time</label>
+                      <Input 
+                        type="datetime-local"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2.5">
-                    <label className="text-sm font-semibold text-gray-300">End Time</label>
-                    <Input 
-                      type="datetime-local"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
-                    />
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 

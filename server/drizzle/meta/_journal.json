@@ -71,6 +71,13 @@
       "when": 1782048508549,
       "tag": "0009_numerous_changeling",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782297195715,
+      "tag": "0010_fixed_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

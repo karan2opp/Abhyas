@@ -23,7 +23,7 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
 
     // Calculate duration automatically if not provided or if we want to override
     let calculatedDuration = data.duration;
-    if (data.startTime && data.endTime) {
+    if (data.type === "SCHEDULED" && data.startTime && data.endTime) {
         calculatedDuration = Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000);
     }
 
@@ -62,10 +62,11 @@ const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string
 
     // Calculate new duration if start/end times change
     let calculatedDuration = data.duration;
+    const finalType = data.type !== undefined ? data.type : existing.type;
     const finalStartTime = data.startTime !== undefined ? data.startTime : existing.startTime;
     const finalEndTime = data.endTime !== undefined ? data.endTime : existing.endTime;
 
-    if (finalStartTime && finalEndTime) {
+    if (finalType === "SCHEDULED" && finalStartTime && finalEndTime) {
         calculatedDuration = Math.round((new Date(finalEndTime).getTime() - new Date(finalStartTime).getTime()) / 60000);
     }
 

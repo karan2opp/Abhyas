@@ -4,16 +4,23 @@ export const createExamSchema = z.object({
   title: z.string({ message: "Title is required" })
     .min(3, { message: "Title must be at least 3 characters long" })
     .max(100, { message: "Title cannot exceed 100 characters" }),
+  type: z.enum(["SCHEDULED", "ON_DEMAND"]).default("SCHEDULED"),
   instructions: z.array(z.string()).optional(),
   duration: z.number({ message: "Duration is required" })
     .min(1, { message: "Duration must be at least 1 minute" })
     .max(180, { message: "Duration cannot exceed 180 minutes" }).optional(),
-  startTime: z.coerce.date({ message: "Start time is required" }),
-  endTime: z.coerce.date({ message: "End time is required" }),
+  startTime: z.coerce.date({ message: "Start time is required" }).optional(),
+  endTime: z.coerce.date({ message: "End time is required" }).optional(),
   totalMarks: z.number({ message: "Total marks is required" })
     .min(1, { message: "Total marks must be at least 1" }),
-}).refine(data => data.endTime > data.startTime, {
-  message: "End time must be after start time",
+}).refine(data => {
+  if (data.type === "SCHEDULED") {
+    if (!data.startTime || !data.endTime) return false;
+    return data.endTime > data.startTime;
+  }
+  return true;
+}, {
+  message: "For scheduled exams, start and end times are required and end time must be after start time",
   path: ["endTime"],
 });
 
@@ -24,6 +31,7 @@ export const updateExamSchema = z.object({
     .min(3, { message: "Title must be at least 3 characters long" })
     .max(100, { message: "Title cannot exceed 100 characters" })
     .optional(),
+  type: z.enum(["SCHEDULED", "ON_DEMAND"]).optional(),
   instructions: z.array(z.string()).optional(),
   duration: z.number({ message: "Duration must be a number" })
     .min(1, { message: "Duration must be at least 1 minute" })
@@ -35,8 +43,10 @@ export const updateExamSchema = z.object({
     .min(1, { message: "Total marks must be at least 1" })
     .optional(),
 }).refine(data => {
-  if (data.startTime && data.endTime) {
-    return data.endTime > data.startTime;
+  if (data.type === "SCHEDULED" || (!data.type && data.startTime && data.endTime)) {
+    if (data.startTime && data.endTime) {
+      return data.endTime > data.startTime;
+    }
   }
   return true;
 }, {

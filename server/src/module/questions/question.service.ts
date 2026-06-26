@@ -243,7 +243,7 @@ QUESTION RULES:
 - Theory questions → test conceptual understanding, definitions, "what is", "why", "differentiate between"
 - Practical questions → test "how to perform X", step-based, output-based, formula-based (especially for Excel/Tally)
 - Difficulty must match requested level (beginner/intermediate/advanced)
-- If requested type is "mcq": you MUST provide exactly 4 options and a correctAnswer.
+- If requested type is "mcq": you MUST provide exactly 4 options and a correctAnswer. The correctAnswer MUST exactly match the full text of one of the options (e.g. do not just say "A", but the full text).
 - CRITICAL: For MCQs, aggressively randomize the position of the correct answer among the 4 options. Do NOT just make the first option the correct answer.
 - If requested type is "text" (descriptive): do NOT provide options or a correctAnswer. The question should be open-ended.
 - Assign "marks" to each question based on the MARKS CONFIGURATION provided by the user${explanationRule}
@@ -254,10 +254,10 @@ Respond ONLY in valid JSON:
   "questions": [
     {
       "question": "string",
-      "type": "theory" | "practical",
+      "type": "mcq" | "descriptive", // Match the requested type
       "subject": "programming" | "tally" | "ms_word" | "ms_excel" | "ms_powerpoint",
-      "options": ["A", "B", "C", "D"], // ONLY include if type is MCQ
-      "correctAnswer": "string", // ONLY include if type is MCQ${explanationFormat}
+      "options": ["string", "string", "string", "string"], // ONLY include if type is 'mcq'
+      "correctAnswer": "string", // ONLY include if type is 'mcq'. MUST exactly match one of the options!${explanationFormat}
       "marks": number
     }
   ]

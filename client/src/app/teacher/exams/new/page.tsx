@@ -30,6 +30,7 @@ export default function NewExamBuilder() {
   const [totalMarks, setTotalMarks] = useState("100");
   const [instructions, setInstructions] = useState<string[]>([""]);
   const [joinCode, setJoinCode] = useState("");
+  const [requireFeedback, setRequireFeedback] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const calculatedDuration = React.useMemo(() => {
@@ -62,7 +63,8 @@ export default function NewExamBuilder() {
         title,
         type,
         instructions: instructions.filter(i => i.trim() !== ""),
-        totalMarks: parseInt(totalMarks)
+        totalMarks: parseInt(totalMarks),
+        requireFeedback
       };
 
       if (type === "SCHEDULED") {
@@ -251,6 +253,29 @@ export default function NewExamBuilder() {
                       <Plus className="h-4 w-4 mr-2" /> Add Instruction
                     </Button>
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-[#0b0f19] border border-white/10 rounded-lg">
+                  <div className="space-y-0.5">
+                    <label className="text-sm font-semibold text-gray-300">Require Feedback Form</label>
+                    <p className="text-xs text-gray-500">Ask students for feedback after they submit the exam.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRequireFeedback(!requireFeedback)}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-[#111520]",
+                      requireFeedback ? "bg-purple-500" : "bg-gray-700"
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        requireFeedback ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
                 </div>
 
                 {type === "SCHEDULED" && (

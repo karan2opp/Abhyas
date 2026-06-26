@@ -13,6 +13,7 @@ export const createExamSchema = z.object({
   endTime: z.coerce.date({ message: "End time is required" }).optional(),
   totalMarks: z.number({ message: "Total marks is required" })
     .min(1, { message: "Total marks must be at least 1" }),
+  requireFeedback: z.boolean().optional().default(false),
 }).refine(data => {
   if (data.type === "SCHEDULED") {
     if (!data.startTime || !data.endTime) return false;
@@ -42,6 +43,7 @@ export const updateExamSchema = z.object({
   totalMarks: z.number({ message: "Total marks must be a number" })
     .min(1, { message: "Total marks must be at least 1" })
     .optional(),
+  requireFeedback: z.boolean().optional(),
 }).refine(data => {
   if (data.type === "SCHEDULED" || (!data.type && data.startTime && data.endTime)) {
     if (data.startTime && data.endTime) {

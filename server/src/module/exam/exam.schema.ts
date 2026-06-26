@@ -1,4 +1,4 @@
-import { pgTable, text, integer, doublePrecision, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, doublePrecision, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { users } from "../auth/user.schema.js";
 
@@ -11,6 +11,7 @@ export const exams = pgTable("exams", {
   createdBy: text("created_by").references(() => users.id).notNull(),
   joinCode: text("join_code").unique().notNull(),
   totalMarks: doublePrecision("total_marks").notNull(),
+  requireFeedback: boolean("require_feedback").default(false).notNull(),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

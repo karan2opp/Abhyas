@@ -7,6 +7,7 @@ import { Clock, Send, Shield, Flag, ChevronLeft, ChevronRight, Check } from "luc
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
+import { FeedbackModal } from "@/components/FeedbackModal";
 
 // Define a type for our flattened question structure
 type FlattenedQuestion = {
@@ -40,6 +41,9 @@ export default function ExamAttemptPage() {
   
   // Navigation State
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Feedback State
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     if (!submissionId) return;
@@ -231,7 +235,11 @@ export default function ExamAttemptPage() {
 
       await submitExamService(submissionId);
       toast.success("Assessment submitted successfully!");
-      router.push(`/student/results/${submissionId}`);
+      if (examData?.requireFeedback) {
+        setShowFeedback(true);
+      } else {
+        router.push(`/student/results/${submissionId}`);
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to submit exam");
       setIsSubmitting(false);
@@ -545,6 +553,16 @@ export default function ExamAttemptPage() {
         </aside>
 
       </div>
+
+      {showFeedback && (
+        <FeedbackModal
+          examId={examData.id}
+          submissionId={submissionId}
+          hasTextQuestions={flattenedQuestions.some(q => q.type !== "mcq")}
+          onClose={() => router.push(`/student/results/${submissionId}`)}
+          onSuccess={() => router.push(`/student/results/${submissionId}`)}
+        />
+      )}
     </div>
   );
 }

@@ -5,3 +5,4 @@ export * from "../../module/questions/question.schema.js";
 export * from "../../module/options/option.schema.js";
 export * from "../../module/submissions/submission.schema.js";
 export * from "../../module/answers/answer.schema.js";
+export * from "../../module/feedback/feedback.schema.js";

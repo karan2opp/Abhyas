@@ -39,3 +39,8 @@ export const getExamLeaderboardService = async (examId: string) => {
   const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
   return res.data;
 };
+
+export const submitFeedbackService = async (data: any) => {
+  const res = await api.post("/feedback", data);
+  return res.data;
+};

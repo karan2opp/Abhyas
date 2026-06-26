@@ -1,0 +1,1 @@
+ALTER TABLE "exams" ADD COLUMN "require_feedback" boolean DEFAULT false NOT NULL;

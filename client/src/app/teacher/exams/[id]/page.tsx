@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import { getExamByIdService, updateExamService } from "../exam.service";
 import { QuestionBuilder } from "../new/QuestionBuilder";
@@ -16,7 +16,9 @@ import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
 export default function EditExamBuilder() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const examId = params.id as string;
+  const initialStep = searchParams.get("step") ? parseInt(searchParams.get("step") as string) : 1;
   
   const { step, setStep, examId: storeExamId, setExamId } = useExamBuilderStore();
   const [isMounted, setIsMounted] = useState(false);
@@ -26,9 +28,9 @@ export default function EditExamBuilder() {
     setIsMounted(true);
     if (storeExamId !== examId) {
        setExamId(examId);
-       setStep(1); // Reset step if opening a different exam
+       setStep(initialStep as 1 | 2); // Reset step if opening a different exam, or jump to specific step
     }
-  }, [examId, storeExamId, setExamId, setStep]);
+  }, [examId, storeExamId, setExamId, setStep, initialStep]);
 
   // Form State for Step 1
   const [title, setTitle] = useState("");
@@ -115,6 +117,8 @@ export default function EditExamBuilder() {
         payload.endTime = new Date(endTime).toISOString();
       } else {
         payload.duration = parseInt(duration);
+        if (startTime) payload.startTime = new Date(startTime).toISOString();
+        if (endTime) payload.endTime = new Date(endTime).toISOString();
       }
 
       await updateExamService(examId, payload);
@@ -232,6 +236,27 @@ export default function EditExamBuilder() {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "Start Time" : "Window Start"}</label>
+                    <Input 
+                      type="datetime-local"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "End Time" : "Window End"}</label>
+                    <Input 
+                      type="datetime-local"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2.5">
                     <label className="text-sm font-semibold text-gray-300">Duration (Minutes)</label>
                     {type === "SCHEDULED" ? (
                       <Input 
@@ -322,28 +347,7 @@ export default function EditExamBuilder() {
                   </button>
                 </div>
 
-                {type === "SCHEDULED" && (
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2.5">
-                      <label className="text-sm font-semibold text-gray-300">Start Time</label>
-                      <Input 
-                        type="datetime-local"
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
-                      />
-                    </div>
-                    <div className="space-y-2.5">
-                      <label className="text-sm font-semibold text-gray-300">End Time</label>
-                      <Input 
-                        type="datetime-local"
-                        value={endTime}
-                        onChange={(e) => setEndTime(e.target.value)}
-                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Date pickers moved up above duration */}
               </CardContent>
             </Card>
 

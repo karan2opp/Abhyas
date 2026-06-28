@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
 import { FeedbackModal } from "@/components/FeedbackModal";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // Define a type for our flattened question structure
 type FlattenedQuestion = {
@@ -346,9 +348,34 @@ export default function ExamAttemptPage() {
           {/* Question Content */}
           <div className="flex-1 px-8 py-8 space-y-8 max-w-4xl">
             <div>
-              <h1 className="text-2xl font-bold text-white leading-snug whitespace-pre-wrap">
-                {currentQuestion.description}
-              </h1>
+              <div className="text-xl md:text-2xl font-bold text-white leading-snug whitespace-pre-wrap prose prose-invert max-w-none">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code: ({node, ...props}) => {
+                      const isInline = !props.className?.includes('language-');
+                      return isInline 
+                        ? <code className="bg-purple-500/10 px-2 py-1 rounded text-lg text-purple-300 font-mono border border-purple-500/20 font-normal" {...props} /> 
+                        : (
+                          <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl font-normal">
+                            <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
+                              <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56]" />
+                              <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]" />
+                              <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f]" />
+                              <span className="ml-3 text-sm font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace('language-', '') || 'code'}</span>
+                            </div>
+                            <div className="p-6 overflow-x-auto custom-scrollbar">
+                              <code className="block font-mono text-[16px] md:text-lg leading-relaxed text-gray-300" {...props} />
+                            </div>
+                          </div>
+                        )
+                    },
+                    p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />
+                  }}
+                >
+                  {currentQuestion.description || "No question text provided."}
+                </ReactMarkdown>
+              </div>
               {currentQuestion.images && currentQuestion.images.length > 0 && (
                 <div className="mt-6 mb-2">
                   <img src={currentQuestion.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-black/50" />

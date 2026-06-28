@@ -50,6 +50,7 @@ export const resetPasswordSchema = z.object({
 })
 
 export const updateProfileSchema = z.object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be at most 50 characters").optional(),
     phone: z.string()
         .length(10, "Phone must be 10 digits")
         .regex(/^[0-9]+$/, "Phone must contain only numbers")

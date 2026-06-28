@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, Plus, X } from "lucide-react";
+import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, Plus, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -72,6 +72,8 @@ export default function NewExamBuilder() {
         payload.endTime = new Date(endTime).toISOString();
       } else {
         payload.duration = parseInt(duration);
+        if (startTime) payload.startTime = new Date(startTime).toISOString();
+        if (endTime) payload.endTime = new Date(endTime).toISOString();
       }
 
       if (!examId) {
@@ -183,6 +185,27 @@ export default function NewExamBuilder() {
                     >
                       On-Demand (Flexible)
                     </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "Start Time" : "Window Start"}</label>
+                    <Input 
+                      type="datetime-local"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "End Time" : "Window End"}</label>
+                    <Input 
+                      type="datetime-local"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                    />
                   </div>
                 </div>
 

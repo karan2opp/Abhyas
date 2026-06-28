@@ -25,3 +25,18 @@ export const checkOpenAI = async () => {
     console.log("OpenAI client initialized successfully.");
     return client;
 };
+
+export const checkMistral = async () => {
+    const openai = (await import("openai")).default;
+    const client = new openai.OpenAI({
+        apiKey: process.env.MISTRAL_API_KEY,
+        baseURL: "https://api.mistral.ai/v1",
+    });
+
+    if (!client) {
+        console.error("Error: Failed to initialize Mistral client.");
+        process.exit(1);
+    }
+    console.log("Mistral client initialized successfully.");
+    return client;
+};

@@ -2,7 +2,7 @@ import { eq, and, isNull, desc, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { submissions, exams, answers, options, questions, sections, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
-import { evaluateTextAnswersBatched, type TextAnswer, type EvaluationMode } from "../evalutaion/evalutaion.js";
+import { evaluateSingleAnswer, type TextAnswer, type ResponseMode } from "../evalutaion/evalutaion.js";
 // ── Join Exam ──────────────────────────────────────────────────────────────────
 const joinExam = async (joinCode: string, studentId: string) => {
     // find exam by join code
@@ -116,19 +116,74 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
         // --- Run AI Evaluation in Background ---
         (async () => {
             try {
-                const textResults = await evaluateTextAnswersBatched(textAnswersToEvaluate, mode as EvaluationMode);
-                let additionalScore = 0;
+                const evalMode: ResponseMode = (mode === "detailed" || mode === "marks_and_feedback") ? "marks_and_feedback" : "marks_only";
 
-                for (const result of textResults) {
-                    additionalScore += result.score;
-                    await db.update(answers)
-                        .set({
-                            isCorrect: result.score === result.maxScore,
-                            marksAwarded: result.score,
-                            feedback: result.feedback ?? null
-                        })
-                        .where(eq(answers.id, result.answerId));
-                }
+                const textScores = await Promise.all(textAnswersToEvaluate.map(async (answer) => {
+                    try {
+                        // Round 1
+                        const r1 = await evaluateSingleAnswer(answer, {
+                            evaluationMode: "initial_evaluation",
+                            mode: evalMode
+                        });
+
+                        // Round 2
+                        const r2 = await evaluateSingleAnswer(answer, {
+                            evaluationMode: "comparison_evaluation",
+                            mode: evalMode,
+                            idealAnswer: r1.idealAnswer,
+                            keyPoints: r1.keyPoints
+                        });
+
+                        let finalMarks = r2.marksAwarded;
+                        let finalFeedback = r2.feedback;
+                        
+                        let needsTiebreaker = false;
+                        if (r1.confidence === "low" || r2.confidence === "low") {
+                            needsTiebreaker = true;
+                        } else if ((r1.confidence === "medium" || r2.confidence === "medium") && Math.abs(r1.marksAwarded - r2.marksAwarded) > 1) {
+                            needsTiebreaker = true;
+                        }
+                        
+                        if (!needsTiebreaker) {
+                            // Average the scores if high/medium and close, round to nearest 0.5
+                            finalMarks = Math.round(((r1.marksAwarded + r2.marksAwarded) / 2) * 2) / 2;
+                        } else {
+                            // Round 3
+                            const r3 = await evaluateSingleAnswer(answer, {
+                                evaluationMode: "tiebreaker_evaluation",
+                                mode: evalMode,
+                                idealAnswer: r1.idealAnswer,
+                                round1Score: r1.marksAwarded,
+                                round2Score: r2.marksAwarded
+                            });
+                            
+                            finalMarks = r3.marksAwarded;
+                            finalFeedback = r3.feedback;
+                        }
+
+                        let feedbackString = null;
+                        if (finalFeedback && typeof finalFeedback === 'object') {
+                           feedbackString = `Strengths: ${finalFeedback.strengths || ''}\nImprovements: ${finalFeedback.improvements || ''}\nSuggestion: ${finalFeedback.suggestion || ''}`;
+                        } else if (typeof finalFeedback === 'string') {
+                            feedbackString = finalFeedback;
+                        }
+
+                        await db.update(answers)
+                            .set({
+                                isCorrect: finalMarks === answer.maxMarks,
+                                marksAwarded: finalMarks,
+                                feedback: feedbackString
+                            })
+                            .where(eq(answers.id, answer.answerId));
+
+                        return finalMarks;
+                    } catch (err) {
+                        console.error(`Failed to evaluate answer ${answer.answerId}`, err);
+                        return 0; // fallback score on error
+                    }
+                }));
+
+                const additionalScore = textScores.reduce((sum, score) => sum + (score || 0), 0);
 
                 await db.update(submissions)
                     .set({

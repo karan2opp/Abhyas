@@ -263,15 +263,15 @@ export default function ResultsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 md:min-h-0">
           {/* Left Column - Main Content */}
-          <div className="md:col-span-3 flex flex-col gap-6 md:overflow-y-auto custom-scrollbar pr-2 pb-6">
+          <div className="md:col-span-3 flex flex-col gap-6 md:overflow-y-auto custom-scrollbar pr-2 pb-6 min-w-0">
             
             {/* Compact Result Summary */}
             <Card className="bg-[#111520] border-white/5 shadow-2xl relative shrink-0">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
               <CardContent className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
                   {/* Score Info */}
-                  <div className="flex items-center gap-4 w-full lg:w-auto">
+                  <div className="flex items-center gap-4 w-full xl:w-auto">
                     <div className={`shrink-0 relative flex items-center justify-center w-16 h-16 rounded-full border-[3px] ${borderClass} ${bgClass}`}>
                       <div className="text-center">
                         <div className={`text-lg font-bold ${colorClass}`}>{percentage}%</div>
@@ -284,7 +284,7 @@ export default function ResultsPage() {
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="flex flex-wrap gap-2 w-full lg:w-auto shrink-0 justify-start">
+                  <div className="flex flex-wrap gap-2 w-full xl:w-auto shrink-0 justify-start">
                     <div className="bg-black/20 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 flex-1 min-w-[70px] sm:min-w-[80px]">
                       <div className="text-lg font-bold text-white flex items-baseline gap-0.5">
                         {score}<span className="text-[10px] text-gray-500">/{totalMarks}</span>

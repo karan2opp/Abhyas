@@ -1,6 +1,6 @@
 import { eq, and, count, inArray, avg, desc } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { exams } from "../../common/db/schema.js";
+import { exams, sections, questions, options } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
@@ -36,6 +36,65 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
 
     if (!exam) throw ApiError.internal("Failed to create exam");
     return exam;
+};
+
+// ── Save Generated Exam ────────────────────────────────────────────────────────
+const saveGeneratedExam = async (data: any, teacherId: string) => {
+    let joinCode = generateJoinCode();
+    let existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
+    while (existing.length > 0) {
+        joinCode = generateJoinCode();
+        existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
+    }
+
+    return await db.transaction(async (tx) => {
+        // Create Exam
+        const [exam] = await tx.insert(exams).values({
+            title: data.title,
+            type: data.examType === "flexible" ? "ON_DEMAND" : "SCHEDULED",
+            duration: data.duration,
+            startTime: data.windowStart ? new Date(data.windowStart) : null,
+            endTime: data.windowEnd ? new Date(data.windowEnd) : null,
+            totalMarks: data.totalMarks || 100,
+            instructions: [],
+            joinCode,
+            createdBy: teacherId,
+        }).returning();
+
+        if (!exam) throw ApiError.internal("Failed to create exam");
+
+        // Create Sections and Questions
+        for (const secData of data.sections || []) {
+            const [section] = await tx.insert(sections).values({
+                examId: exam.id,
+                title: secData.title,
+            }).returning();
+
+            if (!section) throw ApiError.internal("Failed to create section");
+
+            for (const qData of secData.questions || []) {
+                const [question] = await tx.insert(questions).values({
+                    sectionId: section.id,
+                    type: qData.type,
+                    description: qData.description,
+                    marks: qData.marks,
+                }).returning();
+
+                if (!question) throw ApiError.internal("Failed to create question");
+
+                if (qData.type === "mcq" && qData.options) {
+                    await tx.insert(options).values(
+                        qData.options.map((opt: any) => ({
+                            questionId: question.id,
+                            value: opt.value,
+                            isCorrect: opt.isCorrect,
+                        }))
+                    );
+                }
+            }
+        }
+        return exam;
+    });
 };
 
 // ── Get All Exams (teacher sees only his own) ──────────────────────────────────
@@ -131,4 +190,4 @@ const getOverviewStats = async (teacherId: string) => {
     };
 };
 
-export { createExam, getExams, getExamById, updateExam, deleteExam, getOverviewStats };
+export { createExam, getExams, getExamById, updateExam, deleteExam, getOverviewStats, saveGeneratedExam };

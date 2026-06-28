@@ -68,6 +68,16 @@ export const generateQuestionService = async (data: any) => {
   return res.data;
 };
 
+export const chatGenerateQuestionService = async (data: { messages: any[] }) => {
+  const res = await api.post("/questions/chat-generate", data);
+  return res.data;
+};
+
+export const saveGeneratedExamService = async (data: any) => {
+  const res = await api.post("/exams/save-generated", data);
+  return res.data;
+};
+
 export const getQuestionsBySectionService = async (sectionId: string) => {
   const res = await api.get(`/questions/section/${sectionId}`);
   return res.data;

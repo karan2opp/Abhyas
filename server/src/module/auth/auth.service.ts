@@ -167,11 +167,15 @@ const getMe = async (userId: string) => {
 };
 
 // ── Update Profile ────────────────────────────────────────────────────────────
-const updateProfile = async (userId: string, data: { phone?: string }, file?: Express.Multer.File) => {
+const updateProfile = async (userId: string, data: { phone?: string, name?: string }, file?: Express.Multer.File) => {
     const updateData: Partial<typeof users.$inferInsert> = {};
 
     if (data.phone !== undefined) {
         updateData.phone = data.phone;
+    }
+    
+    if (data.name !== undefined) {
+        updateData.name = data.name;
     }
 
     if (file) {

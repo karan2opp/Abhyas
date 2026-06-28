@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/ApiError.js";
 import { ZodError } from "zod";
+import fs from "fs";
 
 const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
     // already formatted ApiError
@@ -37,6 +38,10 @@ const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunct
 
     // unknown/unhandled errors
     console.error("Unhandled error:", err);
+    try {
+        fs.appendFileSync("error.log", new Date().toISOString() + " " + String(err instanceof Error ? err.stack : err) + "\n");
+    } catch (e) {}
+    
     return res.status(500).json({
         success: false,
         message: err instanceof Error ? err.message : "Something went wrong",

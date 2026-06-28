@@ -7,6 +7,11 @@ export const createExam = async (req: Request, res: Response) => {
     return ApiResponse.created(res, "Exam created successfully", exam);
 };
 
+export const saveGeneratedExam = async (req: Request, res: Response) => {
+    const exam = await examService.saveGeneratedExam(req.body, req.user!.id);
+    return ApiResponse.created(res, "Generated exam saved successfully", exam);
+};
+
 export const getExams = async (req: Request, res: Response) => {
     const exams = await examService.getExams(req.user!.id);
     return ApiResponse.ok(res, "Exams fetched successfully", exams);

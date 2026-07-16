@@ -102,7 +102,7 @@ export default function NewExamBuilder() {
       {/* Dynamic Header */}
       <header className="h-[88px] flex-shrink-0 flex items-center justify-between px-10 border-b border-white/5">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-white tracking-tight">New Assessment</h2>
+          <h2 className="text-2xl font-bold text-white tracking-tight">New Exam</h2>
           {joinCode && (
             <span className="px-2.5 py-1 rounded bg-white/5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border border-white/10">
               JOIN CODE: {joinCode}
@@ -111,7 +111,7 @@ export default function NewExamBuilder() {
         </div>
         
         <div className="flex items-center gap-5">
-          <Avatar className="h-10 w-10 cursor-pointer border-2 border-white/10 hover:border-purple-500/50 transition-all">
+          <Avatar className="h-10 w-10 cursor-pointer border-2 border-white/10 hover:border-blue-500/50 transition-all">
             <AvatarImage src="" />
             <AvatarFallback className="bg-green-900/50 text-green-300 text-xs font-semibold">JD</AvatarFallback>
           </Avatar>
@@ -124,12 +124,12 @@ export default function NewExamBuilder() {
         <div className="flex items-center gap-8 mb-10 pl-2">
           <div className="flex items-center gap-4">
             <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
-              step === 1 ? "border-purple-500 text-purple-400 bg-purple-500/10" : "border-white/20 text-white bg-white/5"
+              step === 1 ? "border-blue-500 text-blue-400 bg-blue-500/10" : "border-white/20 text-white bg-white/5"
             )}>
               01
             </div>
             <div>
-              <h3 className={cn("font-bold text-sm tracking-wide", step === 1 ? "text-purple-400" : "text-gray-300")}>Exam Details</h3>
+              <h3 className={cn("font-bold text-sm tracking-wide", step === 1 ? "text-blue-400" : "text-gray-300")}>Exam Details</h3>
               <p className="text-[13px] text-gray-500">Global configurations</p>
             </div>
           </div>
@@ -138,12 +138,12 @@ export default function NewExamBuilder() {
           
           <div className={cn("flex items-center gap-4 transition-all duration-300", step === 1 ? "opacity-50" : "opacity-100")}>
             <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
-              step === 2 ? "border-purple-500 text-purple-400 bg-purple-500/10" : "border-white/10 text-gray-500"
+              step === 2 ? "border-blue-500 text-blue-400 bg-blue-500/10" : "border-white/10 text-gray-500"
             )}>
               02
             </div>
             <div>
-              <h3 className={cn("font-bold text-sm tracking-wide", step === 2 ? "text-purple-400" : "text-gray-500")}>Question Builder</h3>
+              <h3 className={cn("font-bold text-sm tracking-wide", step === 2 ? "text-blue-400" : "text-gray-500")}>Question Builder</h3>
               <p className="text-[13px] text-gray-500">Content & structure</p>
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function NewExamBuilder() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Advanced Fluid Dynamics - Midterm" 
-                    className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-purple-500/50 focus-visible:border-purple-500/50 h-12 rounded-lg"
+                    className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 h-12 rounded-lg"
                   />
                 </div>
                 
@@ -174,14 +174,14 @@ export default function NewExamBuilder() {
                     <Button 
                       variant="outline" 
                       onClick={() => setType("SCHEDULED")}
-                      className={cn("h-12 border-white/10 transition-all", type === "SCHEDULED" ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
+                      className={cn("h-12 border-white/10 transition-all", type === "SCHEDULED" ? "bg-blue-500/20 text-blue-400 border-blue-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
                     >
                       Scheduled (Fixed Time)
                     </Button>
                     <Button 
                       variant="outline" 
                       onClick={() => setType("ON_DEMAND")}
-                      className={cn("h-12 border-white/10 transition-all", type === "ON_DEMAND" ? "bg-purple-500/20 text-purple-400 border-purple-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
+                      className={cn("h-12 border-white/10 transition-all", type === "ON_DEMAND" ? "bg-blue-500/20 text-blue-400 border-blue-500/50" : "bg-[#0b0f19] text-gray-400 hover:bg-white/5 hover:text-white")}
                     >
                       On-Demand (Flexible)
                     </Button>
@@ -195,7 +195,7 @@ export default function NewExamBuilder() {
                       type="datetime-local"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
                     />
                   </div>
                   <div className="space-y-2.5">
@@ -204,7 +204,7 @@ export default function NewExamBuilder() {
                       type="datetime-local"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
-                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -225,7 +225,7 @@ export default function NewExamBuilder() {
                         value={duration}
                         onChange={(e) => setDuration(e.target.value)}
                         placeholder="60"
-                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full"
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full"
                       />
                     )}
                   </div>
@@ -236,7 +236,7 @@ export default function NewExamBuilder() {
                       value={totalMarks}
                       onChange={(e) => setTotalMarks(e.target.value)}
                       placeholder="100" 
-                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full"
+                      className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full"
                     />
                   </div>
                 </div>
@@ -254,7 +254,7 @@ export default function NewExamBuilder() {
                             setInstructions(newInst);
                           }}
                           placeholder={`Instruction ${idx + 1}`}
-                          className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-purple-500/50 h-10 rounded-lg flex-1"
+                          className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-blue-500/50 h-10 rounded-lg flex-1"
                         />
                         {instructions.length > 1 && (
                           <Button 
@@ -287,8 +287,8 @@ export default function NewExamBuilder() {
                     type="button"
                     onClick={() => setRequireFeedback(!requireFeedback)}
                     className={cn(
-                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-[#111520]",
-                      requireFeedback ? "bg-purple-500" : "bg-gray-700"
+                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#111520]",
+                      requireFeedback ? "bg-blue-500" : "bg-gray-700"
                     )}
                   >
                     <span
@@ -309,7 +309,7 @@ export default function NewExamBuilder() {
                         type="datetime-local"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
-                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
                       />
                     </div>
                     <div className="space-y-2.5">
@@ -318,7 +318,7 @@ export default function NewExamBuilder() {
                         type="datetime-local"
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
-                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-purple-500/50 w-full [color-scheme:dark]"
+                        className="bg-[#0b0f19] border-white/10 text-white h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
                       />
                     </div>
                   </div>
@@ -331,11 +331,11 @@ export default function NewExamBuilder() {
               <Card className="bg-[#1a162b] border-[#2d224a] shadow-xl rounded-xl">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3 mb-4">
-                    <Lightbulb className="h-5 w-5 text-purple-400" />
+                    <Lightbulb className="h-5 w-5 text-blue-400" />
                     <h4 className="font-bold text-white tracking-wide">Pro Tip</h4>
                   </div>
                   <p className="text-[13px] text-gray-300 leading-relaxed">
-                    For optimal engagement, limit exam duration to 120 minutes. Students typically peak in performance within the first 45 minutes of assessment.
+                    For optimal engagement, limit exam duration to 120 minutes. Students typically peak in performance within the first 45 minutes of exam.
                   </p>
                 </CardContent>
               </Card>
@@ -349,7 +349,7 @@ export default function NewExamBuilder() {
                     </div>
                   </div>
                   <p className="text-[12px] text-gray-400 font-medium px-2 leading-relaxed">
-                    Visual context helps students identify the assessment theme instantly.
+                    Visual context helps students identify the exam theme instantly.
                   </p>
                   <Button variant="outline" className="w-full bg-transparent border-white/10 text-gray-300 hover:bg-white/5 hover:text-white font-semibold">
                     Upload Cover Image

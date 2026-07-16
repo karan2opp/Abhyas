@@ -39,7 +39,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-purple-600 p-1.5 rounded-md shadow-lg shadow-purple-900/50">
+            <div className="bg-blue-600 p-1.5 rounded-md shadow-lg shadow-blue-900/50">
               <ShieldAlert className="h-5 w-5 text-white" />
             </div>
             <span className="font-bold text-lg text-white tracking-tight">Abhyas Super Admin</span>
@@ -82,7 +82,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
           {/* Logo */}
           <div className={cn("p-6 flex items-center gap-3", isCollapsed ? "justify-center p-4" : "")}>
-            <div className="bg-purple-600 p-2 rounded-lg shadow-lg shadow-purple-900/50 shrink-0">
+            <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/50 shrink-0">
               <ShieldAlert className="h-6 w-6 text-white" />
             </div>
             {!isCollapsed && (

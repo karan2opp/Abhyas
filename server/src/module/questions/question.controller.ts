@@ -34,9 +34,4 @@ export const generateQuestion = async (req: Request, res: Response) => {
     const question = await questionsService.generateQuestion(req.body);
     return ApiResponse.ok(res, "Question generated successfully", question);
 };
-
-export const chatGenerateQuestion = async (req: Request, res: Response) => {
-    const { messages } = req.body;
-    const response = await questionsService.chatGenerateQuestion(messages);
-    return ApiResponse.ok(res, "Chat generated successfully", response);
-};
+

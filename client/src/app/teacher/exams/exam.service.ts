@@ -6,8 +6,8 @@ export const createExamService = async (data: any) => {
   return res.data;
 };
 
-export const getExamsService = async () => {
-  const res = await api.get("/exams");
+export const getExamsService = async (params?: { page?: number, limit?: number, search?: string, days?: string }) => {
+  const res = await api.get("/exams", { params });
   return res.data;
 };
 
@@ -68,10 +68,6 @@ export const generateQuestionService = async (data: any) => {
   return res.data;
 };
 
-export const chatGenerateQuestionService = async (data: { messages: any[] }) => {
-  const res = await api.post("/questions/chat-generate", data);
-  return res.data;
-};
 
 export const saveGeneratedExamService = async (data: any) => {
   const res = await api.post("/exams/save-generated", data);

@@ -10,8 +10,8 @@ export const verifyJoinCodeService = async (joinCode: string) => {
   return res.data;
 };
 
-export const getMySubmissionsService = async () => {
-  const res = await api.get("/submissions/me");
+export const getMySubmissionsService = async (params?: { page?: number, limit?: number, search?: string, days?: string }) => {
+  const res = await api.get("/submissions/me", { params });
   return res.data;
 };
 

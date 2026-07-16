@@ -1,4 +1,4 @@
-import { eq, and, isNull, desc, or } from "drizzle-orm";
+import { eq, and, isNull, desc, or, ilike, gte, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { submissions, exams, answers, options, questions, sections, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -318,23 +318,44 @@ const deleteSubmission = async (submissionId: string, studentId: string) => {
 };
 
 // ── Get My Submissions ─────────────────────────────────────────────────────────
-const getMySubmissions = async (studentId: string, mode: string = "simple") => {
-    const result = await db.select({
+const getMySubmissions = async (studentId: string, mode: string = "simple", search?: string, days?: string, page: number = 1, limit: number = 10) => {
+    const conditions = [
+        eq(submissions.userId, studentId),
+        isNull(submissions.deletedAt)
+    ];
+
+    if (search) {
+        conditions.push(ilike(exams.title, `%${search}%`));
+    }
+
+    if (days && days !== "all") {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+        conditions.push(gte(submissions.createdAt, cutoffDate));
+    }
+
+    const offset = (page - 1) * limit;
+
+    const data = await db.select({
         submission: submissions,
         exam: exams
     })
         .from(submissions)
         .innerJoin(exams, eq(submissions.examId, exams.id))
-        .where(
-            and(
-                eq(submissions.userId, studentId),
-                isNull(submissions.deletedAt)
-            )
-        )
-        .orderBy(desc(submissions.createdAt));
+        .where(and(...conditions))
+        .orderBy(desc(submissions.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+    const [totalCount] = await db.select({ value: count() })
+        .from(submissions)
+        .innerJoin(exams, eq(submissions.examId, exams.id))
+        .where(and(...conditions));
+
+    const total = Number(totalCount?.value) || 0;
 
     const now = new Date();
-    for (const row of result) {
+    for (const row of data) {
         if (row.submission.status === "inprogress" && row.exam.duration) {
             const endTime = new Date(row.submission.createdAt.getTime() + row.exam.duration * 60000);
             if (now >= endTime) {
@@ -348,7 +369,13 @@ const getMySubmissions = async (studentId: string, mode: string = "simple") => {
         }
     }
 
-    return result;
+    return {
+        data,
+        total,
+        page,
+        limit,
+        hasMore: offset + data.length < total
+    };
 };
 
 // ── Get Exam For Submission ────────────────────────────────────────────────────

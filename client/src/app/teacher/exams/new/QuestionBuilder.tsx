@@ -109,14 +109,14 @@ export function QuestionBuilder({ examId }: { examId: string }) {
           <p className="text-sm text-gray-400">Manage sections, questions, and multiple choices.</p>
         </div>
         {!isAddingSection && (
-          <Button onClick={() => setIsAddingSection(true)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-lg shadow-purple-900/50">
+          <Button onClick={() => setIsAddingSection(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-900/50">
             <Plus className="h-4 w-4 mr-2" /> Add Section
           </Button>
         )}
       </div>
 
       {isAddingSection && (
-        <Card className="bg-[#111520] border-purple-500/50 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4">
+        <Card className="bg-[#111520] border-blue-500/50 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-4">
           <div className="p-4 flex items-center gap-4">
             <Input
               autoFocus
@@ -160,17 +160,17 @@ export function QuestionBuilder({ examId }: { examId: string }) {
           {/* Resizable Splitter */}
           {editorConfig.isOpen && editorConfig.sectionId && (
             <div
-              className="w-4 bg-transparent hover:bg-purple-500/20 active:bg-purple-500/40 cursor-col-resize shrink-0 transition-colors flex items-center justify-center group"
+              className="w-4 bg-transparent hover:bg-blue-500/20 active:bg-blue-500/40 cursor-col-resize shrink-0 transition-colors flex items-center justify-center group"
               onMouseDown={() => setIsDraggingSidebar(true)}
             >
-              <div className="w-0.5 h-full min-h-[500px] bg-white/10 group-hover:bg-purple-400 rounded-full transition-colors" />
+              <div className="w-0.5 h-full min-h-[500px] bg-white/10 group-hover:bg-blue-400 rounded-full transition-colors" />
             </div>
           )}
 
           {/* Right Sidebar Editor */}
           {editorConfig.isOpen && editorConfig.sectionId && (
             <div
-              className="shrink-0 sticky top-0 bg-[#151a28] border border-purple-500/40 rounded-xl shadow-[0_0_40px_rgba(147,51,234,0.15)] flex flex-col animate-in slide-in-from-right-8 h-[calc(100vh-250px)] overflow-hidden"
+              className="shrink-0 sticky top-0 bg-[#151a28] border border-blue-500/40 rounded-xl shadow-[0_0_40px_rgba(147,51,234,0.15)] flex flex-col animate-in slide-in-from-right-8 h-[calc(100vh-250px)] overflow-hidden"
               style={{ width: `${sidebarWidth}px` }}
             >
               <SidebarQuestionEditor
@@ -257,7 +257,7 @@ function SectionItem({ section, index, refresh, onOpenEditor }: { section: any, 
           >
             {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </Button>
-          <span className="text-purple-400 font-bold bg-purple-500/10 px-2.5 py-1 rounded">S{index + 1}</span>
+          <span className="text-blue-400 font-bold bg-blue-500/10 px-2.5 py-1 rounded">S{index + 1}</span>
           {isEditing ? (
             <div className="flex items-center gap-2 w-full max-w-sm">
               <Input autoFocus value={title} onChange={e => setTitle(e.target.value)} className="bg-[#0b0f19] border-white/10 text-white h-9" onKeyDown={(e) => e.key === "Enter" && handleUpdate()} />
@@ -290,13 +290,13 @@ function SectionItem({ section, index, refresh, onOpenEditor }: { section: any, 
             <Button onClick={() => onOpenEditor(null)} variant="outline" className="flex-1 min-w-[180px] bg-transparent border-dashed border-white/20 text-gray-400 hover:text-white hover:bg-white/5 py-6">
               <Plus className="h-4 w-4 mr-2" /> Custom Question
             </Button>
-            <div className="flex-1 min-w-[250px] flex items-center bg-purple-500/10 border border-dashed border-purple-500/30 rounded-md overflow-hidden">
-              <div className="px-3 py-3 text-[13px] text-purple-400 font-bold flex items-center border-r border-purple-500/30 whitespace-nowrap">
+            <div className="flex-1 min-w-[250px] flex items-center bg-blue-500/10 border border-dashed border-blue-500/30 rounded-md overflow-hidden">
+              <div className="px-3 py-3 text-[13px] text-blue-400 font-bold flex items-center border-r border-blue-500/30 whitespace-nowrap">
                 <Zap className="h-4 w-4 mr-1.5" /> Quick Add
               </div>
-              <button onClick={() => handleQuickAdd(1)} className="flex-1 py-3 text-sm text-purple-300 hover:bg-purple-500/20 hover:text-white transition-colors border-r border-purple-500/30 font-bold">+1</button>
-              <button onClick={() => handleQuickAdd(5)} className="flex-1 py-3 text-sm text-purple-300 hover:bg-purple-500/20 hover:text-white transition-colors border-r border-purple-500/30 font-bold">+5</button>
-              <button onClick={() => handleQuickAdd(10)} className="flex-1 py-3 text-sm text-purple-300 hover:bg-purple-500/20 hover:text-white transition-colors font-bold">+10</button>
+              <button onClick={() => handleQuickAdd(1)} className="flex-1 py-3 text-sm text-blue-300 hover:bg-blue-500/20 hover:text-white transition-colors border-r border-blue-500/30 font-bold">+1</button>
+              <button onClick={() => handleQuickAdd(5)} className="flex-1 py-3 text-sm text-blue-300 hover:bg-blue-500/20 hover:text-white transition-colors border-r border-blue-500/30 font-bold">+5</button>
+              <button onClick={() => handleQuickAdd(10)} className="flex-1 py-3 text-sm text-blue-300 hover:bg-blue-500/20 hover:text-white transition-colors font-bold">+10</button>
             </div>
           </div>
         </CardContent>
@@ -324,7 +324,7 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
 
   return (
     <div className="bg-[#1a1f2e]/60 border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-sm hover:shadow-md hover:border-white/10 transition-all group">
-      <div className="absolute top-0 left-0 bg-purple-500/10 text-purple-400 font-mono text-xs font-bold px-3 py-1.5 rounded-br-xl border-b border-r border-purple-500/20">
+      <div className="absolute top-0 left-0 bg-blue-500/10 text-blue-400 font-mono text-xs font-bold px-3 py-1.5 rounded-br-xl border-b border-r border-blue-500/20">
         Q{index + 1}
       </div>
 
@@ -355,7 +355,7 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
               code: ({node, ...props}) => {
                 const isInline = !props.className?.includes('language-');
                 return isInline 
-                  ? <code className="bg-purple-500/10 px-1.5 py-0.5 rounded text-[13px] text-purple-300 font-mono border border-purple-500/20" {...props} /> 
+                  ? <code className="bg-blue-500/10 px-1.5 py-0.5 rounded text-[13px] text-blue-300 font-mono border border-blue-500/20" {...props} /> 
                   : (
                     <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl">
                       <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
@@ -521,7 +521,7 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
     <div className="flex flex-col h-full">
       <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-[#1a1f2e]">
         <div className="flex items-center gap-3">
-          <div className="bg-purple-600 p-1.5 rounded text-white">
+          <div className="bg-blue-600 p-1.5 rounded text-white">
             <Settings2 className="h-5 w-5" />
           </div>
           <h3 className="font-bold text-white">{isEditMode ? "Edit Question" : "New Question"}</h3>
@@ -644,7 +644,7 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
       </div>
 
       <div className="p-6 border-t border-white/5 bg-[#1a1f2e] space-y-3 shrink-0">
-        <Button onClick={() => handleSave(false)} disabled={isSaving} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-lg shadow-purple-900/50">
+        <Button onClick={() => handleSave(false)} disabled={isSaving} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-lg shadow-blue-900/50">
           {isSaving ? "Saving..." : "Save Question"}
         </Button>
         {!isEditMode && (

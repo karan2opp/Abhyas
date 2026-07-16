@@ -7,6 +7,7 @@ import { createExamSchema, updateExamSchema } from "./dto/exam.dto.js";
 const router = Router();
 
 router.post("/", authenticate, authorize("teacher"), validate(createExamSchema), controller.createExam);
+router.post("/generate-from-form", authenticate, authorize("teacher"), controller.generateFromForm);
 router.post("/save-generated", authenticate, authorize("teacher"), controller.saveGeneratedExam);
 router.get("/overview/stats", authenticate, authorize("teacher"), controller.getOverviewStats);
 router.get("/", authenticate, authorize("teacher"), controller.getExams);

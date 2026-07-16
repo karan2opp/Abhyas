@@ -149,7 +149,7 @@ export default function WaitingRoomPage() {
           {canJoinNow ? (
             <div className="text-center space-y-6">
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 text-emerald-400">
-                <p className="text-lg font-semibold mb-1">The assessment is ready!</p>
+                <p className="text-lg font-semibold mb-1">The exam is ready!</p>
                 <p className="text-sm text-emerald-400/80">You will be redirected automatically...</p>
               </div>
               <Button 
@@ -159,11 +159,11 @@ export default function WaitingRoomPage() {
               >
                 {isJoining ? (
                   <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Preparing Assessment...
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Preparing Exam...
                   </>
                 ) : (
                   <>
-                    Enter Assessment Now <ArrowRight className="ml-2 h-5 w-5" />
+                    Enter Exam Now <ArrowRight className="ml-2 h-5 w-5" />
                   </>
                 )}
               </Button>
@@ -200,13 +200,13 @@ export default function WaitingRoomPage() {
               {examData.instructions && examData.instructions.length > 0 && (
                 <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-5 space-y-3">
                   <div className="flex items-center gap-2 text-white font-bold">
-                    <ListChecks className="h-5 w-5 text-purple-400" />
+                    <ListChecks className="h-5 w-5 text-blue-400" />
                     Instructions
                   </div>
                   <ul className="space-y-2">
                     {examData.instructions.map((inst: string, idx: number) => (
                       <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                        <span className="text-purple-400 mt-0.5">•</span>
+                        <span className="text-blue-400 mt-0.5">•</span>
                         <span>{inst}</span>
                       </li>
                     ))}
@@ -240,7 +240,7 @@ export default function WaitingRoomPage() {
               </div>
 
               <div className="text-center text-sm text-gray-500">
-                Please wait on this page. You will be automatically redirected to the assessment when the timer reaches zero.
+                Please wait on this page. You will be automatically redirected to the exam when the timer reaches zero.
               </div>
             </div>
           )}

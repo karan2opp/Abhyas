@@ -12,9 +12,21 @@ export const saveGeneratedExam = async (req: Request, res: Response) => {
     return ApiResponse.created(res, "Generated exam saved successfully", exam);
 };
 
+export const generateFromForm = async (req: Request, res: Response) => {
+    const examData = await examService.generateExamFromForm(req.body, req.user!.id);
+    return ApiResponse.ok(res, "Exam generated successfully", examData);
+};
+
 export const getExams = async (req: Request, res: Response) => {
-    const exams = await examService.getExams(req.user!.id);
-    return ApiResponse.ok(res, "Exams fetched successfully", exams);
+    const { search, days, page, limit } = req.query;
+    const examsData = await examService.getExams(
+        req.user!.id,
+        search as string,
+        days as string,
+        Number(page) || 1,
+        Number(limit) || 10
+    );
+    return ApiResponse.ok(res, "Exams fetched successfully", examsData);
 };
 
 export const getExamById = async (req: Request, res: Response) => {

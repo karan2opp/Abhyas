@@ -8,6 +8,8 @@ import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot
 import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
 import { toast } from "sonner";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export default function ResultsPage() {
   const params = useParams();
@@ -267,7 +269,7 @@ export default function ResultsPage() {
             
             {/* Compact Result Summary */}
             <Card className="bg-[#111520] border-white/5 shadow-2xl relative shrink-0">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-purple-600"></div>
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-blue-600"></div>
               <CardContent className="p-6">
                 <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
                   {/* Score Info */}
@@ -324,10 +326,42 @@ export default function ResultsPage() {
               <Card className="bg-[#111520]/80 border-white/5 shadow-xl backdrop-blur-xl shrink-0">
                 <CardHeader className="border-b border-white/5 pb-4 bg-white/[0.02]">
                   <div className="flex justify-between items-start gap-4">
-                    <CardTitle className="text-lg font-medium text-white leading-relaxed">
-                      <span className="text-gray-500 mr-2">Q{questionIndex + 1}.</span> 
-                      {selectedQuestion.description}
-                    </CardTitle>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider ${selectedQuestion.type === 'mcq' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                          {selectedQuestion.type === 'mcq' ? 'Multiple Choice' : 'Descriptive'}
+                        </span>
+                        <span className="border border-white/10 bg-white/5 px-2.5 py-1 rounded-md text-gray-300 text-[10px] font-bold">Marks: {selectedQuestion.marks || 1}</span>
+                      </div>
+                      <CardTitle className="text-lg font-medium text-white leading-relaxed prose prose-invert max-w-none">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            code: ({node, ...props}) => {
+                              const isInline = !props.className?.includes('language-');
+                              return isInline 
+                                ? <code className="bg-blue-500/10 px-1.5 py-0.5 rounded text-[13px] text-blue-300 font-mono border border-blue-500/20" {...props} /> 
+                                : (
+                                  <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl">
+                                    <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
+                                      <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                                      <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                                      <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+                                      <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace('language-', '') || 'code'}</span>
+                                    </div>
+                                    <div className="p-5 overflow-x-auto custom-scrollbar font-normal">
+                                      <code className="block font-mono text-[13px] leading-relaxed text-gray-300" {...props} />
+                                    </div>
+                                  </div>
+                                )
+                            },
+                            p: ({node, ...props}) => <p className="mb-2 last:mb-0 inline-block" {...props} />
+                          }}
+                        >
+                          {`**Q${questionIndex + 1}.** ${selectedQuestion.description}`}
+                        </ReactMarkdown>
+                      </CardTitle>
+                    </div>
                     <div className="flex flex-col items-end shrink-0">
                       <div className={`text-sm font-bold px-3 py-1 rounded-full border ${
                         isDescriptive 

@@ -11,7 +11,6 @@ import answersRouter from "./module/answers/answer.route.js";
 import adminRouter from "./module/admin/admin.route.js";
 import superadminRouter from "./module/superadmin/superadmin.route.js";
 import feedbackRouter from "./module/feedback/feedback.route.js";
-import chatRouter from "./module/chat/chat.route.js";
 import errorHandler from "./common/middleware/error.middleware.js";
 import 'dotenv/config'
 const app = express();
@@ -35,7 +34,6 @@ app.use("/api/answers", answersRouter)
 app.use("/api/admin", adminRouter)
 app.use("/api/superadmin", superadminRouter)
 app.use("/api/feedback", feedbackRouter)
-app.use("/api/chat", chatRouter)
 app.use(errorHandler)
 
 export default app;

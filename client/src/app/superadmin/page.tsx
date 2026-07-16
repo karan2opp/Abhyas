@@ -138,7 +138,7 @@ export default function SuperAdminDashboardPage() {
           <Card className="bg-[#111520]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
             <CardHeader>
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                <UserPlus className="h-5 w-5 text-purple-400" />
+                <UserPlus className="h-5 w-5 text-blue-400" />
                 Assign Admin
               </CardTitle>
             </CardHeader>

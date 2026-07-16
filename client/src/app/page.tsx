@@ -54,7 +54,7 @@ export default function LandingPage() {
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/ai_generation.png" alt="AI Exam Generation" fill className="object-cover object-top" />
+          <Image src="/ai_generation.png" alt="AI Exam Generation" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Effortless Content Creation", 
@@ -65,18 +65,18 @@ export default function LandingPage() {
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/student_dashboard.png" alt="Smart Auto Evaluation" fill className="object-cover object-top" />
+          <Image src="/ai_evaluation.png" alt="Smart Auto Evaluation" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Smart AI Evaluations", 
       desc: "Save hours of grading. Our AI automatically evaluates and scores descriptive student answers.",
-      gradient: "from-purple-600/50 to-purple-900/10",
-      borderGlow: "from-purple-500/50 via-purple-500/10 to-transparent"
+      gradient: "from-blue-600/50 to-blue-900/10",
+      borderGlow: "from-blue-500/50 via-blue-500/10 to-transparent"
     },
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/leaderboard.png" alt="Competitive Leaderboard" fill className="object-cover object-top" />
+          <Image src="/leaderboard.png" alt="Competitive Leaderboard" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Competitive Leaderboard", 
@@ -87,7 +87,7 @@ export default function LandingPage() {
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/student_feedback.png" alt="Personalized Student Feedback" fill className="object-cover object-top" />
+          <Image src="/student_feedback.png" alt="Personalized Student Feedback" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Personalized Student Feedback", 
@@ -98,7 +98,7 @@ export default function LandingPage() {
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/question_formats.png" alt="Diverse Question Formats" fill className="object-cover object-top" />
+          <Image src="/question_formats.png" alt="Diverse Question Formats" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Diverse Question Formats", 
@@ -109,7 +109,7 @@ export default function LandingPage() {
     { 
       mockup: (
         <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/teacher_dashboard.png" alt="Actionable Teacher Dashboard" fill className="object-cover object-top" />
+          <Image src="/teacher_dashboard.png" alt="Actionable Teacher Dashboard" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
         </div>
       ),
       title: "Actionable Teacher Dashboard", 

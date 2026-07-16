@@ -46,10 +46,10 @@ export default function TeacherDashboard() {
             import('@/store/useExamBuilderStore').then(m => m.useExamBuilderStore.getState().resetStore());
             router.push('/teacher/exams/new');
           }}
-          className="bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
         >
           <PlusCircle className="mr-2 h-5 w-5" />
-          Create New Assessment
+          Create New Exam
         </Button>
       </header>
 
@@ -57,7 +57,7 @@ export default function TeacherDashboard() {
         <Card className="bg-[#111520] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Exams</CardTitle>
-            <FileText className="h-4 w-4 text-purple-400" />
+            <FileText className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalExams}</div>
@@ -66,7 +66,7 @@ export default function TeacherDashboard() {
         <Card className="bg-[#111520] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-purple-400" />
+            <Users className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalStudents}</div>
@@ -75,7 +75,7 @@ export default function TeacherDashboard() {
         <Card className="bg-[#111520] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Average Score</CardTitle>
-            <BarChart className="h-4 w-4 text-purple-400" />
+            <BarChart className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{averageScore}%</div>
@@ -84,20 +84,20 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="mt-4">
-        <h3 className="text-xl font-semibold text-white mb-4">Recent Assessments</h3>
+        <h3 className="text-xl font-semibold text-white mb-4">Recent Exams</h3>
         {recentExams.length === 0 ? (
           <Card className="bg-[#111520] border-white/5">
             <CardContent className="p-0">
                <div className="p-8 text-center text-gray-500 text-sm">
-                  No recent assessments found. Click "Create New Assessment" to get started.
+                  No recent exams found. Click "Create New Exam" to get started.
                </div>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {recentExams.map((exam: any) => (
-              <Card key={exam.id || exam._id} className="bg-[#111520] border-white/5 hover:border-purple-500/30 transition-colors shadow-lg overflow-hidden group">
-                <div className="h-2 bg-gradient-to-r from-purple-600 to-indigo-600"></div>
+              <Card key={exam.id || exam._id} className="bg-[#111520] border-white/5 hover:border-blue-500/30 transition-colors shadow-lg overflow-hidden group">
+                <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4 gap-4">
                     <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">{exam.title}</h3>
@@ -105,15 +105,15 @@ export default function TeacherDashboard() {
                   
                   <div className="space-y-2 mt-4 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-purple-400" />
+                      <Clock className="h-4 w-4 text-blue-400" />
                       <span>Duration: {exam.duration} mins</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-purple-400" />
+                      <FileText className="h-4 w-4 text-blue-400" />
                       <span>Total Marks: {exam.totalMarks}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-purple-400" />
+                      <Calendar className="h-4 w-4 text-blue-400" />
                       <span>Created: {new Date(exam.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
@@ -134,7 +134,7 @@ export default function TeacherDashboard() {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="bg-transparent border-white/10 text-purple-400 border-purple-500/30 hover:text-purple-300 hover:bg-purple-500/10"
+                        className="bg-transparent border-white/10 text-blue-400 border-blue-500/30 hover:text-blue-300 hover:bg-blue-500/10"
                         onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}`)}
                       >
                         Manage

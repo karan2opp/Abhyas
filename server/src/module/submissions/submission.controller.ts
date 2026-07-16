@@ -31,8 +31,16 @@ export const deleteSubmission = async (req: Request, res: Response) => {
 
 export const getMySubmissions = async (req: Request, res: Response) => {
     const mode = (req.query.mode as string) || "simple";
-    const submissions = await submissionsService.getMySubmissions(req.user!.id, mode);
-    return ApiResponse.ok(res, "My submissions fetched successfully", submissions);
+    const { search, days, page, limit } = req.query;
+    const submissionsData = await submissionsService.getMySubmissions(
+        req.user!.id,
+        mode,
+        search as string,
+        days as string,
+        Number(page) || 1,
+        Number(limit) || 10
+    );
+    return ApiResponse.ok(res, "My submissions fetched successfully", submissionsData);
 };
 
 export const getExamForSubmission = async (req: Request, res: Response) => {

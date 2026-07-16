@@ -17,5 +17,5 @@ router.get("/:id", authenticate, authorize("teacher"), controller.getQuestionByI
 router.patch("/:id", authenticate, authorize("teacher"), upload.array("images", 1), validate(updateQuestionSchema), controller.updateQuestion);
 router.delete("/:id", authenticate, authorize("teacher"), controller.deleteQuestion);
 router.post('/generate', authenticate, authorize("teacher"), validate(generateQuestionConfigSchema), controller.generateQuestion);
-router.post('/chat-generate', authenticate, authorize("teacher"), controller.chatGenerateQuestion);
+
 export default router;

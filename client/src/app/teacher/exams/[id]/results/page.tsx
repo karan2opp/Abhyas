@@ -81,7 +81,7 @@ export default function ExamResultsPage() {
         <Card className="bg-[#111520] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Submissions</CardTitle>
-            <Users className="h-4 w-4 text-purple-400" />
+            <Users className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalSubmissions}</div>
@@ -143,7 +143,7 @@ export default function ExamResultsPage() {
                         {row.submission.status === "submitted" && <span className="px-2 py-1 bg-green-500/10 text-green-400 rounded text-xs font-bold uppercase tracking-wider border border-green-500/20">Submitted</span>}
                         {row.submission.status === "evaluating" && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs font-bold uppercase tracking-wider border border-blue-500/20">Evaluating</span>}
                         {row.submission.status === "timeout" && <span className="px-2 py-1 bg-yellow-500/10 text-yellow-400 rounded text-xs font-bold uppercase tracking-wider border border-yellow-500/20">Timeout</span>}
-                        {row.submission.status === "inprogress" && <span className="px-2 py-1 bg-purple-500/10 text-purple-400 rounded text-xs font-bold uppercase tracking-wider border border-purple-500/20">In Progress</span>}
+                        {row.submission.status === "inprogress" && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs font-bold uppercase tracking-wider border border-blue-500/20">In Progress</span>}
                       </td>
                       <td className="px-6 py-4 font-bold text-white">
                         {row.submission.score !== null ? row.submission.score : "-"}

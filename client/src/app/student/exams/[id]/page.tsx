@@ -93,7 +93,7 @@ export default function ExamAttemptPage() {
         }
 
       } catch (err) {
-        toast.error("Failed to load the assessment.");
+        toast.error("Failed to load the exam.");
         router.push("/student");
       } finally {
         setLoading(false);
@@ -132,7 +132,7 @@ export default function ExamAttemptPage() {
   }, [examData]);
 
   const handleTimeUp = async () => {
-    toast.error("Time is up! Submitting your assessment automatically.");
+    toast.error("Time is up! Submitting your exam automatically.");
     await submitExamFinal();
   };
 
@@ -236,7 +236,7 @@ export default function ExamAttemptPage() {
       }
 
       await submitExamService(submissionId);
-      toast.success("Assessment submitted successfully!");
+      toast.success("Exam submitted successfully!");
       if (examData?.requireFeedback) {
         setShowFeedback(true);
       } else {
@@ -249,7 +249,7 @@ export default function ExamAttemptPage() {
   };
 
   const handleSubmitClick = () => {
-    if (!confirm("Are you sure you want to submit your assessment? You cannot change your answers after submitting.")) return;
+    if (!confirm("Are you sure you want to submit your exam? You cannot change your answers after submitting.")) return;
     submitExamFinal();
   };
 
@@ -286,9 +286,9 @@ export default function ExamAttemptPage() {
     );
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Loading Assessment...</div>;
-  if (!examData) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Assessment not found.</div>;
-  if (flattenedQuestions.length === 0) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">No questions in this assessment.</div>;
+  if (loading) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Loading Exam...</div>;
+  if (!examData) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Exam not found.</div>;
+  if (flattenedQuestions.length === 0) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">No questions in this exam.</div>;
 
   const currentQuestion = flattenedQuestions[currentIndex];
   const selectedOptions = answers[currentQuestion.id] || [];
@@ -355,7 +355,7 @@ export default function ExamAttemptPage() {
                     code: ({node, ...props}) => {
                       const isInline = !props.className?.includes('language-');
                       return isInline 
-                        ? <code className="bg-purple-500/10 px-2 py-1 rounded text-lg text-purple-300 font-mono border border-purple-500/20 font-normal" {...props} /> 
+                        ? <code className="bg-blue-500/10 px-2 py-1 rounded text-lg text-blue-300 font-mono border border-blue-500/20 font-normal" {...props} /> 
                         : (
                           <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl font-normal">
                             <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">

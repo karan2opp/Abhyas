@@ -1,9 +1,31 @@
-import { eq, and, count, inArray, avg, desc } from "drizzle-orm";
+import { eq, and, count, inArray, avg, desc, ilike, gte } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { exams, sections, questions, options } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
+
+import { run } from "@openai/agents";
+import { guardrailAgent } from "../Test-agent-/guardrail/agent.js";
+import { SubTopicAgent } from "../Test-agent-/subtopic/agent.js";
+import { allocateGenerationTasks } from "./ai/planner/allocation.js";
+import { executeGenerationTasks } from "./ai/question/executor.js";
+import { validateGenerationResults, validateQuestion } from "./ai/question/validator.js";
+import { repairQuestion } from "./ai/question/repair.js";
+import { formatExam } from "./ai/question/formatter.js";
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // ── Generate Join Code ─────────────────────────────────────────────────────────
 const generateJoinCode = (): string => {
@@ -98,9 +120,39 @@ const saveGeneratedExam = async (data: any, teacherId: string) => {
 };
 
 // ── Get All Exams (teacher sees only his own) ──────────────────────────────────
-const getExams = async (teacherId: string) => {
-    const result = await db.select().from(exams).where(eq(exams.createdBy, teacherId));
-    return result;
+const getExams = async (teacherId: string, search?: string, days?: string, page: number = 1, limit: number = 10) => {
+    const conditions = [eq(exams.createdBy, teacherId)];
+
+    if (search) {
+        conditions.push(ilike(exams.title, `%${search}%`));
+    }
+
+    if (days && days !== "all") {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - parseInt(days));
+        // Use createdAt for filtering newly created exams
+        conditions.push(gte(exams.createdAt, cutoffDate));
+    }
+
+    const offset = (page - 1) * limit;
+
+    const data = await db.select().from(exams)
+        .where(and(...conditions))
+        .orderBy(desc(exams.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+    const [totalCount] = await db.select({ value: count() }).from(exams)
+        .where(and(...conditions));
+    const total = Number(totalCount?.value) || 0;
+
+    return {
+        data,
+        total,
+        page,
+        limit,
+        hasMore: offset + data.length < total
+    };
 };
 
 // ── Get Single Exam ────────────────────────────────────────────────────────────
@@ -130,10 +182,10 @@ const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string
     }
 
     const [updated] = await db.update(exams)
-        .set({ 
-            ...data, 
+        .set({
+            ...data,
             duration: calculatedDuration !== undefined ? calculatedDuration : existing.duration,
-            updatedAt: new Date() 
+            updatedAt: new Date()
         })
         .where(eq(exams.id, examId))
         .returning();
@@ -190,4 +242,141 @@ const getOverviewStats = async (teacherId: string) => {
     };
 };
 
-export { createExam, getExams, getExamById, updateExam, deleteExam, getOverviewStats, saveGeneratedExam };
+// ── Generate Exam From Form ──────────────────────────────────────────────────────
+
+const ORG_CONFIG = {
+    orgId: "default",
+    examType: "Competitive",
+};
+
+const generateExamFromForm = async (data: any, teacherId: string) => {
+    // 1. Guardrail
+    const allTopics = data.sections.map((s: any) => s.topics).join(", ");
+    const guardrailInput: any = [
+        { 
+            role: "user", 
+            content: [{ type: "input_text", text: `Create an exam with title "${data.title}" and subject "${data.subject}". Topics include: ${allTopics}. Special instructions: ${data.specialInstructions || "None"}.` }] 
+        }
+    ];
+
+    const guardrailResult = await run(guardrailAgent, guardrailInput);
+    const guardrailData = guardrailResult.finalOutput as any;
+
+    if (!guardrailData || !guardrailData.isValid) {
+        throw new ApiError(400, guardrailData?.reason || "Invalid request according to safety guardrails.");
+    }
+
+    // 2. Subtopic Planner
+    const allSubtopics = [];
+    for (const section of data.sections) {
+        const totalSectionQuestions = section.groups.reduce((acc: number, g: any) => acc + (Number(g.numberOfQuestions) || 0), 0);
+        const subTopicInput = {
+            subject: data.subject,
+            difficulty: data.difficulty,
+            specialInstructions: data.specialInstructions,
+            sections: [{ name: section.name, questions: [{ count: totalSectionQuestions }] }],
+            questionCount: totalSectionQuestions,
+            orgConfig: ORG_CONFIG
+        };
+        const subTopicResult = await run(SubTopicAgent, JSON.stringify(subTopicInput));
+        
+        const subtopics = ((subTopicResult.finalOutput as any).subtopics || []).map((st: any) => ({
+            ...st,
+            section: section.name
+        }));
+        
+        allSubtopics.push({ sectionData: section, subtopics });
+    }
+
+    // 3. Allocation Engine
+    let generationTasks: any[] = [];
+    for (const { sectionData, subtopics } of allSubtopics) {
+        const groups = sectionData.groups.map((g: any) => ({
+            questionType: g.questionType,
+            numberOfQuestions: Number(g.numberOfQuestions),
+            marksPerQuestion: Number(g.marksPerQuestion),
+        }));
+
+        const allocation = allocateGenerationTasks(
+            data.title,
+            data.subject,
+            subtopics,
+            groups,
+            data.specialInstructions
+        );
+        generationTasks.push(...allocation.tasks);
+    }
+
+    // 4. Executor
+    const executorConfig = { ...ORG_CONFIG, concurrency: 5 };
+    const executorResult = await executeGenerationTasks(generationTasks, executorConfig);
+
+    // 5. Validator
+    let validationResult = validateGenerationResults(executorResult.results);
+
+    // 6. Repair
+    if (!validationResult.isValid) {
+        for (const issue of validationResult.issues) {
+            const task = issue.task;
+            const question = issue.question;
+            if (!task || !question) continue;
+
+            const taskId = task.id;
+            const questionId = question.id;
+
+            // Repair the question
+            const repairResult = await repairQuestion(issue, ORG_CONFIG);
+            
+            // Revalidate repaired question
+            const newIssues = validateQuestion(repairResult.repairedQuestion, task);
+            if (newIssues.length > 0) {
+                throw new ApiError(500, `Validation failed after repair: ${newIssues[0]?.message}`);
+            }
+
+            // Update the GenerationResult
+            const resultIndex = executorResult.results.findIndex((r: any) => r.task.id === taskId);
+            if (resultIndex !== -1) {
+                const result = executorResult.results[resultIndex];
+                if (result && result.output) {
+                    const output = result.output;
+                    const qIndex = output.questions.findIndex((q: any) => q.id === questionId);
+                    if (qIndex !== -1) {
+                        output.questions[qIndex] = repairResult.repairedQuestion;
+                    }
+                }
+            }
+        }
+        
+        // Re-run global validator just to be safe
+        validationResult = validateGenerationResults(executorResult.results);
+        if (!validationResult.isValid) {
+            throw new ApiError(500, "Validation failed after repair.");
+        }
+    }
+
+    // 7. Formatter
+    const examMetadata = {
+        title: data.title,
+        subject: data.subject,
+        description: `${data.subject} exam`,
+        duration: data.duration || 60,
+        examType: "flexible"
+    };
+
+    const formattedExam = formatExam(examMetadata, executorResult.results);
+
+    return formattedExam;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+export { createExam, getExams, getExamById, updateExam, deleteExam, getOverviewStats, saveGeneratedExam, generateExamFromForm };

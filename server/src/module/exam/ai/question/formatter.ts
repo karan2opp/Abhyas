@@ -54,6 +54,18 @@ function formatQuestion(
 
     if (question.type === "mcq") {
 
+        const options = question.options.map((option: any) => ({
+            value: option.text,
+            isCorrect: option.id === question.correctOptionId,
+        }));
+
+        for (let i = options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temp = options[i];
+            options[i] = options[j] as any;
+            options[j] = temp as any;
+        }
+
         return {
 
             type: result.task.questionType,
@@ -62,14 +74,7 @@ function formatQuestion(
 
             marks: result.task.marksPerQuestion,
 
-            options: question.options.map((option: any) => ({
-
-                value: option.text,
-
-                isCorrect:
-                    option.id === question.correctOptionId,
-
-            })),
+            options,
 
         };
 

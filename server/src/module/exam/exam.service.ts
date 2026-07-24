@@ -271,6 +271,7 @@ const generateExamFromForm = async (data: any, teacherId: string) => {
     for (const section of data.sections) {
         const totalSectionQuestions = section.groups.reduce((acc: number, g: any) => acc + (Number(g.numberOfQuestions) || 0), 0);
         const subTopicInput = {
+            topic: section.topics,
             subject: data.subject,
             difficulty: data.difficulty,
             specialInstructions: data.specialInstructions,
@@ -312,6 +313,8 @@ const generateExamFromForm = async (data: any, teacherId: string) => {
 
     // 4. Executor
     const executorConfig = { ...ORG_CONFIG, concurrency: 5 };
+    console.log("=== GENERATION TASKS ===");
+    console.log(JSON.stringify(generationTasks, null, 2));
     const executorResult = await executeGenerationTasks(generationTasks, executorConfig);
 
     // 5. Validator

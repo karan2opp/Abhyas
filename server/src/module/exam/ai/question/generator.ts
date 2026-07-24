@@ -59,7 +59,7 @@ export async function generateQuestions(
     });
 
     const agent = new Agent({
-        name: `${task.questionType.toUpperCase()} Generator`,
+        name: `${task.questionType.toUpperCase()} Generator - ${task.id}`,
         model: "gpt-4o-mini",
         instructions,
         outputType: GenerationOutputSchema,

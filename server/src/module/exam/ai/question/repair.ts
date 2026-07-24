@@ -88,7 +88,7 @@ export async function repairQuestion(
 
     const agent = new Agent({
 
-        name: "Question Repair Agent",
+        name: `Question Repair Agent - ${issue.task.id}`,
 
         model: "gpt-4o-mini",
 

@@ -295,6 +295,9 @@ const generateExamFromForm = async (data: any, teacherId: string) => {
             questionType: g.questionType,
             numberOfQuestions: Number(g.numberOfQuestions),
             marksPerQuestion: Number(g.marksPerQuestion),
+            specialInstructions: g.specialInstructions ? g.specialInstructions.filter((i: string) => i.trim() !== "").join("\n") : undefined,
+            topics: g.topics,
+            mergeSectionTopics: g.mergeSectionTopics
         }));
 
         const allocation = allocateGenerationTasks(

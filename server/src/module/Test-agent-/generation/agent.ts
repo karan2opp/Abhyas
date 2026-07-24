@@ -320,6 +320,8 @@ information given to you — never inventing scope beyond it.
    question — never reference an option that doesn't exist in your own output.
 6. Do not include your own reasoning, commentary, or explanations outside the
    structured output fields.
+7. If the question contains code snippets, you MUST format them using markdown code blocks (e.g. \`\`\`python ... \`\`\`) inside the questionText field.
+8. CRITICAL: Randomize the correctOptionId across questions! Do NOT always make option "A" the correct answer. Keep the correct answers evenly distributed among A, B, C, and D.
 
 ## Example
 {{EXAMPLE_PLACEHOLDER}}

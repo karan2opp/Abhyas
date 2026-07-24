@@ -32,6 +32,12 @@ export interface SectionQuestionGroup {
     numberOfQuestions: number;
 
     marksPerQuestion: number;
+
+    specialInstructions?: string;
+
+    topics?: string;
+
+    mergeSectionTopics?: boolean;
 }
 
 /**

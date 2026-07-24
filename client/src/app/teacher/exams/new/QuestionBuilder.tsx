@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Edit2, Check, X, CheckCircle2, Circle, Settings2, Zap, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Edit2, Check, X, CheckCircle2, Circle, Settings2, Zap, Sparkles, ChevronDown, ChevronUp, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -428,6 +428,8 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
   const [isSaving, setIsSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(config.question?.images?.[0]?.url || null);
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync state if config changes (e.g. Save & Another clicked)
   useEffect(() => {
@@ -458,6 +460,27 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+  };
+
+  const handleInsertCodeBlock = () => {
+    if (!textareaRef.current) return;
+    const textarea = textareaRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    const selectedText = description.substring(start, end);
+    const beforeText = description.substring(0, start);
+    const afterText = description.substring(end);
+    
+    const codeBlock = `\n\`\`\`python\n${selectedText || 'console.log("Hello World");'}\n\`\`\`\n`;
+    
+    const newDescription = beforeText + codeBlock + afterText;
+    setDescription(newDescription);
+    
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + 11, start + 11 + (selectedText.length || 27));
+    }, 0);
   };
 
   const handleSave = async (addAnother: boolean = false) => {
@@ -559,12 +582,25 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh }: {
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-300">Question Description</label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-gray-300">Question Description</label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleInsertCodeBlock}
+              className="h-7 text-xs bg-blue-500/10 border-blue-500/20 text-blue-400 hover:text-white hover:bg-blue-500/30"
+            >
+              <Code className="h-3 w-3 mr-1" />
+              Make Code Block
+            </Button>
+          </div>
           <Textarea
+            ref={textareaRef}
             placeholder="Enter question text here..."
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="bg-[#0b0f19] border-white/10 text-white min-h-[140px]"
+            className="bg-[#0b0f19] border-white/10 text-white min-h-[140px] font-mono text-[13px]"
           />
           <p className="text-xs text-gray-500 text-right">{description.length} chars (min 10)</p>
         </div>

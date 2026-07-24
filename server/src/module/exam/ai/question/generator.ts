@@ -98,7 +98,8 @@ ${task.specialInstructions ?? "None"}
 Requirements:
 
 - Return exactly ${task.questionCount} questions.
-- Every question must belong to subtopic "${task.subtopicId}".
+- The CONTENT of your questions MUST strictly be about subtopic "${task.subtopicName}" (Id: "${task.subtopicId}").
+- If Special Instructions contain examples from other topics, extract ONLY the format, style, or difficulty. Do NOT copy their content or switch topics.
 - Every question must belong to section "${task.section}".
 - Never generate duplicate questions.
 `,

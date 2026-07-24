@@ -20,7 +20,7 @@ export default function CreateExamPage() {
     title: "",
     subject: "",
     difficulty: "Medium",
-    specialInstructions: "",
+    specialInstructions: [""],
     sections: [
       {
         id: Date.now().toString(),
@@ -32,6 +32,9 @@ export default function CreateExamPage() {
             questionType: "mcq",
             marksPerQuestion: 1,
             numberOfQuestions: 5,
+            specialInstructions: [""],
+            topics: "",
+            mergeSectionTopics: true,
           }
         ]
       }
@@ -64,6 +67,9 @@ export default function CreateExamPage() {
               questionType: "mcq",
               marksPerQuestion: 1,
               numberOfQuestions: 5,
+              specialInstructions: [""],
+              topics: "",
+              mergeSectionTopics: true,
             }
           ]
         }
@@ -94,7 +100,7 @@ export default function CreateExamPage() {
       ...prev,
       sections: prev.sections.map(s => s.id === sectionId ? {
         ...s,
-        groups: [...s.groups, { id: Date.now().toString(), questionType: "mcq", marksPerQuestion: 1, numberOfQuestions: 5 }]
+        groups: [...s.groups, { id: Date.now().toString(), questionType: "mcq", marksPerQuestion: 1, numberOfQuestions: 5, specialInstructions: [""], topics: "", mergeSectionTopics: true }]
       } : s)
     }));
   };
@@ -143,8 +149,14 @@ export default function CreateExamPage() {
     
     try {
       setLoadingMessage("Validating exam scope and topics...");
+      
+      const payloadToSubmit = {
+        ...formData,
+        specialInstructions: formData.specialInstructions.filter(i => i.trim() !== "").join("\n")
+      };
+
       // Backend API call to generate exam
-      const res = await api.post("/exams/generate-from-form", formData);
+      const res = await api.post("/exams/generate-from-form", payloadToSubmit);
       const generatedExam = res.data.data;
       
       setLoadingMessage("Saving generated exam and questions...");
@@ -266,14 +278,45 @@ export default function CreateExamPage() {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Special Instructions (Optional)</label>
-                <textarea 
-                  value={formData.specialInstructions}
-                  onChange={e => setFormData({...formData, specialInstructions: e.target.value})}
-                  placeholder="e.g. Include scenario-based questions, avoid true/false..."
-                  className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-md p-3 min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y"
-                />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-300">Special Instructions (Optional)</label>
+                  <Button 
+                    type="button" 
+                    onClick={() => setFormData(prev => ({...prev, specialInstructions: [...prev.specialInstructions, ""]}))} 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Add Instruction
+                  </Button>
+                </div>
+                {formData.specialInstructions.map((instruction, idx) => (
+                  <div key={idx} className="flex gap-2 items-start relative group">
+                    <textarea 
+                      value={instruction}
+                      onChange={e => {
+                        const newInstructions = [...formData.specialInstructions];
+                        newInstructions[idx] = e.target.value;
+                        setFormData({...formData, specialInstructions: newInstructions});
+                      }}
+                      placeholder={`e.g. Instruction ${idx + 1}...`}
+                      className="flex-1 bg-[#1a1f2e] border border-white/10 text-white rounded-md p-3 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y"
+                    />
+                    {formData.specialInstructions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newInstructions = formData.specialInstructions.filter((_, i) => i !== idx);
+                          setFormData({...formData, specialInstructions: newInstructions});
+                        }}
+                        className="mt-2 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove instruction"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -318,11 +361,11 @@ export default function CreateExamPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Topics to Cover *</label>
-                      <Input 
+                      <textarea 
                         value={section.topics}
                         onChange={e => updateSection(section.id, 'topics', e.target.value)}
                         placeholder="e.g. arrays, strings, dynamic programming"
-                        className="bg-[#1a1f2e] border-white/10 text-white h-9"
+                        className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-md p-2 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y"
                         required
                       />
                     </div>
@@ -384,6 +427,76 @@ export default function CreateExamPage() {
                                 <Trash2 className="h-4 w-4" />
                               </button>
                             </div>
+                            <div className="col-span-12 mt-2 space-y-3 pt-2 border-t border-white/5">
+                              {/* Topics Override */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Group Topics (Optional override)</label>
+                                  <div className="flex items-center gap-2">
+                                    <input 
+                                      type="checkbox" 
+                                      id={`merge-${group.id}`}
+                                      checked={group.mergeSectionTopics !== false}
+                                      onChange={e => updateGroup(section.id, group.id, 'mergeSectionTopics', e.target.checked)}
+                                      className="h-3 w-3 rounded bg-white/10 border-white/20 text-blue-500 focus:ring-0 focus:ring-offset-0"
+                                    />
+                                    <label htmlFor={`merge-${group.id}`} className="text-[10px] text-gray-400 cursor-pointer">Merge with section topics</label>
+                                  </div>
+                                </div>
+                                <Input 
+                                  value={group.topics || ""}
+                                  onChange={e => updateGroup(section.id, group.id, 'topics', e.target.value)}
+                                  placeholder="e.g. specific to this group..."
+                                  className="bg-[#1a1f2e] border-white/10 text-white h-8 text-xs"
+                                />
+                              </div>
+
+                              {/* Special Instructions */}
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Group Instructions (Optional)</label>
+                                  <Button 
+                                    type="button" 
+                                    onClick={() => {
+                                      const newInst = [...(group.specialInstructions || [""]), ""];
+                                      updateGroup(section.id, group.id, 'specialInstructions', newInst);
+                                    }} 
+                                    variant="ghost" 
+                                    className="h-5 px-1.5 text-[10px] text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" /> Add
+                                  </Button>
+                                </div>
+                              {(group.specialInstructions || [""]).map((inst: string, iIdx: number) => (
+                                <div key={iIdx} className="flex gap-2 items-start group/inst">
+                                  <textarea 
+                                    value={inst}
+                                    onChange={e => {
+                                      const newInst = [...(group.specialInstructions || [""])];
+                                      newInst[iIdx] = e.target.value;
+                                      updateGroup(section.id, group.id, 'specialInstructions', newInst);
+                                    }}
+                                    placeholder="e.g. Ask output prediction based questions..."
+                                    className="flex-1 bg-[#1a1f2e] border border-white/10 text-white rounded-md p-2 text-xs min-h-[40px] focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-y"
+                                  />
+                                  {((group.specialInstructions || [""]).length > 1 || inst !== "") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        let newInst = (group.specialInstructions || [""]).filter((_: any, i: number) => i !== iIdx);
+                                        if (newInst.length === 0) newInst = [""];
+                                        updateGroup(section.id, group.id, 'specialInstructions', newInst);
+                                      }}
+                                      className="mt-1 text-gray-500 hover:text-red-400 opacity-0 group-hover/inst:opacity-100 transition-opacity"
+                                      title="Remove instruction"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -434,10 +547,14 @@ export default function CreateExamPage() {
                 </div>
               </div>
 
-              {formData.specialInstructions && (
+              {formData.specialInstructions && formData.specialInstructions.some(i => i.trim() !== '') && (
                 <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl relative z-10">
                   <h4 className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">Special Instructions</h4>
-                  <p className="text-amber-200/80 text-sm">{formData.specialInstructions}</p>
+                  <ul className="list-disc list-inside text-amber-200/80 text-sm space-y-1">
+                    {formData.specialInstructions.filter(i => i.trim() !== '').map((inst, idx) => (
+                      <li key={idx}>{inst}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
@@ -467,11 +584,29 @@ export default function CreateExamPage() {
                     </div>
                     
                     {sec.groups.length > 0 && (
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4 border-l-2 border-white/10">
+                      <div className="mt-4 grid grid-cols-1 gap-2 pl-4 border-l-2 border-white/10">
                         {sec.groups.map((g: any, gIdx: number) => (
-                          <div key={gIdx} className="bg-white/5 px-3 py-2 rounded flex justify-between items-center text-xs">
-                            <span className="text-gray-300">{g.questionType === 'mcq' ? 'MCQ' : 'Descriptive'}</span>
-                            <span className="text-gray-400">{g.numberOfQuestions} Qs × {g.marksPerQuestion} marks</span>
+                          <div key={gIdx} className="bg-white/5 px-3 py-2 rounded flex flex-col gap-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-300">{g.questionType === 'mcq' ? 'MCQ' : 'Descriptive'}</span>
+                              <span className="text-gray-400">{g.numberOfQuestions} Qs × {g.marksPerQuestion} marks</span>
+                            </div>
+                            {g.topics && (
+                              <div className="pt-2 border-t border-white/5">
+                                <span className="text-[10px] text-blue-400 font-semibold uppercase block mb-1">Specific Topics</span>
+                                <p className="text-[11px] text-gray-400">{g.topics} <span className="text-gray-500 ml-1">({g.mergeSectionTopics === false ? "Override" : "Merged"})</span></p>
+                              </div>
+                            )}
+                            {g.specialInstructions && g.specialInstructions.some((i: string) => i.trim() !== '') && (
+                              <div className="pt-2 border-t border-white/5">
+                                <span className="text-[10px] text-amber-400 font-semibold uppercase block mb-1">Group Instructions</span>
+                                <ul className="list-disc list-inside text-amber-200/70 text-[11px] space-y-0.5">
+                                  {g.specialInstructions.filter((i: string) => i.trim() !== '').map((inst: string, idx: number) => (
+                                    <li key={idx}>{inst}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

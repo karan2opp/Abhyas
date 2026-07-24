@@ -62,6 +62,26 @@ export function allocateGenerationTasks(
         );
 
     for (const group of groups) {
+        if (group.topics && group.mergeSectionTopics === false) {
+            // Override section topics completely: create ONE task for this group.
+            const task: GenerationTask = {
+                id: crypto.randomUUID(),
+                examTitle,
+                subject,
+                section: subtopics.length > 0 ? (subtopics[0]?.section ?? "Default") : "Default",
+                subtopicId: crypto.randomUUID(),
+                subtopicName: group.topics,
+                description: null,
+                difficulty: subtopics.length > 0 ? (subtopics[0]?.difficulty ?? "medium") : "medium",
+                questionType: group.questionType,
+                questionCount: group.numberOfQuestions,
+                marksPerQuestion: group.marksPerQuestion,
+            };
+            const combinedInstructions = [specialInstructions, group.specialInstructions].filter(Boolean).join("\n\n");
+            if (combinedInstructions) task.specialInstructions = combinedInstructions;
+            tasks.push(task);
+            continue;
+        }
 
         const distribution =
             proportionalDistribution(
@@ -76,9 +96,9 @@ export function allocateGenerationTasks(
 
             if (count === 0) return;
 
-            tasks.push({
-
+            const task: GenerationTask = {
                 id:
+
                     crypto.randomUUID(),
 
                 examTitle,
@@ -108,10 +128,18 @@ export function allocateGenerationTasks(
 
                 marksPerQuestion:
                     group.marksPerQuestion,
+            };
 
-                ...(specialInstructions ? { specialInstructions } : {}),
-            });
+            const combinedInstructions = [
+                specialInstructions, 
+                group.specialInstructions,
+                group.topics && group.mergeSectionTopics !== false ? `Must also include/cover topics: ${group.topics}` : null
+            ].filter(Boolean).join("\n\n");
+            if (combinedInstructions) {
+                task.specialInstructions = combinedInstructions;
+            }
 
+            tasks.push(task);
         });
     }
 

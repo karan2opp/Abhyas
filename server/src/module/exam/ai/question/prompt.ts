@@ -37,9 +37,17 @@ GENERAL RULES
 
 6. Never explain your reasoning.
 
-7. Never include markdown.
+7. CRITICAL CODE FORMATTING: If the question contains code, you MUST format it as a MULTI-LINE markdown code block using triple backticks. You MUST use newlines (\n) to format the code properly.
+Example:
+What is the output?
+\`\`\`python
+def example(x):
+    return x + 1
+print(example(5))
+\`\`\`
+DO NOT put all code on a single line. DO NOT use single backticks.
 
-8. Never include prose.
+8. Never include prose outside of the required fields.
 
 9. Return ONLY structured output.
 
@@ -53,8 +61,7 @@ GENERAL RULES
 
 14. Never skip a requested field.
 
-15. If special instructions are supplied,
-they override every default rule.
+15. If special instructions are supplied, take inspiration and collect information from them. Do NOT blindly copy or follow them, and they must NOT override the requirement to generate unique and diverse questions.
 
 `;
 
@@ -80,6 +87,8 @@ Never generate descriptive questions.
 Never generate explanations.
 
 Incorrect options should be realistic distractors.
+
+CRITICAL: Randomize the correctOptionId across questions! Do NOT always make option A the correct answer. You MUST NOT have the same correct option (e.g., A, A, A) three times in a row. Keep the correct answers evenly distributed and highly varied among A, B, C, and D.
 
 `;
 
@@ -110,13 +119,11 @@ OUTPUT RULES
 
 Return ONLY structured output.
 
-No markdown.
-
 No explanations.
 
-No code fences.
-
 No comments.
+
+(Note: Markdown and code fences are allowed ONLY inside the questionText field for formatting code).
 
 `;
 

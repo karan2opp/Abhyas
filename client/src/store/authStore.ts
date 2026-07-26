@@ -5,7 +5,7 @@ interface User {
   _id: string;
   name: string;
   email: string;
-  role: 'student' | 'teacher' | 'admin' | 'superadmin';
+  role: 'student' | 'teacher' | 'manager' | 'system_admin';
   avatarUrl?: string;
 }
 
@@ -45,8 +45,8 @@ export const useAuthStore = create<AuthState>((set) => ({
    * Set user + token after login
    */
   setUser: (userData, token) => {
-    const isAdmin = userData?.role === "admin";
-    const isSuperAdmin = userData?.role === "superadmin";
+    const isAdmin = userData?.role === "system_admin";
+    const isSuperAdmin = userData?.role === "system_admin";
     set({
       user: userData,
       accessToken: token,
@@ -87,7 +87,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 // ── Helper Hooks (for components) ─────────────────────
 export const useIsAdmin = () =>
-  useAuthStore((state) => state.user?.role === "admin");
+  useAuthStore((state) => state.user?.role === "system_admin");
 
 export const useUserRole = () =>
   useAuthStore((state) => state.user?.role);

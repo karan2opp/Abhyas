@@ -6,8 +6,8 @@ import { manageAdminSchema } from "./dto/superadmin.dto.js";
 
 const router = Router();
 
-router.get("/admins", authenticate, authorize("superadmin"), controller.getAdmins);
-router.post("/assign-admin", authenticate, authorize("superadmin"), validate(manageAdminSchema), controller.assignAdmin);
-router.post("/revoke-admin", authenticate, authorize("superadmin"), validate(manageAdminSchema), controller.revokeAdmin);
+router.get("/admins", authenticate, authorize("system_admin"), controller.getAdmins);
+router.post("/assign-admin", authenticate, authorize("system_admin"), validate(manageAdminSchema), controller.assignAdmin);
+router.post("/revoke-admin", authenticate, authorize("system_admin"), validate(manageAdminSchema), controller.revokeAdmin);
 
 export default router;

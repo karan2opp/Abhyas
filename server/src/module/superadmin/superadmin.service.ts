@@ -5,20 +5,17 @@ import { ApiError } from "../../common/utils/ApiError.js";
 
 export const assignAdmin = async (email: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
-    
+
     if (!user) {
         throw ApiError.notFound("User not found with this email address");
     }
 
-    if (user.role === "admin") {
-        throw ApiError.badRequest("User is already an admin");
-    }
-    if (user.role === "superadmin") {
-        throw ApiError.badRequest("Cannot assign admin to a superadmin");
+    if (user.role === "system_admin") {
+        throw ApiError.badRequest("User is already a system admin");
     }
 
     const [updatedUser] = await db.update(users)
-        .set({ role: "admin" })
+        .set({ role: "system_admin" })
         .where(eq(users.email, email))
         .returning();
 
@@ -27,13 +24,13 @@ export const assignAdmin = async (email: string) => {
 
 export const revokeAdmin = async (email: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
-    
+
     if (!user) {
         throw ApiError.notFound("User not found with this email address");
     }
 
-    if (user.role !== "admin") {
-        throw ApiError.badRequest("User is not an admin");
+    if (user.role !== "system_admin") {
+        throw ApiError.badRequest("User is not a system admin");
     }
 
     const [updatedUser] = await db.update(users)
@@ -51,5 +48,5 @@ export const getAdmins = async () => {
         email: users.email,
         role: users.role,
         createdAt: users.createdAt,
-    }).from(users).where(eq(users.role, "admin"));
+    }).from(users).where(eq(users.role, "system_admin"));
 };

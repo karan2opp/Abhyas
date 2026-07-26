@@ -3,17 +3,18 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldCheck, User } from "lucide-react";
+import { Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldAlert, User, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sidebarLinks = [
-  { name: "Manage Teachers", href: "/admin", icon: Users },
-  { name: "Profile", href: "/admin/profile", icon: User },
+  { name: "Organisations", href: "/system_admin/organisations", icon: Building2 },
+  { name: "Manage Admins", href: "/system_admin", icon: Users },
+  { name: "Profile", href: "/system_admin/profile", icon: User },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function SystemAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore(state => state.logout);
@@ -26,8 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (isInitialized) {
       if (!user) {
         router.push("/auth/login");
-      } else if ((user.role as string) !== "admin") {
-        // "admin" role no longer exists (replaced by "manager"/"system_admin") — this route is orphaned.
+      } else if (user.role !== "system_admin") {
         router.replace(`/${user.role}`);
       }
     }
@@ -36,14 +36,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <TooltipProvider>
       <div className="flex flex-col md:flex-row h-screen w-full bg-[#0a0d14] text-gray-100 font-sans overflow-hidden">
-        
+
         {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="bg-blue-600 p-1.5 rounded-md shadow-lg shadow-blue-900/50">
-              <ShieldCheck className="h-5 w-5 text-white" />
+              <ShieldAlert className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg text-white tracking-tight">Abhyas Admin</span>
+            <span className="font-bold text-lg text-white tracking-tight">Abhyas System Admin</span>
           </div>
           <button onClick={() => setIsMobileOpen(true)} className="p-2 -mr-2 text-gray-400 hover:text-white">
             <Menu className="h-6 w-6" />
@@ -52,7 +52,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Mobile Overlay */}
         {isMobileOpen && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/60 z-40 md:hidden"
             onClick={() => setIsMobileOpen(false)}
           />
@@ -65,8 +65,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           "w-64", // Fixed width on mobile
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}>
-          
-          <button 
+
+          <button
             className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white z-10"
             onClick={() => setIsMobileOpen(false)}
           >
@@ -74,7 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
 
           {/* Toggle Button */}
-          <button 
+          <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="hidden md:block absolute -right-3 top-8 bg-[#1a1f2e] border border-white/10 rounded-full p-1 text-gray-400 hover:text-white hover:bg-white/10 transition-colors z-10 shadow-md"
           >
@@ -84,11 +84,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Logo */}
           <div className={cn("p-6 flex items-center gap-3", isCollapsed ? "justify-center p-4" : "")}>
             <div className="bg-blue-600 p-2 rounded-lg shadow-lg shadow-blue-900/50 shrink-0">
-              <ShieldCheck className="h-6 w-6 text-white" />
+              <ShieldAlert className="h-6 w-6 text-white" />
             </div>
             {!isCollapsed && (
               <div className="overflow-hidden whitespace-nowrap">
-                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">Admin Portal</h1>
+                <h1 className="font-bold text-lg leading-tight tracking-tight text-white">System Admin</h1>
                 <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Abhyas</p>
               </div>
             )}
@@ -97,9 +97,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1">
             {sidebarLinks.map((link) => {
-              const isActive = pathname === link.href || pathname.startsWith(link.href + "/") && link.href !== "/admin";
+              const isActive = pathname === link.href || (pathname.startsWith(link.href + "/") && link.href !== "/system_admin");
               const Icon = link.icon;
-              
+
               return (
                 <Link
                   key={link.name}
@@ -109,8 +109,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   className={cn(
                     "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                     isCollapsed ? "justify-center" : "gap-3",
-                    isActive 
-                      ? "bg-white/5 text-blue-400" 
+                    isActive
+                      ? "bg-white/5 text-red-400"
                       : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
                   )}
                 >
@@ -123,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Bottom Actions */}
           <div className="p-4 border-t border-white/5 space-y-1">
-            <button 
+            <button
               onClick={async () => {
                 await logout();
                 router.push("/auth/login");

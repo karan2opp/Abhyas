@@ -9,6 +9,6 @@ const router = Router();
 router.get("/teachers", authenticate, authorize("admin"), controller.getTeachers);
 router.post("/assign-teacher", authenticate, authorize("admin"), validate(manageTeacherSchema), controller.assignTeacher);
 router.post("/revoke-teacher", authenticate, authorize("admin"), validate(manageTeacherSchema), controller.revokeTeacher);
-router.post("/search-user", authenticate, authorize("admin"), validate(searchUserSchema), controller.searchUser);
+router.post("/search-user", authenticate, authorize("system_admin"), validate(searchUserSchema), controller.searchUser);
 
 export default router;

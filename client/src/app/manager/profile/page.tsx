@@ -1,5 +1,5 @@
 import ProfileView from "@/components/ProfileView";
 
-export default function SuperadminProfile() {
+export default function ManagerProfile() {
   return <ProfileView />;
 }

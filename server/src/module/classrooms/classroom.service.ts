@@ -57,6 +57,19 @@ const assertCanManageClassroomTeachers = async (requester: Requester, classroomI
     if (!isOwner) throw ApiError.forbidden("Only the classroom owner or an org manager can manage teachers");
 };
 
+// General classroom management (view roster, edit, join codes, invites): any
+// co-teacher on the classroom, or a manager from the same organisation.
+const assertCanManageClassroom = async (requester: Requester, classroomId: string) => {
+    if (requester.role === "manager") {
+        const allowed = await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId);
+        if (!allowed) throw ApiError.forbidden("You are not authorized to manage this classroom");
+        return;
+    }
+
+    const allowed = await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
+    if (!allowed) throw ApiError.forbidden("You are not authorized to manage this classroom");
+};
+
 // ── Create Classroom ─────────────────────────────────────────────────────────
 const createClassroom = async (data: CreateClassroomDto, teacherId: string, organisationId: string) => {
     const joinCode = await generateUniqueCode();
@@ -83,9 +96,8 @@ const createClassroom = async (data: CreateClassroomDto, teacherId: string, orga
 };
 
 // ── Update Classroom ─────────────────────────────────────────────────────────
-const updateClassroom = async (classroomId: string, data: UpdateClassroomDto, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this classroom");
+const updateClassroom = async (classroomId: string, data: UpdateClassroomDto, requester: Requester) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     const [updated] = await db.update(classrooms)
         .set({ ...data, updatedAt: new Date() })
@@ -139,9 +151,8 @@ const removeTeacher = async (classroomId: string, teacherIdToRemove: string, req
 };
 
 // ── List Teachers ────────────────────────────────────────────────────────────
-const listTeachers = async (classroomId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this classroom");
+const listTeachers = async (classroomId: string, requester: Requester) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     return await db.select({
         id: users.id,
@@ -154,9 +165,8 @@ const listTeachers = async (classroomId: string, teacherId: string) => {
 };
 
 // ── Regenerate Join Code ──────────────────────────────────────────────────────
-const regenerateJoinCode = async (classroomId: string, teacherId: string, data: RegenerateJoinCodeDto) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to manage this classroom");
+const regenerateJoinCode = async (classroomId: string, requester: Requester, data: RegenerateJoinCodeDto) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     const joinCode = await generateUniqueCode();
 
@@ -177,9 +187,8 @@ const regenerateJoinCode = async (classroomId: string, teacherId: string, data: 
 };
 
 // ── Revoke Join Code ──────────────────────────────────────────────────────────
-const revokeJoinCode = async (classroomId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to manage this classroom");
+const revokeJoinCode = async (classroomId: string, requester: Requester) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     const [updated] = await db.update(classrooms)
         .set({ joinCodeRevoked: true, updatedAt: new Date() })
@@ -191,9 +200,8 @@ const revokeJoinCode = async (classroomId: string, teacherId: string) => {
 };
 
 // ── Invite Student (single-use, emailed) ─────────────────────────────────────
-const inviteStudent = async (classroomId: string, data: InviteStudentDto, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to invite students to this classroom");
+const inviteStudent = async (classroomId: string, data: InviteStudentDto, requester: Requester) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     const [classroom] = await db.select().from(classrooms).where(eq(classrooms.id, classroomId));
     if (!classroom) throw ApiError.notFound("Classroom not found");
@@ -204,7 +212,7 @@ const inviteStudent = async (classroomId: string, data: InviteStudentDto, teache
         classroomId,
         email: data.email,
         code,
-        invitedBy: teacherId,
+        invitedBy: requester.id,
         expiresAt: buildExpiry(INVITE_EXPIRY_DAYS),
     }).returning();
 
@@ -319,10 +327,22 @@ const getMyClassrooms = async (teacherId: string) => {
         .where(eq(classroomTeachers.teacherId, teacherId));
 };
 
-// ── Get Classroom Roster (teacher) ───────────────────────────────────────────
-const getClassroomRoster = async (classroomId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this classroom");
+// ── List Classrooms in Organisation (manager) ────────────────────────────────
+const listOrganisationClassrooms = async (organisationId: string) => {
+    return await db.select().from(classrooms).where(eq(classrooms.organisationId, organisationId));
+};
+
+// ── Get My Classrooms (student) ──────────────────────────────────────────────
+const getMyClassroomsAsStudent = async (studentId: string) => {
+    return await db.select({ classroom: classrooms })
+        .from(classroomStudents)
+        .innerJoin(classrooms, eq(classroomStudents.classroomId, classrooms.id))
+        .where(and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active")));
+};
+
+// ── Get Classroom Roster (teacher or manager) ────────────────────────────────
+const getClassroomRoster = async (classroomId: string, requester: Requester) => {
+    await assertCanManageClassroom(requester, classroomId);
 
     return await db.select({
         studentId: users.id,
@@ -348,5 +368,7 @@ export {
     revokeJoinCode,
     joinClassroom,
     getMyClassrooms,
+    getMyClassroomsAsStudent,
     getClassroomRoster,
+    listOrganisationClassrooms,
 };

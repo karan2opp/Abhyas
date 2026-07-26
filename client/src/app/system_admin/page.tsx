@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { getAdminsService, assignAdminService, revokeAdminService } from "./superadmin.service";
+import { getAdminsService, assignAdminService, revokeAdminService } from "./systemAdmin.service";
 import { searchUserService } from "../admin/admin.service";
 
-export default function SuperAdminDashboardPage() {
+export default function SystemAdminDashboardPage() {
   const [admins, setAdmins] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchEmail, setSearchEmail] = useState("");
@@ -21,7 +21,7 @@ export default function SuperAdminDashboardPage() {
       const data = await getAdminsService();
       setAdmins(data.data || data);
     } catch (error) {
-      toast.error("Failed to load admins");
+      toast.error("Failed to load system admins");
     } finally {
       setLoading(false);
     }
@@ -49,22 +49,22 @@ export default function SuperAdminDashboardPage() {
     setIsAssigning(true);
     try {
       await assignAdminService(searchResult.email);
-      toast.success(`${searchResult.name} is now an admin`);
+      toast.success(`${searchResult.name} is now a system admin`);
       setSearchResult(null);
       setSearchEmail("");
       fetchAdmins();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to assign admin role");
+      toast.error(error.response?.data?.message || "Failed to assign system admin role");
     } finally {
       setIsAssigning(false);
     }
   };
 
   const handleRevokeAdmin = async (email: string) => {
-    if (!confirm(`Are you sure you want to revoke admin access for ${email}?`)) return;
+    if (!confirm(`Are you sure you want to revoke system admin access for ${email}?`)) return;
     try {
       await revokeAdminService(email);
-      toast.success(`Admin role revoked for ${email}`);
+      toast.success(`System admin role revoked for ${email}`);
       fetchAdmins();
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to revoke role");
@@ -78,9 +78,9 @@ export default function SuperAdminDashboardPage() {
       <header className="mb-8">
         <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
           <Crown className="h-8 w-8 text-red-500" />
-          Manage Admins
+          Manage System Admins
         </h2>
-        <p className="text-gray-400 mt-1">Assign or revoke admin privileges for users.</p>
+        <p className="text-gray-400 mt-1">Assign or revoke system admin privileges for users.</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -90,13 +90,13 @@ export default function SuperAdminDashboardPage() {
             <CardHeader className="border-b border-white/5 pb-4">
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
                 <Users className="h-5 w-5 text-red-400" />
-                Current Admins ({admins.length})
+                Current System Admins ({admins.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {admins.length === 0 ? (
                 <div className="p-10 text-center text-gray-500">
-                  No admins found.
+                  No system admins found.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -114,13 +114,13 @@ export default function SuperAdminDashboardPage() {
                           <td className="px-6 py-4 font-medium text-white">{admin.name}</td>
                           <td className="px-6 py-4 text-gray-400">{admin.email}</td>
                           <td className="px-6 py-4 text-right">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                               onClick={() => handleRevokeAdmin(admin.email)}
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Snatch Role
+                              <Trash2 className="h-4 w-4 mr-2" /> Revoke
                             </Button>
                           </td>
                         </tr>
@@ -139,7 +139,7 @@ export default function SuperAdminDashboardPage() {
             <CardHeader>
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
                 <UserPlus className="h-5 w-5 text-blue-400" />
-                Assign Admin
+                Assign System Admin
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -147,10 +147,10 @@ export default function SuperAdminDashboardPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-300">Search User by Email</label>
                   <div className="flex gap-2">
-                    <Input 
+                    <Input
                       value={searchEmail}
                       onChange={(e) => setSearchEmail(e.target.value)}
-                      placeholder="user@example.com" 
+                      placeholder="user@example.com"
                       className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-red-500/50 flex-1"
                     />
                     <Button type="submit" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
@@ -171,23 +171,19 @@ export default function SuperAdminDashboardPage() {
                       <p className="text-xs text-gray-400">{searchResult.email}</p>
                     </div>
                   </div>
-                  
+
                   <div className="pt-2 border-t border-white/5">
-                    {searchResult.role === "admin" ? (
+                    {searchResult.role === "system_admin" ? (
                       <p className="text-sm text-yellow-400 flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4" /> Already an admin
-                      </p>
-                    ) : searchResult.role === "superadmin" ? (
-                      <p className="text-sm text-red-400 flex items-center gap-2">
-                        <ShieldAlert className="h-4 w-4" /> Cannot assign admin to a superadmin
+                        <ShieldAlert className="h-4 w-4" /> Already a system admin
                       </p>
                     ) : (
-                      <Button 
+                      <Button
                         onClick={handleAssignAdmin}
                         disabled={isAssigning}
                         className="w-full bg-red-600 hover:bg-red-500 text-white"
                       >
-                        {isAssigning ? "Assigning..." : "Make Admin"}
+                        {isAssigning ? "Assigning..." : "Make System Admin"}
                       </Button>
                     )}
                   </div>

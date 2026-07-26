@@ -1,0 +1,17 @@
+import api from "@/utils/axios";
+
+// ------------- ORGANISATION TEACHERS -------------
+export const getMyOrganisationTeachersService = async () => {
+  const res = await api.get("/organisations/mine/teachers");
+  return res.data;
+};
+
+export const assignTeacherToMyOrganisationService = async (email: string) => {
+  const res = await api.post("/organisations/mine/teachers", { email });
+  return res.data;
+};
+
+export const removeTeacherFromMyOrganisationService = async (userId: string) => {
+  const res = await api.delete(`/organisations/mine/teachers/${userId}`);
+  return res.data;
+};

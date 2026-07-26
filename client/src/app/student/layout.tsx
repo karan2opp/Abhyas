@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, LayoutDashboard, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User } from "lucide-react";
+import { GraduationCap, LayoutDashboard, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User, School } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/student", icon: LayoutDashboard },
+  { name: "Classrooms", href: "/student/classrooms", icon: School },
   { name: "Profile", href: "/student/profile", icon: User },
 ];
 

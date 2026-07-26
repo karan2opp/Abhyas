@@ -11,7 +11,7 @@ export const getMe = async (set: any) => {
     const userData = res.data?.data;
 
     // ✅ Compute isAdmin from role
-    const isAdmin = userData?.role === "admin";
+    const isAdmin = userData?.role === "system_admin";
 
     set({
       user: userData,

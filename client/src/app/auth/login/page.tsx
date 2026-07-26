@@ -46,12 +46,12 @@ export default function LoginPage() {
       toast.success("Successfully logged in");
       
       // Navigate based on role
-      if (userData?.role === "superadmin") {
-        router.push('/superadmin');
+      if (userData?.role === "system_admin") {
+        router.push('/system_admin');
       } else if (userData?.role === "teacher") {
         router.push('/teacher');
-      } else if (userData?.role === "admin") {
-        router.push('/admin');
+      } else if (userData?.role === "manager") {
+        router.push('/manager');
       } else {
         router.push('/student');
       }

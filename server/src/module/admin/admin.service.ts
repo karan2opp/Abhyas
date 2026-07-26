@@ -13,8 +13,8 @@ export const assignTeacher = async (email: string) => {
     if (user.role === "teacher") {
         throw ApiError.badRequest("User is already a teacher");
     }
-    if (user.role === "admin" || user.role === "superadmin") {
-        throw ApiError.badRequest("Cannot downgrade an admin to teacher");
+    if (user.role === "manager" || user.role === "system_admin") {
+        throw ApiError.badRequest("Cannot downgrade a manager or system admin to teacher");
     }
 
     const [updatedUser] = await db.update(users)

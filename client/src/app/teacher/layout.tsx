@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, LayoutDashboard, FileText, Database, BarChart, Settings, HelpCircle, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User, Sparkles, MessageSquare, Plus, Loader2 } from "lucide-react";
+import { GraduationCap, LayoutDashboard, FileText, Database, BarChart, Settings, HelpCircle, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User, Sparkles, MessageSquare, Plus, Loader2, School } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import api from "@/utils/axios";
 
 const sidebarLinks = [
   { name: "Overview", href: "/teacher", icon: LayoutDashboard },
+  { name: "Classrooms", href: "/teacher/classrooms", icon: School },
   { name: "Exams", href: "/teacher/exams", icon: FileText },
   { name: "Results", href: "/teacher/results", icon: BarChart },
   { name: "Create Exam", href: "/teacher/create-exam", icon: Sparkles },

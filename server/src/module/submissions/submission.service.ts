@@ -1,14 +1,11 @@
 import { eq, and, isNull, desc, or, ilike, gte, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { submissions, exams, answers, options, questions, sections, users } from "../../common/db/schema.js";
+import { submissions, exams, answers, options, questions, sections, users, classroomStudents, groupStudents } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { evaluateSingleAnswer, type TextAnswer, type ResponseMode } from "../evalutaion/evalutaion.js";
-// ── Join Exam ──────────────────────────────────────────────────────────────────
-const joinExam = async (joinCode: string, studentId: string) => {
-    // find exam by join code
-    const [exam] = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
-    if (!exam) throw ApiError.notFound("Invalid join code");
 
+// ── Shared: start (or resume) a submission for a resolved exam ─────────────────
+const startSubmissionForExam = async (exam: typeof exams.$inferSelect, studentId: string) => {
     // check exam time is valid
     const now = new Date();
     if (exam.startTime && now < exam.startTime) throw ApiError.badRequest("Exam has not started yet");
@@ -40,6 +37,40 @@ const joinExam = async (joinCode: string, studentId: string) => {
     if (!submission) throw ApiError.internal("Failed to join exam");
 
     return { submission, exam };
+};
+
+// ── Join Exam (by code) ────────────────────────────────────────────────────────
+const joinExam = async (joinCode: string, studentId: string) => {
+    // find exam by join code
+    const [exam] = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
+    if (!exam) throw ApiError.notFound("Invalid join code");
+
+    return startSubmissionForExam(exam, studentId);
+};
+
+// ── Start Exam (classroom/group-scoped, no code needed) ───────────────────────
+const startScopedExam = async (examId: string, studentId: string) => {
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
+    if (!exam) throw ApiError.notFound("Exam not found");
+    if (!exam.classroomId) throw ApiError.badRequest("This exam is not scoped to a classroom");
+
+    const [classroomMembership] = await db.select().from(classroomStudents).where(
+        and(
+            eq(classroomStudents.classroomId, exam.classroomId),
+            eq(classroomStudents.studentId, studentId),
+            eq(classroomStudents.status, "active"),
+        )
+    );
+    if (!classroomMembership) throw ApiError.forbidden("You are not a member of this exam's classroom");
+
+    if (exam.groupId) {
+        const [groupMembership] = await db.select().from(groupStudents).where(
+            and(eq(groupStudents.groupId, exam.groupId), eq(groupStudents.studentId, studentId))
+        );
+        if (!groupMembership) throw ApiError.forbidden("You are not a member of this exam's group");
+    }
+
+    return startSubmissionForExam(exam, studentId);
 };
 
 // ── Submit Exam ────────────────────────────────────────────────────────────────
@@ -491,4 +522,4 @@ const getExamLeaderboard = async (examId: string, userId: string, role: string) 
     return result;
 };
 
-export { joinExam, submitExam, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getExamForSubmission, verifyJoinCode, getExamLeaderboard };
+export { joinExam, startScopedExam, submitExam, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getExamForSubmission, verifyJoinCode, getExamLeaderboard };

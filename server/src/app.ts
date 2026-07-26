@@ -2,6 +2,10 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import authRoutes from "./module/auth/auth.route.js";
+import organisationsRouter from "./module/organisations/organisation.route.js";
+import classroomsRouter from "./module/classrooms/classroom.route.js";
+import groupsRouter from "./module/groups/group.route.js";
+import assignmentsRouter from "./module/assignments/assignment.route.js";
 import examRouter from "./module/exam/exam.route.js";
 import sectionsRouter from "./module/sections/section.routes.js";
 import questionsRouter from "./module/questions/question.route.js";
@@ -25,6 +29,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/organisations", organisationsRouter)
+app.use("/api/classrooms", classroomsRouter)
+app.use("/api/groups", groupsRouter)
+app.use("/api/assignments", assignmentsRouter)
 app.use("/api/exams", examRouter)
 app.use("/api/sections", sectionsRouter)
 app.use("/api/questions", questionsRouter)

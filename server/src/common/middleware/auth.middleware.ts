@@ -14,6 +14,7 @@ declare global {
         role: string;
         name: string;
         email: string;
+        organisationId: string | null;
       };
     }
   }
@@ -52,6 +53,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       role: user.role,
       name: user.name,
       email: user.email,
+      organisationId: user.organisationId,
     };
 
     next();

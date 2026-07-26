@@ -14,6 +14,8 @@ export const createExamSchema = z.object({
   totalMarks: z.number({ message: "Total marks is required" })
     .min(1, { message: "Total marks must be at least 1" }),
   requireFeedback: z.boolean().optional().default(false),
+  classroomId: z.string().min(1).optional(),
+  groupId: z.string().min(1).optional(),
 }).refine(data => {
   if (data.type === "SCHEDULED") {
     if (!data.startTime || !data.endTime) return false;
@@ -23,6 +25,12 @@ export const createExamSchema = z.object({
 }, {
   message: "For scheduled exams, start and end times are required and end time must be after start time",
   path: ["endTime"],
+}).refine(data => {
+  if (data.groupId && !data.classroomId) return false;
+  return true;
+}, {
+  message: "classroomId is required when groupId is set",
+  path: ["classroomId"],
 });
 
 export type CreateExamDto = z.infer<typeof createExamSchema>;
@@ -44,6 +52,8 @@ export const updateExamSchema = z.object({
     .min(1, { message: "Total marks must be at least 1" })
     .optional(),
   requireFeedback: z.boolean().optional(),
+  classroomId: z.string().min(1).optional(),
+  groupId: z.string().min(1).optional(),
 }).refine(data => {
   if (data.type === "SCHEDULED" || (!data.type && data.startTime && data.endTime)) {
     if (data.startTime && data.endTime) {
@@ -54,6 +64,12 @@ export const updateExamSchema = z.object({
 }, {
   message: "End time must be after start time",
   path: ["endTime"],
+}).refine(data => {
+  if (data.groupId && !data.classroomId) return false;
+  return true;
+}, {
+  message: "classroomId is required when groupId is set",
+  path: ["classroomId"],
 });
 
 export type UpdateExamDto = z.infer<typeof updateExamSchema>;

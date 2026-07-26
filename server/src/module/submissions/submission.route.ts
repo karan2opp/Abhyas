@@ -9,6 +9,7 @@ const router = Router();
 
 // student routes
 router.post("/join", authenticate, authorize("student"), validate(joinExamSchema), controller.joinExam);
+router.post("/start/:examId", authenticate, authorize("student"), controller.startScopedExam);
 router.get("/me", authenticate, authorize("student"), controller.getMySubmissions);
 router.get("/:id/exam", authenticate, authorize("student", "teacher"), controller.getExamForSubmission);
 router.patch("/:id/submit", authenticate, authorize("student"), controller.submitExam);

@@ -1,9 +1,10 @@
 import { eq, and, count, inArray, avg, desc, ilike, gte } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { exams, sections, questions, options } from "../../common/db/schema.js";
+import { exams, sections, questions, options, groups } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
+import { PermissionService } from "../../common/permissions/index.js";
 
 import { run } from "@openai/agents";
 import { guardrailAgent } from "../Test-agent-/guardrail/agent.js";
@@ -32,8 +33,28 @@ const generateJoinCode = (): string => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+// ── Validate Classroom/Group Scope ─────────────────────────────────────────────
+const validateExamScope = async (classroomId: string | undefined, groupId: string | undefined, teacherId: string) => {
+    if (!classroomId) return;
+
+    const canManageClassroom = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
+    if (!canManageClassroom) throw ApiError.forbidden("You are not authorized to create exams in this classroom");
+
+    if (groupId) {
+        const canManageGroup = await PermissionService.teacher.canManageGroup(teacherId, groupId);
+        if (!canManageGroup) throw ApiError.forbidden("You are not authorized to use this group");
+
+        const [group] = await db.select().from(groups).where(eq(groups.id, groupId));
+        if (!group || group.classroomId !== classroomId) {
+            throw ApiError.badRequest("Group does not belong to the given classroom");
+        }
+    }
+};
+
 // ── Create Exam ────────────────────────────────────────────────────────────────
 const createExam = async (data: CreateExamDto, teacherId: string) => {
+    await validateExamScope(data.classroomId, data.groupId, teacherId);
+
     let joinCode = generateJoinCode();
 
     // ensure join code is unique
@@ -54,6 +75,8 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
         duration: calculatedDuration || 60, // fallback to 60 if somehow null
         joinCode,
         createdBy: teacherId,
+        classroomId: data.classroomId ?? null,
+        groupId: data.groupId ?? null,
     }).returning();
 
     if (!exam) throw ApiError.internal("Failed to create exam");
@@ -62,6 +85,8 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
 
 // ── Save Generated Exam ────────────────────────────────────────────────────────
 const saveGeneratedExam = async (data: any, teacherId: string) => {
+    await validateExamScope(data.classroomId, data.groupId, teacherId);
+
     let joinCode = generateJoinCode();
     let existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
     while (existing.length > 0) {
@@ -81,6 +106,8 @@ const saveGeneratedExam = async (data: any, teacherId: string) => {
             instructions: [],
             joinCode,
             createdBy: teacherId,
+            classroomId: data.classroomId ?? null,
+            groupId: data.groupId ?? null,
         }).returning();
 
         if (!exam) throw ApiError.internal("Failed to create exam");
@@ -157,19 +184,29 @@ const getExams = async (teacherId: string, search?: string, days?: string, page:
 
 // ── Get Single Exam ────────────────────────────────────────────────────────────
 const getExamById = async (examId: string, teacherId: string) => {
-    const [exam] = await db.select().from(exams).where(
-        and(eq(exams.id, examId), eq(exams.createdBy, teacherId))
-    );
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam");
+
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
     if (!exam) throw ApiError.notFound("Exam not found");
     return exam;
 };
 
 // ── Update Exam ────────────────────────────────────────────────────────────────
 const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string) => {
-    const [existing] = await db.select().from(exams).where(
-        and(eq(exams.id, examId), eq(exams.createdBy, teacherId))
-    );
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this exam");
+
+    const [existing] = await db.select().from(exams).where(eq(exams.id, examId));
     if (!existing) throw ApiError.notFound("Exam not found");
+
+    if (data.classroomId !== undefined || data.groupId !== undefined) {
+        await validateExamScope(
+            data.classroomId ?? existing.classroomId ?? undefined,
+            data.groupId ?? existing.groupId ?? undefined,
+            teacherId,
+        );
+    }
 
     // Calculate new duration if start/end times change
     let calculatedDuration = data.duration;
@@ -195,9 +232,10 @@ const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string
 
 // ── Delete Exam ────────────────────────────────────────────────────────────────
 const deleteExam = async (examId: string, teacherId: string) => {
-    const [existing] = await db.select().from(exams).where(
-        and(eq(exams.id, examId), eq(exams.createdBy, teacherId))
-    );
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to delete this exam");
+
+    const [existing] = await db.select().from(exams).where(eq(exams.id, examId));
     if (!existing) throw ApiError.notFound("Exam not found");
 
     await db.delete(exams).where(eq(exams.id, examId));

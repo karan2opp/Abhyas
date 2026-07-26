@@ -4,13 +4,13 @@ import { sections, exams, questions, options } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateSectionDto, UpdateSectionDto } from "./dto/section.dto.js";
 
+import { PermissionService } from "../../common/permissions/index.js";
+
 // ── Create Section ─────────────────────────────────────────────────────────────
 const createSection = async (data: CreateSectionDto, teacherId: string) => {
-    // verify exam exists and belongs to teacher
-    const [exam] = await db.select().from(exams).where(
-        and(eq(exams.id, data.examId), eq(exams.createdBy, teacherId))
-    );
-    if (!exam) throw ApiError.notFound("Exam not found");
+    // verify exam belongs to teacher
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, data.examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to create a section for this exam");
 
     const [section] = await db.insert(sections).values({
         title: data.title,
@@ -24,10 +24,8 @@ const createSection = async (data: CreateSectionDto, teacherId: string) => {
 // ── Get All Sections of an Exam (teacher) ──────────────────────────────────────
 const getSectionsByExam = async (examId: string, teacherId: string) => {
     // verify exam belongs to teacher
-    const [exam] = await db.select().from(exams).where(
-        and(eq(exams.id, examId), eq(exams.createdBy, teacherId))
-    );
-    if (!exam) throw ApiError.notFound("Exam not found");
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam's sections");
 
     const result = await db.select().from(sections).where(eq(sections.examId, examId));
     return result;
@@ -36,10 +34,8 @@ const getSectionsByExam = async (examId: string, teacherId: string) => {
 // ── Get Sections with Questions and Options (teacher full view) ────────────────
 const getSectionsWithDetails = async (examId: string, teacherId: string) => {
     // verify exam belongs to teacher
-    const [exam] = await db.select().from(exams).where(
-        and(eq(exams.id, examId), eq(exams.createdBy, teacherId))
-    );
-    if (!exam) throw ApiError.notFound("Exam not found");
+    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam's details");
 
     const sectionsData = await db.select().from(sections).where(eq(sections.examId, examId));
 
@@ -64,17 +60,9 @@ const getSectionsWithDetails = async (examId: string, teacherId: string) => {
 
 // ── Update Section ─────────────────────────────────────────────────────────────
 const updateSection = async (sectionId: string, data: UpdateSectionDto, teacherId: string) => {
-    // verify section exists and belongs to teacher's exam
-    const [section] = await db.select({
-        id: sections.id,
-        examCreatedBy: exams.createdBy,
-    })
-        .from(sections)
-        .innerJoin(exams, eq(sections.examId, exams.id))
-        .where(eq(sections.id, sectionId));
-
-    if (!section) throw ApiError.notFound("Section not found");
-    if (section.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized to update this section");
+    // verify section belongs to teacher's exam
+    const hasAccess = await PermissionService.teacher.canManageSection(teacherId, sectionId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this section");
 
     const [updated] = await db.update(sections)
         .set({ ...data, updatedAt: new Date() })
@@ -86,17 +74,9 @@ const updateSection = async (sectionId: string, data: UpdateSectionDto, teacherI
 
 // ── Delete Section (cascades questions + options) ──────────────────────────────
 const deleteSection = async (sectionId: string, teacherId: string) => {
-    // verify section exists and belongs to teacher's exam
-    const [section] = await db.select({
-        id: sections.id,
-        examCreatedBy: exams.createdBy,
-    })
-        .from(sections)
-        .innerJoin(exams, eq(sections.examId, exams.id))
-        .where(eq(sections.id, sectionId));
-
-    if (!section) throw ApiError.notFound("Section not found");
-    if (section.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized to delete this section");
+    // verify section belongs to teacher's exam
+    const hasAccess = await PermissionService.teacher.canManageSection(teacherId, sectionId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to delete this section");
 
     await db.delete(sections).where(eq(sections.id, sectionId));
     // questions and options are cascade deleted automatically by PostgreSQL

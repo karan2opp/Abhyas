@@ -7,6 +7,11 @@ export const joinExam = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Exam joined successfully", result);
 };
 
+export const startScopedExam = async (req: Request, res: Response) => {
+    const result = await submissionsService.startScopedExam(req.params.examId as string, req.user!.id);
+    return ApiResponse.ok(res, "Exam started successfully", result);
+};
+
 export const submitExam = async (req: Request, res: Response) => {
     const result = await submissionsService.submitExam(req.params.id as string, req.user!.id, req.body?.mode as string);
     return ApiResponse.ok(res, "Exam submitted successfully", result);

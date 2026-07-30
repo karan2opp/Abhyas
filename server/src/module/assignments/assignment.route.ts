@@ -3,8 +3,11 @@ import * as controller from "./assignment.controller.js";
 import validate from "../../common/middleware/validate.middleware.js";
 import { authenticate, authorize } from "../../common/middleware/auth.middleware.js";
 import {
+    createSeriesSchema,
+    updateSeriesSchema,
     createAssignmentSchema,
     updateAssignmentSchema,
+    extendAssignmentSchema,
     createAssignmentQuestionSchema,
     updateAssignmentQuestionSchema,
     saveAssignmentAnswerSchema,
@@ -12,6 +15,12 @@ import {
 } from "./dto/assignment.dto.js";
 
 const router = Router();
+
+// teacher: assignment series
+router.post("/series", authenticate, authorize("teacher"), validate(createSeriesSchema), controller.createSeries);
+router.get("/series/classroom/:classroomId", authenticate, authorize("teacher"), controller.listSeriesForClassroom);
+router.patch("/series/:id", authenticate, authorize("teacher"), validate(updateSeriesSchema), controller.updateSeries);
+router.delete("/series/:id", authenticate, authorize("teacher"), controller.deleteSeries);
 
 // teacher: assignment CRUD
 router.post("/", authenticate, authorize("teacher"), validate(createAssignmentSchema), controller.createAssignment);
@@ -38,6 +47,7 @@ router.get("/me", authenticate, authorize("student"), controller.getMyAssignment
 // shared: assignment detail / questions (role-branches inside controller)
 router.get("/:id", authenticate, authorize("teacher", "student"), controller.getAssignmentById);
 router.patch("/:id", authenticate, authorize("teacher"), validate(updateAssignmentSchema), controller.updateAssignment);
+router.post("/:id/extend", authenticate, authorize("teacher"), validate(extendAssignmentSchema), controller.extendAssignment);
 router.delete("/:id", authenticate, authorize("teacher"), controller.deleteAssignment);
 router.get("/:id/questions", authenticate, authorize("teacher", "student"), controller.getQuestions);
 

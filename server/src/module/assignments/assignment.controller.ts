@@ -2,9 +2,34 @@ import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
 import * as assignmentService from "./assignment.service.js";
 
+export const createSeries = async (req: Request, res: Response) => {
+    const result = await assignmentService.createSeries(req.body, req.user!.id);
+    return ApiResponse.created(res, "Series created successfully", result);
+};
+
+export const listSeriesForClassroom = async (req: Request, res: Response) => {
+    const result = await assignmentService.listSeriesForClassroom(req.params.classroomId as string, req.user!.id);
+    return ApiResponse.ok(res, "Series", result);
+};
+
+export const updateSeries = async (req: Request, res: Response) => {
+    const result = await assignmentService.updateSeries(req.params.id as string, req.body, req.user!.id);
+    return ApiResponse.ok(res, "Series updated successfully", result);
+};
+
+export const deleteSeries = async (req: Request, res: Response) => {
+    await assignmentService.deleteSeries(req.params.id as string, req.user!.id);
+    return ApiResponse.ok(res, "Series deleted successfully", null);
+};
+
 export const createAssignment = async (req: Request, res: Response) => {
     const result = await assignmentService.createAssignment(req.body, req.user!.id);
     return ApiResponse.created(res, "Assignment created successfully", result);
+};
+
+export const extendAssignment = async (req: Request, res: Response) => {
+    const result = await assignmentService.extendAssignment(req.params.id as string, req.body, req.user!.id);
+    return ApiResponse.ok(res, "Assignment schedule updated", result);
 };
 
 export const updateAssignment = async (req: Request, res: Response) => {
@@ -18,7 +43,15 @@ export const deleteAssignment = async (req: Request, res: Response) => {
 };
 
 export const listAssignmentsForClassroom = async (req: Request, res: Response) => {
-    const result = await assignmentService.listAssignmentsForClassroom(req.params.classroomId as string, req.user!.id);
+    const { standaloneOnly, groupId, search, status, page, limit } = req.query;
+    const result = await assignmentService.listAssignmentsForClassroom(req.params.classroomId as string, req.user!.id, {
+        standaloneOnly: standaloneOnly === "true",
+        groupId: groupId as string | undefined,
+        search: search as string | undefined,
+        status: status as "upcoming" | "live" | "closed" | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+    });
     return ApiResponse.ok(res, "Assignments", result);
 };
 
@@ -52,7 +85,7 @@ export const getQuestions = async (req: Request, res: Response) => {
 };
 
 export const getMyAssignments = async (req: Request, res: Response) => {
-    const result = await assignmentService.getMyAssignments(req.user!.id);
+    const result = await assignmentService.getMyAssignments(req.user!.id, req.query.classroomId as string | undefined);
     return ApiResponse.ok(res, "Your assignments", result);
 };
 
@@ -77,7 +110,12 @@ export const getMySubmission = async (req: Request, res: Response) => {
 };
 
 export const getSubmissionsForAssignment = async (req: Request, res: Response) => {
-    const result = await assignmentService.getSubmissionsForAssignment(req.params.id as string, req.user!.id);
+    const { search, page, limit } = req.query;
+    const result = await assignmentService.getSubmissionsForAssignment(req.params.id as string, req.user!.id, {
+        search: search as string | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+    });
     return ApiResponse.ok(res, "Submissions", result);
 };
 

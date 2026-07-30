@@ -22,6 +22,11 @@ export const updateClassroom = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Classroom updated successfully", result);
 };
 
+export const deleteClassroom = async (req: Request, res: Response) => {
+    await classroomService.deleteClassroom(req.params.id as string, toRequester(req));
+    return ApiResponse.ok(res, "Classroom deleted successfully", null);
+};
+
 export const addTeacher = async (req: Request, res: Response) => {
     const result = await classroomService.addTeacher(req.params.id as string, req.body, toRequester(req));
     return ApiResponse.created(res, "Teacher added to classroom", result);
@@ -33,7 +38,7 @@ export const removeTeacher = async (req: Request, res: Response) => {
 };
 
 export const listTeachers = async (req: Request, res: Response) => {
-    const result = await classroomService.listTeachers(req.params.id as string, toRequester(req));
+    const result = await classroomService.listTeachers(req.params.id as string, toRequester(req), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Classroom teachers", result);
 };
 
@@ -59,7 +64,7 @@ export const joinClassroom = async (req: Request, res: Response) => {
 };
 
 export const getMyClassrooms = async (req: Request, res: Response) => {
-    const result = await classroomService.getMyClassrooms(req.user!.id);
+    const result = await classroomService.getMyClassrooms(req.user!.id, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Your classrooms", result);
 };
 
@@ -69,7 +74,7 @@ export const getMyClassroomsAsStudent = async (req: Request, res: Response) => {
 };
 
 export const getClassroomRoster = async (req: Request, res: Response) => {
-    const result = await classroomService.getClassroomRoster(req.params.id as string, toRequester(req));
+    const result = await classroomService.getClassroomRoster(req.params.id as string, toRequester(req), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Classroom roster", result);
 };
 
@@ -77,6 +82,6 @@ export const listOrganisationClassrooms = async (req: Request, res: Response) =>
     const organisationId = req.user!.organisationId;
     if (!organisationId) throw ApiError.badRequest("Your account is not linked to an organisation yet");
 
-    const result = await classroomService.listOrganisationClassrooms(organisationId);
+    const result = await classroomService.listOrganisationClassrooms(organisationId, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation classrooms", result);
 };

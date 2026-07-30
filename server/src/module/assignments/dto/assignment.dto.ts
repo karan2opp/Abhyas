@@ -1,5 +1,27 @@
 import { z } from "zod";
 
+export const createSeriesSchema = z.object({
+    title: z.string({ message: "Title is required" })
+        .min(3, "Title must be at least 3 characters long")
+        .max(100, "Title cannot exceed 100 characters"),
+    type: z.enum(["weekly", "custom"]).default("weekly"),
+    classroomId: z.string({ message: "Classroom ID is required" }).min(1),
+    groupId: z.string().min(1).optional(),
+});
+
+export type CreateSeriesDto = z.infer<typeof createSeriesSchema>;
+
+export const updateSeriesSchema = z.object({
+    title: z.string({ message: "Title is required" })
+        .min(3, "Title must be at least 3 characters long")
+        .max(100, "Title cannot exceed 100 characters"),
+});
+
+export type UpdateSeriesDto = z.infer<typeof updateSeriesSchema>;
+
+// Whether dayGap vs. startDate/dueDate is required for a series assignment
+// depends on the series' `type` (weekly vs custom), which requires a DB
+// lookup — that branch is validated in the service layer, not here.
 export const createAssignmentSchema = z.object({
     title: z.string({ message: "Title is required" })
         .min(3, "Title must be at least 3 characters long")
@@ -10,7 +32,11 @@ export const createAssignmentSchema = z.object({
     groupId: z.string().min(1).optional(),
     totalMarks: z.number({ message: "Total marks is required" })
         .min(1, "Total marks must be at least 1"),
+    startDate: z.coerce.date().optional(),
     dueDate: z.coerce.date().optional(),
+    // Series-only field (weekly series):
+    seriesId: z.string().min(1).optional(),
+    dayGap: z.number().int().min(1).optional(),
 });
 
 export type CreateAssignmentDto = z.infer<typeof createAssignmentSchema>;
@@ -20,10 +46,20 @@ export const updateAssignmentSchema = z.object({
     instructions: z.string().optional(),
     groupId: z.string().min(1).nullable().optional(),
     totalMarks: z.number().min(1).optional(),
+    startDate: z.coerce.date().nullable().optional(),
     dueDate: z.coerce.date().nullable().optional(),
+    dayGap: z.number().int().min(1).nullable().optional(),
 });
 
 export type UpdateAssignmentDto = z.infer<typeof updateAssignmentSchema>;
+
+export const extendAssignmentSchema = z.object({
+    days: z.number().int().min(1, "Must extend by at least 1 day"),
+    mode: z.enum(["grow", "shift"], { message: "Mode must be 'grow' or 'shift'" }),
+    cascade: z.boolean({ message: "cascade is required" }),
+});
+
+export type ExtendAssignmentDto = z.infer<typeof extendAssignmentSchema>;
 
 const assignmentOptionSchema = z.object({
     value: z.string({ message: "Option value is required" }).min(1, "Option value cannot be empty"),

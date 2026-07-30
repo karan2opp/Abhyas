@@ -1,9 +1,27 @@
-import { pgTable, text, doublePrecision, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, doublePrecision, timestamp, boolean, jsonb, pgEnum } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { users } from "../auth/user.schema.js";
 import { classrooms } from "../classrooms/classroom.schema.js";
 import { groups } from "../groups/group.schema.js";
 import { questionTypeEnum } from "../questions/question.schema.js";
+
+// weekly = dates computed per student, relative to their enrollment date
+// (chained via dayGap/unlockOffsetDays). custom = teacher sets a fixed
+// start/due date per assignment, same for the whole classroom.
+export const seriesTypeEnum = pgEnum("series_type", ["weekly", "custom"]);
+
+// A named, ordered container of assignments — e.g. "AI Course - Weekly
+// Assignments" with 24 weekly entries. Scoped to a classroom (+ optional group).
+export const assignmentSeries = pgTable("assignment_series", {
+  id: text("id").primaryKey().$defaultFn(() => createId()),
+  title: text("title").notNull(),
+  type: seriesTypeEnum("type").default("weekly").notNull(),
+  classroomId: text("classroom_id").references(() => classrooms.id, { onDelete: "cascade" }).notNull(),
+  groupId: text("group_id").references(() => groups.id, { onDelete: "cascade" }),
+  createdBy: text("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Always scoped to a classroom; groupId null = class-wide, set = restricted to
 // that group's members. No sections layer — a flat list of questions.
@@ -15,7 +33,20 @@ export const assignments = pgTable("assignments", {
   groupId: text("group_id").references(() => groups.id, { onDelete: "cascade" }),
   createdBy: text("created_by").references(() => users.id).notNull(),
   totalMarks: doublePrecision("total_marks").notNull(),
+  // Standalone (non-series) assignments only: a manually-set absolute date
+  // gate ("don't allow starting before this date") and a manual due date.
+  startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
+  // Series fields. seriesId + sequenceOrder place this assignment in an
+  // ordered drip series (e.g. week 1..24). dayGap = how many days this
+  // assignment's own window lasts (replaces a manual dueDate). unlockOffsetDays
+  // = stored cumulative days-after-enrollment this assignment starts — chained
+  // from the previous assignment's (unlockOffsetDays + dayGap + 1), but stored
+  // (not recomputed live) so an "extend without cascade" can freeze it.
+  seriesId: text("series_id").references(() => assignmentSeries.id, { onDelete: "cascade" }),
+  sequenceOrder: integer("sequence_order"),
+  dayGap: integer("day_gap"),
+  unlockOffsetDays: integer("unlock_offset_days"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -70,6 +101,7 @@ export const assignmentAnswers = pgTable("assignment_answers", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export type AssignmentSeries = typeof assignmentSeries.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
 export type NewAssignment = typeof assignments.$inferInsert;
 export type AssignmentQuestion = typeof assignmentQuestions.$inferSelect;

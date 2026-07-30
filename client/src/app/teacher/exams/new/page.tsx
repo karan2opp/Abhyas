@@ -1,20 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, Plus, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 import { createExamService, updateExamService } from "../exam.service";
+import { getMyClassroomsService } from "../../classrooms/classroom.service";
+import { listGroupsService } from "../../classrooms/group.service";
 import { QuestionBuilder } from "./QuestionBuilder";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
-export default function NewExamBuilder() {
+function NewExamBuilderContent() {
+  const searchParams = useSearchParams();
   const { step, setStep, examId, setExamId } = useExamBuilderStore();
   const [isMounted, setIsMounted] = useState(false);
 
@@ -32,6 +37,51 @@ export default function NewExamBuilder() {
   const [joinCode, setJoinCode] = useState("");
   const [requireFeedback, setRequireFeedback] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [classrooms, setClassrooms] = useState<{ id: string; name: string }[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [selectedClassroomId, setSelectedClassroomId] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+
+  const classroomIdParam = searchParams.get("classroomId") || "";
+  const groupIdParam = searchParams.get("groupId") || "";
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getMyClassroomsService();
+        const list = (res.data || []).map((r: any) => r.classroom);
+        setClassrooms(list);
+        if (classroomIdParam && list.some((c: any) => c.id === classroomIdParam)) {
+          setSelectedClassroomId(classroomIdParam);
+        }
+      } catch (err) {
+        toast.error("Failed to load classrooms");
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClassroomId) {
+      setGroups([]);
+      setSelectedGroupId("");
+      return;
+    }
+    (async () => {
+      try {
+        const res = await listGroupsService(selectedClassroomId);
+        const list = res.data || [];
+        setGroups(list);
+        if (selectedClassroomId === classroomIdParam && groupIdParam && list.some((g: any) => g.id === groupIdParam)) {
+          setSelectedGroupId(groupIdParam);
+        } else {
+          setSelectedGroupId("");
+        }
+      } catch (err) {
+        toast.error("Failed to load groups");
+      }
+    })();
+  }, [selectedClassroomId]);
 
   const calculatedDuration = React.useMemo(() => {
     if (startTime && endTime) {
@@ -64,8 +114,11 @@ export default function NewExamBuilder() {
         type,
         instructions: instructions.filter(i => i.trim() !== ""),
         totalMarks: parseInt(totalMarks),
-        requireFeedback
+        requireFeedback,
       };
+
+      if (selectedClassroomId) payload.classroomId = selectedClassroomId;
+      if (selectedGroupId) payload.groupId = selectedGroupId;
 
       if (type === "SCHEDULED") {
         payload.startTime = new Date(startTime).toISOString();
@@ -168,6 +221,38 @@ export default function NewExamBuilder() {
                   />
                 </div>
                 
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">Classroom (optional)</label>
+                    <select
+                      value={selectedClassroomId}
+                      onChange={(e) => setSelectedClassroomId(e.target.value)}
+                      className="w-full bg-[#0b0f19] border border-white/10 text-white h-12 rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-sm"
+                    >
+                      <option value="">No classroom (join code only)</option>
+                      {classrooms.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500">Lets classroom members start directly, no code needed.</p>
+                  </div>
+                  <div className="space-y-2.5">
+                    <label className="text-sm font-semibold text-gray-300">Group (optional)</label>
+                    <select
+                      value={selectedGroupId}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      disabled={!selectedClassroomId}
+                      className="w-full bg-[#0b0f19] border border-white/10 text-white h-12 rounded-lg px-3 focus:outline-none focus:ring-1 focus:ring-blue-500/50 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Class-wide (all students)</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500">Restrict to one group instead of the whole classroom.</p>
+                  </div>
+                </div>
+
                 <div className="space-y-2.5">
                   <label className="text-sm font-semibold text-gray-300">Exam Type</label>
                   <div className="grid grid-cols-2 gap-4">
@@ -283,22 +368,7 @@ export default function NewExamBuilder() {
                     <label className="text-sm font-semibold text-gray-300">Require Feedback Form</label>
                     <p className="text-xs text-gray-500">Ask students for feedback after they submit the exam.</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setRequireFeedback(!requireFeedback)}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#111520]",
-                      requireFeedback ? "bg-blue-500" : "bg-gray-700"
-                    )}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                        requireFeedback ? "translate-x-5" : "translate-x-0"
-                      )}
-                    />
-                  </button>
+                  <Switch checked={requireFeedback} onCheckedChange={setRequireFeedback} />
                 </div>
 
                 {type === "SCHEDULED" && (
@@ -374,5 +444,13 @@ export default function NewExamBuilder() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function NewExamBuilder() {
+  return (
+    <Suspense fallback={<div className="p-10 text-white text-center">Loading...</div>}>
+      <NewExamBuilderContent />
+    </Suspense>
   );
 }

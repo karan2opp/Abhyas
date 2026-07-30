@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getExamsService } from "../exams/exam.service";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { formatDateTime } from "@/lib/date";
 
 export default function ResultsList() {
   const [exams, setExams] = useState<any[]>([]);
@@ -138,15 +139,7 @@ export default function ResultsList() {
             <div className="flex flex-col gap-3">
               {exams.map((exam) => {
                 const examDate = new Date(exam.startTime || exam.createdAt);
-                
-                const formattedDate = examDate.toLocaleString('en-GB', { 
-                  day: '2-digit', 
-                  month: '2-digit', 
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
-                }).replace(',', '');
+                const formattedDate = formatDateTime(examDate);
 
                 return (
                   <div key={exam.id || exam._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4">

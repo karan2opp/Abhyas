@@ -1,6 +1,6 @@
 import { eq, and, count, inArray, avg, desc, ilike, gte } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { exams, sections, questions, options, groups } from "../../common/db/schema.js";
+import { exams, sections, questions, options, groups, classroomStudents, groupStudents } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
@@ -28,21 +28,27 @@ import { formatExam } from "./ai/question/formatter.js";
 
 
 
+type Requester = { id: string; role: string; organisationId: string | null };
+
 // ── Generate Join Code ─────────────────────────────────────────────────────────
 const generateJoinCode = (): string => {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
 // ── Validate Classroom/Group Scope ─────────────────────────────────────────────
-const validateExamScope = async (classroomId: string | undefined, groupId: string | undefined, teacherId: string) => {
+const validateExamScope = async (classroomId: string | undefined, groupId: string | undefined, requester: Requester) => {
     if (!classroomId) return;
 
-    const canManageClassroom = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
+    const canManageClassroom = requester.role === "manager"
+        ? await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId)
+        : await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
     if (!canManageClassroom) throw ApiError.forbidden("You are not authorized to create exams in this classroom");
 
     if (groupId) {
-        const canManageGroup = await PermissionService.teacher.canManageGroup(teacherId, groupId);
-        if (!canManageGroup) throw ApiError.forbidden("You are not authorized to use this group");
+        if (requester.role === "teacher") {
+            const canManageGroup = await PermissionService.teacher.canManageGroup(requester.id, groupId);
+            if (!canManageGroup) throw ApiError.forbidden("You are not authorized to use this group");
+        }
 
         const [group] = await db.select().from(groups).where(eq(groups.id, groupId));
         if (!group || group.classroomId !== classroomId) {
@@ -51,9 +57,22 @@ const validateExamScope = async (classroomId: string | undefined, groupId: strin
     }
 };
 
+// ── Assert requester can manage a specific existing exam ───────────────────────
+const assertExamAccess = async (requester: Requester, examId: string) => {
+    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
+    if (!exam) throw ApiError.notFound("Exam not found");
+
+    const hasAccess = requester.role === "manager"
+        ? await PermissionService.manager.canManageExam(requester.organisationId, examId)
+        : await PermissionService.teacher.canManageExam(requester.id, examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to manage this exam");
+
+    return exam;
+};
+
 // ── Create Exam ────────────────────────────────────────────────────────────────
-const createExam = async (data: CreateExamDto, teacherId: string) => {
-    await validateExamScope(data.classroomId, data.groupId, teacherId);
+const createExam = async (data: CreateExamDto, requester: Requester) => {
+    await validateExamScope(data.classroomId, data.groupId, requester);
 
     let joinCode = generateJoinCode();
 
@@ -74,7 +93,7 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
         ...data,
         duration: calculatedDuration || 60, // fallback to 60 if somehow null
         joinCode,
-        createdBy: teacherId,
+        createdBy: requester.id,
         classroomId: data.classroomId ?? null,
         groupId: data.groupId ?? null,
     }).returning();
@@ -85,7 +104,7 @@ const createExam = async (data: CreateExamDto, teacherId: string) => {
 
 // ── Save Generated Exam ────────────────────────────────────────────────────────
 const saveGeneratedExam = async (data: any, teacherId: string) => {
-    await validateExamScope(data.classroomId, data.groupId, teacherId);
+    await validateExamScope(data.classroomId, data.groupId, { id: teacherId, role: "teacher", organisationId: null });
 
     let joinCode = generateJoinCode();
     let existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
@@ -183,28 +202,32 @@ const getExams = async (teacherId: string, search?: string, days?: string, page:
 };
 
 // ── Get Single Exam ────────────────────────────────────────────────────────────
-const getExamById = async (examId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam");
+const getExamById = async (examId: string, requester: Requester) => {
+    return await assertExamAccess(requester, examId);
+};
 
-    const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
-    if (!exam) throw ApiError.notFound("Exam not found");
-    return exam;
+// ── List Exams for a Classroom (teacher or manager) ────────────────────────────
+const listExamsForClassroom = async (classroomId: string, requester: Requester, groupId?: string) => {
+    const canManageClassroom = requester.role === "manager"
+        ? await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId)
+        : await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
+    if (!canManageClassroom) throw ApiError.forbidden("You are not authorized to view this classroom's exams");
+
+    const conditions = [eq(exams.classroomId, classroomId)];
+    if (groupId) conditions.push(eq(exams.groupId, groupId));
+
+    return await db.select().from(exams).where(and(...conditions)).orderBy(desc(exams.createdAt));
 };
 
 // ── Update Exam ────────────────────────────────────────────────────────────────
-const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this exam");
-
-    const [existing] = await db.select().from(exams).where(eq(exams.id, examId));
-    if (!existing) throw ApiError.notFound("Exam not found");
+const updateExam = async (examId: string, data: UpdateExamDto, requester: Requester) => {
+    const existing = await assertExamAccess(requester, examId);
 
     if (data.classroomId !== undefined || data.groupId !== undefined) {
         await validateExamScope(
             data.classroomId ?? existing.classroomId ?? undefined,
             data.groupId ?? existing.groupId ?? undefined,
-            teacherId,
+            requester,
         );
     }
 
@@ -231,13 +254,8 @@ const updateExam = async (examId: string, data: UpdateExamDto, teacherId: string
 };
 
 // ── Delete Exam ────────────────────────────────────────────────────────────────
-const deleteExam = async (examId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
-    if (!hasAccess) throw ApiError.forbidden("You are not authorized to delete this exam");
-
-    const [existing] = await db.select().from(exams).where(eq(exams.id, examId));
-    if (!existing) throw ApiError.notFound("Exam not found");
-
+const deleteExam = async (examId: string, requester: Requester) => {
+    await assertExamAccess(requester, examId);
     await db.delete(exams).where(eq(exams.id, examId));
 };
 
@@ -412,6 +430,23 @@ const generateExamFromForm = async (data: any, teacherId: string) => {
     return formattedExam;
 };
 
+// ── Get My Exams (student, via classroom/group membership) ───────────────────
+const getMyExams = async (studentId: string, classroomId?: string) => {
+    const memberships = await db.select().from(classroomStudents).where(
+        and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active"))
+    );
+    const memberClassroomIds = memberships.map(m => m.classroomId);
+    if (memberClassroomIds.length === 0) return [];
+    if (classroomId && !memberClassroomIds.includes(classroomId)) return [];
+
+    const classroomIds = classroomId ? [classroomId] : memberClassroomIds;
+    const myGroups = await db.select().from(groupStudents).where(eq(groupStudents.studentId, studentId));
+    const myGroupIds = new Set(myGroups.map(g => g.groupId));
+
+    const classroomExams = await db.select().from(exams).where(inArray(exams.classroomId, classroomIds));
+
+    return classroomExams.filter(e => !e.groupId || myGroupIds.has(e.groupId));
+};
 
 
 
@@ -423,4 +458,5 @@ const generateExamFromForm = async (data: any, teacherId: string) => {
 
 
 
-export { createExam, getExams, getExamById, updateExam, deleteExam, getOverviewStats, saveGeneratedExam, generateExamFromForm };
+
+export { createExam, getExams, getExamById, listExamsForClassroom, updateExam, deleteExam, getOverviewStats, saveGeneratedExam, generateExamFromForm, getMyExams };

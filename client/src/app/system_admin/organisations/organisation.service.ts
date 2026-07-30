@@ -10,8 +10,8 @@ export const getOrganisationsService = async () => {
   return res.data;
 };
 
-export const getOrganisationManagersService = async (organisationId: string) => {
-  const res = await api.get(`/organisations/${organisationId}/managers`);
+export const getOrganisationManagersService = async (organisationId: string, search?: string) => {
+  const res = await api.get(`/organisations/${organisationId}/managers`, { params: { search } });
   return res.data;
 };
 

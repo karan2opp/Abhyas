@@ -7,7 +7,8 @@ import { createGroupSchema, updateGroupSchema, addStudentToGroupSchema } from ".
 const router = Router();
 
 router.post("/", authenticate, authorize("teacher"), validate(createGroupSchema), controller.createGroup);
-router.get("/:classroomId", authenticate, authorize("teacher"), controller.listGroups);
+router.get("/me", authenticate, authorize("student"), controller.getMyGroups);
+router.get("/:classroomId", authenticate, authorize("teacher", "manager"), controller.listGroups);
 router.patch("/:id", authenticate, authorize("teacher"), validate(updateGroupSchema), controller.updateGroup);
 router.delete("/:id", authenticate, authorize("teacher"), controller.deleteGroup);
 

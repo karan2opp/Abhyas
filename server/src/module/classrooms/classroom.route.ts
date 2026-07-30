@@ -17,6 +17,7 @@ router.post("/", authenticate, authorize("teacher"), validate(createClassroomSch
 router.get("/", authenticate, authorize("teacher"), controller.getMyClassrooms);
 router.get("/org", authenticate, authorize("manager"), controller.listOrganisationClassrooms);
 router.patch("/:id", authenticate, authorize("teacher", "manager"), validate(updateClassroomSchema), controller.updateClassroom);
+router.delete("/:id", authenticate, authorize("teacher", "manager"), controller.deleteClassroom);
 
 router.get("/:id/roster", authenticate, authorize("teacher", "manager"), controller.getClassroomRoster);
 

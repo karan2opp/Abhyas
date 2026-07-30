@@ -1,0 +1,274 @@
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, ClipboardList, Layers, Lock, Search, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { toast } from "sonner";
+import { getMyAssignmentsService } from "../../../assignments/assignment.service";
+import { getMyGroupsService } from "../../../classrooms/group.service";
+import { formatDateTime } from "@/lib/date";
+
+interface AssignmentEntry {
+  id: string;
+  title: string;
+  totalMarks: number;
+  startDate: string | null;
+  dueDate: string | null;
+  sequenceOrder: number | null;
+  seriesId: string | null;
+  groupId: string | null;
+  locked: boolean;
+  unlocksAt: string | null;
+  reason: "time" | "previous_incomplete" | null;
+  submissionStatus: "in_progress" | "submitted" | "graded" | null;
+}
+
+type View = "landing" | "weekly" | "standard";
+type DateStatus = "live" | "upcoming" | "past";
+type StatusFilter = DateStatus | "submitted";
+
+const classifyStatus = (a: AssignmentEntry): DateStatus => {
+  const now = new Date();
+  if (a.startDate && now < new Date(a.startDate)) return "upcoming";
+  if (a.dueDate && now > new Date(a.dueDate)) return "past";
+  return "live";
+};
+
+const isSubmitted = (a: AssignmentEntry) => a.submissionStatus === "submitted" || a.submissionStatus === "graded";
+
+export default function StudentClassroomAssignmentsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const classroomId = params.id as string;
+
+  const [assignments, setAssignments] = useState<AssignmentEntry[]>([]);
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+
+  const [view, setView] = useState<View>("landing");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("live");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [aRes, gRes] = await Promise.all([
+          getMyAssignmentsService(classroomId),
+          getMyGroupsService(classroomId),
+        ]);
+        const sorted = [...(aRes.data || [])].sort((a, b) => {
+          if (a.sequenceOrder && b.sequenceOrder) return a.sequenceOrder - b.sequenceOrder;
+          if (a.sequenceOrder) return -1;
+          if (b.sequenceOrder) return 1;
+          return 0;
+        });
+        setAssignments(sorted);
+        const map: Record<string, string> = {};
+        (gRes.data || []).forEach((g: { id: string; name: string }) => { map[g.id] = g.name; });
+        setGroupNames(map);
+      } catch (err) {
+        toast.error("Failed to load assignments");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [classroomId]);
+
+  const weekly = useMemo(() => assignments.filter((a) => a.seriesId), [assignments]);
+  const standard = useMemo(() => assignments.filter((a) => !a.seriesId), [assignments]);
+  const bucket = view === "weekly" ? weekly : view === "standard" ? standard : [];
+
+  const counts = useMemo(() => {
+    const c = { live: 0, upcoming: 0, past: 0, submitted: 0 };
+    bucket.forEach((a) => {
+      c[classifyStatus(a)]++;
+      if (isSubmitted(a)) c.submitted++;
+    });
+    return c;
+  }, [bucket]);
+
+  const visible = bucket
+    .filter((a) => (status === "submitted" ? isSubmitted(a) : classifyStatus(a) === status))
+    .filter((a) => a.title.toLowerCase().includes(search.toLowerCase()));
+
+  const openView = (v: View) => {
+    setView(v);
+    setSearch("");
+    setStatus("live");
+  };
+
+  if (loading) return <div className="text-gray-400 text-center py-10">Loading...</div>;
+
+  if (view === "landing") {
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-white">Assignments ({assignments.length})</h2>
+          <p className="text-gray-400 text-base mt-1">Assignments available to you in this classroom.</p>
+        </div>
+
+        {assignments.length === 0 ? (
+          <Card className="bg-[#111520] border-white/5 py-10 text-center">
+            <CardContent>
+              <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+              <p className="text-gray-400">No assignments available yet.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card
+              onClick={() => openView("weekly")}
+              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+            >
+              <CardContent className="p-6">
+                <div className="h-10 w-10 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/20 mb-3">
+                  <Layers className="h-5 w-5" />
+                </div>
+                <p className="text-white font-semibold text-base">Weekly Assignments</p>
+                <p className="text-gray-500 text-sm mt-1">{weekly.length} assignment{weekly.length === 1 ? "" : "s"} in an ordered series.</p>
+              </CardContent>
+            </Card>
+            <Card
+              onClick={() => openView("standard")}
+              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+            >
+              <CardContent className="p-6">
+                <div className="h-10 w-10 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center border border-blue-500/20 mb-3">
+                  <ClipboardList className="h-5 w-5" />
+                </div>
+                <p className="text-white font-semibold text-base">Standard Assignments</p>
+                <p className="text-gray-500 text-sm mt-1">{standard.length} one-off assignment{standard.length === 1 ? "" : "s"}.</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setView("landing")}
+        className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm mb-4 transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Back to Assignments
+      </button>
+
+      <div className="mb-6">
+        <h3 className="text-2xl font-bold text-white">{view === "weekly" ? "Weekly Assignments" : "Standard Assignments"}</h3>
+      </div>
+
+      <div className="relative max-w-md mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input
+          type="text"
+          placeholder="Search assignments..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        {(
+          [
+            ["live", "Live", counts.live],
+            ["upcoming", "Upcoming", counts.upcoming],
+            ["past", "Past", counts.past],
+            ["submitted", "Submitted", counts.submitted],
+          ] as [StatusFilter, string, number][]
+        ).map(([key, label, count]) => (
+          <button
+            key={key}
+            onClick={() => setStatus(key)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              status === key ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-transparent border-white/10 text-gray-400 hover:bg-white/5"
+            }`}
+          >
+            {label} ({count})
+          </button>
+        ))}
+      </div>
+
+      {visible.length === 0 ? (
+        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+          <CardContent>
+            <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+            <p className="text-gray-400">No {status} assignments here.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {visible.map((a) => (
+            <Card key={a.id} className={`border-white/5 ${a.locked ? "bg-[#111520]/50" : "bg-[#111520]"}`}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <p className={`font-semibold text-base ${a.locked ? "text-gray-500" : "text-white"}`}>
+                    {a.sequenceOrder && `#${a.sequenceOrder}: `}{a.title}
+                  </p>
+                  {a.locked ? (
+                    <Lock className="h-4 w-4 text-gray-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${
+                        a.submissionStatus === "submitted" || a.submissionStatus === "graded"
+                          ? "bg-emerald-600/10 text-emerald-400 border-emerald-500/20"
+                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      }`}
+                    >
+                      {a.submissionStatus === "submitted" || a.submissionStatus === "graded" ? "Submitted" : "Pending"}
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-500 text-sm mb-3">
+                  {a.groupId ? groupNames[a.groupId] || "Group" : "Class-wide"}
+                </p>
+
+                <div className="p-4 bg-[#161b28] border border-white/10 rounded-xl mb-4">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    <Clock className="h-3.5 w-3.5" /> Timeline
+                  </p>
+                  <div className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="w-px flex-1 bg-white/10 my-1" />
+                      <span className="h-2 w-2 rounded-full bg-red-400 shrink-0" />
+                    </div>
+                    <div className="flex-1 flex flex-col justify-between gap-3 pb-0.5">
+                      <div>
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wide">Start</p>
+                        <p className="text-base text-gray-200 font-medium mt-0.5">{a.startDate ? formatDateTime(a.startDate) : "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-gray-500 uppercase tracking-wide">Due</p>
+                        <p className="text-base text-red-400 font-semibold mt-0.5">{a.dueDate ? formatDateTime(a.dueDate) : "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600/10 text-emerald-400 border border-emerald-500/20">
+                    {a.totalMarks} marks
+                  </span>
+                  <Button
+                    size="lg"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 px-6"
+                    onClick={() => router.push(`/student/assignments/${a.id}`)}
+                    disabled={a.locked}
+                  >
+                    {a.locked ? "Locked" : "Open"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

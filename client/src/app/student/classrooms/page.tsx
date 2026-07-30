@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { School, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { School, Plus, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getMyClassroomsService, joinClassroomService } from "./classroom.service";
+import { formatDate } from "@/lib/date";
 
 interface Classroom {
   id: string;
@@ -21,6 +23,7 @@ interface Classroom {
 }
 
 export default function StudentClassroomsPage() {
+  const router = useRouter();
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -98,7 +101,8 @@ export default function StudentClassroomsPage() {
           {classrooms.map((classroom) => (
             <div
               key={classroom.id}
-              className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4"
+              onClick={() => router.push(`/student/classrooms/${classroom.id}`)}
+              className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4 cursor-pointer"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="h-10 w-10 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center shrink-0 border border-blue-500/20">
@@ -107,10 +111,11 @@ export default function StudentClassroomsPage() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-white leading-tight truncate">{classroom.name}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Joined {new Date(classroom.createdAt).toLocaleDateString()}
+                    Joined {formatDate(classroom.createdAt)}
                   </p>
                 </div>
               </div>
+              <ChevronRight className="h-5 w-5 text-gray-500 shrink-0" />
             </div>
           ))}
         </div>

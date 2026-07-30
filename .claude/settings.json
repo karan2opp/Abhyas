@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"teacher/exams/new: %{http_code}\\\\n\" \"http://localhost:3000/teacher/exams/new?classroomId=abc&groupId=def\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/api/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/joincode\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms\")",
+      "Bash(rm -rf \"/d/AI_MOCK_EXAM_PLATFORM/client/src/app/teacher/classrooms/[id]/roster\" && echo done)",
+      "Bash(grep -rn \"classrooms/\\\\${.*}/roster\\\\|classrooms/.*roster\" src/app)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments\")",
+      "Bash(curl -s -o /dev/null -w \"groups list: %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/groups\")",
+      "Bash(curl -s -o /dev/null -w \"group detail: %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/groups/test-group-id\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/groups/test-group\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/teachers\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/students\")",
+      "Bash(grep -n \"createSeries,$\\\\|listSeriesForClassroom,$\\\\|deleteSeries,$\" src/module/assignments/assignment.service.ts)",
+      "Bash(curl -s -o /dev/null -w \"assignments: %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments\")",
+      "Bash(curl -s -o /dev/null -w \"assignment detail: %{http_code}\\\\n\" \"http://localhost:3000/teacher/assignments/test-assignment-id?tab=submissions\")",
+      "Bash(curl -s -o /dev/null -w \"assignment detail: %{http_code}\\\\n\" \"http://localhost:3000/teacher/assignments/test-assignment-id\")",
+      "Bash(curl -s -o /dev/null -w \"submissions list: %{http_code}\\\\n\" \"http://localhost:3000/teacher/assignments/test-assignment-id/submissions\")",
+      "Bash(curl -s -o /dev/null -w \"assignments classroom page: %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/teacher/assignments/test-assignment-id\")",
+      "Bash(rm -rf \"/d/AI_MOCK_EXAM_PLATFORM/client/src/app/teacher/assignments/[id]\" && echo done)",
+      "Bash(curl -s -o /dev/null -w \"assignment detail \\(nested\\): %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments/test-assignment-id\")",
+      "Bash(curl -s -o /dev/null -w \"submissions list \\(nested\\): %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments/test-assignment-id/submissions\")",
+      "Bash(curl -s -o /dev/null -w \"submission grading \\(nested\\): %{http_code}\\\\n\" \"http://localhost:3000/teacher/classrooms/test-id/assignments/test-assignment-id/submissions/test-submission-id\")",
+      "Bash(curl -s -o /dev/null -w \"old route \\(should 404 now\\): %{http_code}\\\\n\" \"http://localhost:3000/teacher/assignments/test-assignment-id\")",
+      "Bash(node -e ' *)",
+      "Bash(xargs -I{} sh -c 'echo ==={}===; cat {}')",
+      "Bash(curl -s --compressed http://localhost:3000/teacher/classrooms/test-id/assignments/test-assignment-id/preview -o /tmp/preview.html)",
+      "Bash(rm -rf \"/d/AI_MOCK_EXAM_PLATFORM/client/src/app/student/classrooms/[id]/submissions\")",
+      "Bash(npx next *)",
+      "Bash(git check-ignore *)"
+    ],
+    "additionalDirectories": [
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\classrooms\\[id]\\roster",
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\assignments\\[id]",
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\student\\classrooms\\[id]\\submissions"
+    ]
+  }
+}

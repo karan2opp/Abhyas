@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Plus, Trash2, ArrowRight, Loader2, CheckCircle2, ChevronRight, Save, LayoutDashboard, Sparkles } from "lucide-react";
 import api from "@/utils/axios";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getMyClassroomsService } from "../classrooms/classroom.service";
+import { listGroupsService } from "../classrooms/group.service";
 
 export default function CreateExamPage() {
   const router = useRouter();
@@ -40,6 +42,38 @@ export default function CreateExamPage() {
       }
     ]
   });
+
+  const [classrooms, setClassrooms] = useState<{ id: string; name: string }[]>([]);
+  const [examGroups, setExamGroups] = useState<{ id: string; name: string }[]>([]);
+  const [selectedClassroomId, setSelectedClassroomId] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getMyClassroomsService();
+        setClassrooms((res.data || []).map((r: any) => r.classroom));
+      } catch (err) {
+        toast.error("Failed to load classrooms");
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    setSelectedGroupId("");
+    if (!selectedClassroomId) {
+      setExamGroups([]);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await listGroupsService(selectedClassroomId);
+        setExamGroups(res.data || []);
+      } catch (err) {
+        toast.error("Failed to load groups");
+      }
+    })();
+  }, [selectedClassroomId]);
 
   const calculateSectionMarks = (section: any) => {
     return section.groups.reduce((acc: number, g: any) => acc + (Number(g.marksPerQuestion) || 0) * (Number(g.numberOfQuestions) || 0), 0);
@@ -172,7 +206,10 @@ export default function CreateExamPage() {
         requireFeedback: false,
         duration: generatedExam.duration || 60
       };
-      
+
+      if (selectedClassroomId) payload.classroomId = selectedClassroomId;
+      if (selectedGroupId) payload.groupId = selectedGroupId;
+
       const examRes = await api.post("/exams", payload);
       const newExamId = examRes.data.data.id || examRes.data.data._id;
 
@@ -266,7 +303,7 @@ export default function CreateExamPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-300">Difficulty</label>
-                  <select 
+                  <select
                     value={formData.difficulty}
                     onChange={e => setFormData({...formData, difficulty: e.target.value})}
                     className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-md h-10 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
@@ -274,6 +311,33 @@ export default function CreateExamPage() {
                     <option value="Easy">Easy</option>
                     <option value="Medium">Medium</option>
                     <option value="Hard">Hard</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">Classroom (optional)</label>
+                  <select
+                    value={selectedClassroomId}
+                    onChange={e => setSelectedClassroomId(e.target.value)}
+                    className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-md h-10 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  >
+                    <option value="">No classroom (join code only)</option>
+                    {classrooms.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">Group (optional)</label>
+                  <select
+                    value={selectedGroupId}
+                    onChange={e => setSelectedGroupId(e.target.value)}
+                    disabled={!selectedClassroomId}
+                    className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-md h-10 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Class-wide (all students)</option>
+                    {examGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>

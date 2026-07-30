@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
+import { formatDate } from "@/lib/date";
 import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -254,7 +255,7 @@ export default function ResultsPage() {
           <div className="flex items-center gap-6 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              <span>{new Date(submission.submittedAt || submission.updatedAt).toLocaleDateString()}</span>
+              <span>{formatDate(submission.submittedAt || submission.updatedAt)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />

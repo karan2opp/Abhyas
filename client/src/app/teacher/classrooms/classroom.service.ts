@@ -6,8 +6,8 @@ export const createClassroomService = async (data: { name: string; joinCodeExpir
   return res.data;
 };
 
-export const getMyClassroomsService = async () => {
-  const res = await api.get("/classrooms");
+export const getMyClassroomsService = async (search?: string) => {
+  const res = await api.get("/classrooms", { params: { search } });
   return res.data;
 };
 
@@ -16,14 +16,19 @@ export const updateClassroomService = async (id: string, data: { name?: string }
   return res.data;
 };
 
-// ------------- ROSTER / TEACHERS -------------
-export const getClassroomRosterService = async (id: string) => {
-  const res = await api.get(`/classrooms/${id}/roster`);
+export const deleteClassroomService = async (id: string) => {
+  const res = await api.delete(`/classrooms/${id}`);
   return res.data;
 };
 
-export const getClassroomTeachersService = async (id: string) => {
-  const res = await api.get(`/classrooms/${id}/teachers`);
+// ------------- ROSTER / TEACHERS -------------
+export const getClassroomRosterService = async (id: string, search?: string) => {
+  const res = await api.get(`/classrooms/${id}/roster`, { params: { search } });
+  return res.data;
+};
+
+export const getClassroomTeachersService = async (id: string, search?: string) => {
+  const res = await api.get(`/classrooms/${id}/teachers`, { params: { search } });
   return res.data;
 };
 

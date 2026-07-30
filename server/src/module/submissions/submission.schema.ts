@@ -12,6 +12,11 @@ export const submissions = pgTable("submissions", {
   status: submissionStatusEnum("status").notNull(),
   score: doublePrecision("score"),
   submittedAt: timestamp("submitted_at"),
+  // Set only when a teacher has manually reviewed/graded this submission
+  // (as opposed to it only ever having gone through auto MCQ + AI scoring).
+  gradedBy: text("graded_by").references(() => users.id),
+  gradedAt: timestamp("graded_at"),
+  overallFeedback: text("overall_feedback"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at")   // null = active, timestamp = deleted

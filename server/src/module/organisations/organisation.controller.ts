@@ -31,13 +31,13 @@ export const revokeManager = async (req: Request, res: Response) => {
 };
 
 export const getOrganisationManagers = async (req: Request, res: Response) => {
-    const result = await organisationService.getOrganisationManagers(req.params.id as string);
+    const result = await organisationService.getOrganisationManagers(req.params.id as string, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation managers", result);
 };
 
 // ── Manager-scoped: manage teachers within their own organisation ────────────
 export const getMyOrganisationTeachers = async (req: Request, res: Response) => {
-    const result = await organisationService.getOrganisationTeachers(req.user!.organisationId!);
+    const result = await organisationService.getOrganisationTeachers(req.user!.organisationId!, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation teachers", result);
 };
 

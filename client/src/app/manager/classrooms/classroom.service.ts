@@ -1,7 +1,7 @@
 import api from "@/utils/axios";
 
-export const getOrganisationClassroomsService = async () => {
-  const res = await api.get("/classrooms/org");
+export const getOrganisationClassroomsService = async (search?: string) => {
+  const res = await api.get("/classrooms/org", { params: { search } });
   return res.data;
 };
 
@@ -10,13 +10,18 @@ export const updateClassroomService = async (id: string, data: { name?: string }
   return res.data;
 };
 
-export const getClassroomRosterService = async (id: string) => {
-  const res = await api.get(`/classrooms/${id}/roster`);
+export const deleteClassroomService = async (id: string) => {
+  const res = await api.delete(`/classrooms/${id}`);
   return res.data;
 };
 
-export const getClassroomTeachersService = async (id: string) => {
-  const res = await api.get(`/classrooms/${id}/teachers`);
+export const getClassroomRosterService = async (id: string, search?: string) => {
+  const res = await api.get(`/classrooms/${id}/roster`, { params: { search } });
+  return res.data;
+};
+
+export const getClassroomTeachersService = async (id: string, search?: string) => {
+  const res = await api.get(`/classrooms/${id}/teachers`, { params: { search } });
   return res.data;
 };
 

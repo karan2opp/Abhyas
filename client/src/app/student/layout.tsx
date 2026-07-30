@@ -34,13 +34,19 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }, [user, isInitialized, router]);
 
   const isExamMode = pathname.includes('/exams/') || pathname.includes('/waiting/');
+  // Inside a specific classroom (/student/classrooms/<id>/...), the classroom's
+  // own layout renders its own sidebar — hide this outer portal sidebar so we
+  // don't show two side-by-side. The bare list page (/student/classrooms) still
+  // uses this sidebar as normal.
+  const isInsideClassroomDetail = /^\/student\/classrooms\/[^/]+/.test(pathname);
+  const hideSidebar = isExamMode || isInsideClassroomDetail;
 
   return (
     <TooltipProvider>
       <div className="flex flex-col md:flex-row h-screen w-full bg-[#0a0d14] text-gray-100 font-sans overflow-hidden">
         
         {/* Mobile Header */}
-        {!isExamMode && (
+        {!hideSidebar && (
           <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-blue-600 p-1.5 rounded-md shadow-lg shadow-blue-900/50">
@@ -55,7 +61,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         )}
 
         {/* Mobile Overlay */}
-        {!isExamMode && isMobileOpen && (
+        {!hideSidebar && isMobileOpen && (
           <div 
             className="fixed inset-0 bg-black/60 z-40 md:hidden"
             onClick={() => setIsMobileOpen(false)}
@@ -63,7 +69,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         )}
 
         {/* Sidebar */}
-        {!isExamMode && (
+        {!hideSidebar && (
           <aside className={cn(
             "fixed md:relative z-50 h-full border-r border-white/5 flex flex-col bg-[#111520] shrink-0 transition-all duration-300",
             isCollapsed ? "md:w-20" : "md:w-64",

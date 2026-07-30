@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, School, Users, ChevronRight } from "lucide-react";
+import { Plus, School, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { createClassroomService, getMyClassroomsService } from "./classroom.service";
+import { formatDate } from "@/lib/date";
 
 interface Classroom {
   id: string;
@@ -31,10 +32,18 @@ export default function ClassroomsPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
 
-  const fetchClassrooms = async () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const fetchClassrooms = async (search: string) => {
     setLoading(true);
     try {
-      const res = await getMyClassroomsService();
+      const res = await getMyClassroomsService(search || undefined);
       const rows = res.data || [];
       setClassrooms(rows.map((r: any) => r.classroom));
     } catch (err) {
@@ -45,8 +54,8 @@ export default function ClassroomsPage() {
   };
 
   useEffect(() => {
-    fetchClassrooms();
-  }, []);
+    fetchClassrooms(debouncedSearch);
+  }, [debouncedSearch]);
 
   const handleCreate = async () => {
     if (name.trim().length < 2) {
@@ -59,15 +68,13 @@ export default function ClassroomsPage() {
       toast.success("Classroom created");
       setDialogOpen(false);
       setName("");
-      fetchClassrooms();
+      fetchClassrooms(debouncedSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to create classroom");
     } finally {
       setCreating(false);
     }
   };
-
-  if (loading) return <div className="p-10 text-white text-center">Loading classrooms...</div>;
 
   return (
     <div className="p-10 h-full overflow-y-auto custom-scrollbar">
@@ -85,17 +92,36 @@ export default function ClassroomsPage() {
         </Button>
       </div>
 
-      {classrooms.length === 0 ? (
+      <div className="relative w-full sm:w-72 mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input
+          type="text"
+          placeholder="Search classrooms..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+        />
+      </div>
+
+      {loading ? (
+        <div className="text-white text-center py-10">Loading classrooms...</div>
+      ) : classrooms.length === 0 ? (
         <Card className="bg-[#111520]/50 border-white/5 py-16 text-center">
           <CardContent className="flex flex-col items-center">
             <div className="h-16 w-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
               <School className="h-8 w-8 text-gray-500" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">No classrooms yet</h3>
-            <p className="text-gray-400 max-w-sm mb-6">Create a classroom to start inviting students and organizing exams/assignments.</p>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setDialogOpen(true)}>
-              Create Classroom
-            </Button>
+            <h3 className="text-xl font-bold text-white mb-2">
+              {debouncedSearch ? `No classrooms matching "${debouncedSearch}"` : "No classrooms yet"}
+            </h3>
+            {!debouncedSearch && (
+              <>
+                <p className="text-gray-400 max-w-sm mb-6">Create a classroom to start inviting students and organizing exams/assignments.</p>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setDialogOpen(true)}>
+                  Create Classroom
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -113,7 +139,7 @@ export default function ClassroomsPage() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-white leading-tight truncate">{classroom.name}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Created {new Date(classroom.createdAt).toLocaleDateString()}
+                    Created {formatDate(classroom.createdAt)}
                   </p>
                 </div>
               </div>

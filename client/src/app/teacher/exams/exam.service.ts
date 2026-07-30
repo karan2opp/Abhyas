@@ -21,6 +21,11 @@ export const getExamByIdService = async (id: string) => {
   return res.data;
 };
 
+export const listExamsForClassroomService = async (classroomId: string, groupId?: string) => {
+  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { groupId } });
+  return res.data;
+};
+
 export const updateExamService = async (id: string, data: any) => {
   const res = await api.patch(`/exams/${id}`, data);
   return res.data;
@@ -118,5 +123,21 @@ export const getExamSubmissionsService = async (examId: string) => {
 
 export const getExamLeaderboardService = async (examId: string) => {
   const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
+  return res.data;
+};
+
+export const gradeExamSubmissionService = async (
+  submissionId: string,
+  data: { answers: { answerId: string; marksAwarded: number; feedback?: string }[]; overallFeedback?: string }
+) => {
+  const res = await api.patch(`/submissions/${submissionId}/grade`, data);
+  return res.data;
+};
+
+export const evaluateExamSubmissionWithAiService = async (
+  submissionId: string,
+  data: { mode?: "marks_only" | "marks_and_feedback" }
+) => {
+  const res = await api.post(`/submissions/${submissionId}/evaluate-ai`, data);
   return res.data;
 };

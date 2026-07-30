@@ -2,13 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Copy, RefreshCw, Ban, UserPlus, Mail, Trash2, Users, KeyRound } from "lucide-react";
+import { ArrowLeft, Copy, RefreshCw, Ban, UserPlus, Mail, Trash2, Users, KeyRound, Pencil, Check, X, Search, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   getOrganisationClassroomsService,
+  updateClassroomService,
+  deleteClassroomService,
   getClassroomRosterService,
   getClassroomTeachersService,
   addTeacherService,
@@ -17,6 +19,9 @@ import {
   revokeJoinCodeService,
   inviteStudentService,
 } from "../classroom.service";
+import { listGroupsService } from "../group.service";
+import { listExamsForClassroomService, deleteExamService } from "../exam.service";
+import { formatDate, formatDateTime } from "@/lib/date";
 
 interface Classroom {
   id: string;
@@ -42,6 +47,21 @@ interface TeacherEntry {
   email: string;
 }
 
+interface GroupEntry {
+  id: string;
+  name: string;
+}
+
+interface ExamEntry {
+  id: string;
+  title: string;
+  type: "SCHEDULED" | "ON_DEMAND";
+  totalMarks: number;
+  groupId: string | null;
+  startTime: string | null;
+  duration: number;
+}
+
 export default function ManagerClassroomDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -58,30 +78,91 @@ export default function ManagerClassroomDetailPage() {
   const [addingTeacher, setAddingTeacher] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState("");
+  const [debouncedTeacherSearch, setDebouncedTeacherSearch] = useState("");
+
+  const [groups, setGroups] = useState<GroupEntry[]>([]);
+  const [exams, setExams] = useState<ExamEntry[]>([]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedStudentSearch(studentSearchQuery), 400);
+    return () => clearTimeout(handler);
+  }, [studentSearchQuery]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedTeacherSearch(teacherSearchQuery), 400);
+    return () => clearTimeout(handler);
+  }, [teacherSearchQuery]);
+
+  const loadClassroom = async () => {
+    try {
+      const classroomsRes = await getOrganisationClassroomsService();
+      const found = (classroomsRes.data || []).find((c: Classroom) => c.id === classroomId);
+      setClassroom(found || null);
+    } catch (err) {
+      toast.error("Failed to load classroom");
+    }
+  };
+
+  const loadRoster = async (search: string) => {
+    try {
+      const rosterRes = await getClassroomRosterService(classroomId, search || undefined);
+      setRoster(rosterRes.data || []);
+    } catch (err) {
+      toast.error("Failed to load roster");
+    }
+  };
+
+  const loadTeachers = async (search: string) => {
+    try {
+      const teachersRes = await getClassroomTeachersService(classroomId, search || undefined);
+      setTeachers(teachersRes.data || []);
+    } catch (err) {
+      toast.error("Failed to load teachers");
+    }
+  };
+
+  const loadGroups = async () => {
+    try {
+      const res = await listGroupsService(classroomId);
+      setGroups(res.data || []);
+    } catch (err) {
+      toast.error("Failed to load groups");
+    }
+  };
+
+  const loadExams = async () => {
+    try {
+      const res = await listExamsForClassroomService(classroomId);
+      setExams(res.data || []);
+    } catch (err) {
+      toast.error("Failed to load exams");
+    }
+  };
 
   const loadAll = async () => {
     setLoading(true);
-    try {
-      const [classroomsRes, rosterRes, teachersRes] = await Promise.all([
-        getOrganisationClassroomsService(),
-        getClassroomRosterService(classroomId),
-        getClassroomTeachersService(classroomId),
-      ]);
-
-      const found = (classroomsRes.data || []).find((c: Classroom) => c.id === classroomId);
-      setClassroom(found || null);
-      setRoster(rosterRes.data || []);
-      setTeachers(teachersRes.data || []);
-    } catch (err) {
-      toast.error("Failed to load classroom");
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([loadClassroom(), loadRoster(debouncedStudentSearch), loadTeachers(debouncedTeacherSearch), loadGroups(), loadExams()]);
+    setLoading(false);
   };
 
   useEffect(() => {
     if (classroomId) loadAll();
   }, [classroomId]);
+
+  useEffect(() => {
+    if (classroomId && !loading) loadRoster(debouncedStudentSearch);
+  }, [debouncedStudentSearch]);
+
+  useEffect(() => {
+    if (classroomId && !loading) loadTeachers(debouncedTeacherSearch);
+  }, [debouncedTeacherSearch]);
 
   const handleCopyCode = () => {
     if (!classroom) return;
@@ -94,7 +175,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       await regenerateJoinCodeService(classroomId);
       toast.success("Join code regenerated");
-      loadAll();
+      loadClassroom();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to regenerate join code");
     } finally {
@@ -108,7 +189,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       await revokeJoinCodeService(classroomId);
       toast.success("Join code revoked");
-      loadAll();
+      loadClassroom();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to revoke join code");
     } finally {
@@ -143,7 +224,7 @@ export default function ManagerClassroomDetailPage() {
       await addTeacherService(classroomId, teacherEmail.trim());
       toast.success("Teacher added");
       setTeacherEmail("");
-      loadAll();
+      loadTeachers(debouncedTeacherSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add teacher");
     } finally {
@@ -156,9 +237,59 @@ export default function ManagerClassroomDetailPage() {
     try {
       await removeTeacherService(classroomId, teacherId);
       toast.success("Teacher removed");
-      loadAll();
+      loadTeachers(debouncedTeacherSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to remove teacher");
+    }
+  };
+
+  const handleStartEditName = () => {
+    setNameInput(classroom!.name);
+    setEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (nameInput.trim().length < 2) {
+      toast.error("Classroom name must be at least 2 characters");
+      return;
+    }
+    setSavingName(true);
+    try {
+      await updateClassroomService(classroomId, { name: nameInput.trim() });
+      toast.success("Classroom renamed");
+      setEditingName(false);
+      loadClassroom();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to rename classroom");
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleDeleteExam = async (examId: string, title: string) => {
+    if (!confirm(`Delete exam "${title}"? This permanently deletes its sections, questions, and submissions. This cannot be undone.`)) return;
+    try {
+      await deleteExamService(examId);
+      toast.success("Exam deleted");
+      loadExams();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to delete exam");
+    }
+  };
+
+  const handleDeleteClassroom = async () => {
+    if (!confirm(
+      `Delete "${classroom!.name}"? This permanently deletes its roster, co-teachers, invites, groups, exams, and assignments. This cannot be undone.`
+    )) return;
+
+    setDeleting(true);
+    try {
+      await deleteClassroomService(classroomId);
+      toast.success("Classroom deleted");
+      router.push("/manager/classrooms");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to delete classroom");
+      setDeleting(false);
     }
   };
 
@@ -174,9 +305,40 @@ export default function ManagerClassroomDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Back to Classrooms
       </button>
 
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-white tracking-tight">{classroom.name}</h2>
-        <p className="text-gray-400 mt-1">Manage join code, roster, and co-teachers.</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveName()}
+                className="bg-[#09090b] border border-white/10 rounded-lg px-3 py-1.5 text-2xl font-bold text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
+              />
+              <Button size="icon" className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" onClick={handleSaveName} disabled={savingName}>
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white shrink-0" onClick={() => setEditingName(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h2 className="text-3xl font-bold text-white tracking-tight truncate">{classroom.name}</h2>
+              <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white shrink-0" onClick={handleStartEditName} title="Rename classroom">
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          <p className="text-gray-400 mt-1">Manage join code, roster, and co-teachers.</p>
+        </div>
+
+        <Button variant="destructive" className="shrink-0" onClick={handleDeleteClassroom} disabled={deleting}>
+          <Trash2 className="mr-2 h-4 w-4" />
+          {deleting ? "Deleting..." : "Delete Classroom"}
+        </Button>
       </div>
 
       <Tabs defaultValue="joincode">
@@ -184,6 +346,7 @@ export default function ManagerClassroomDetailPage() {
           <TabsTrigger value="joincode">Join Code</TabsTrigger>
           <TabsTrigger value="roster">Roster ({roster.length})</TabsTrigger>
           <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
+          <TabsTrigger value="exams">Exams ({exams.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="joincode">
@@ -210,7 +373,7 @@ export default function ManagerClassroomDetailPage() {
                 )}
 
                 <div className="text-xs text-gray-500 space-y-1">
-                  <p>Expires: {new Date(classroom.joinCodeExpiresAt).toLocaleString()}</p>
+                  <p>Expires: {formatDateTime(classroom.joinCodeExpiresAt)}</p>
                   <p>Uses: {classroom.joinCodeUseCount} / {classroom.joinCodeMaxUses}</p>
                 </div>
 
@@ -261,31 +424,46 @@ export default function ManagerClassroomDetailPage() {
         </TabsContent>
 
         <TabsContent value="roster">
-          {roster.length === 0 ? (
-            <Card className="bg-[#111520]/50 border-white/5 py-16 text-center">
-              <CardContent className="flex flex-col items-center">
-                <Users className="h-10 w-10 text-gray-500 mb-3" />
-                <p className="text-gray-400">No students have joined yet.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {roster.map((s) => (
-                <div key={s.studentId} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
-                  <div>
-                    <p className="text-white font-semibold text-sm">{s.name}</p>
-                    <p className="text-gray-500 text-xs">{s.email}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.status === "active" ? "bg-emerald-600/10 text-emerald-400 border border-emerald-500/20" : "bg-gray-500/10 text-gray-400 border border-gray-500/20"}`}>
-                      {s.status}
-                    </span>
-                    <span className="text-gray-500 text-xs">Joined {new Date(s.enrolledAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
+          <div className="flex flex-col gap-4">
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Search students by name or email..."
+                value={studentSearchQuery}
+                onChange={(e) => setStudentSearchQuery(e.target.value)}
+                className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+              />
             </div>
-          )}
+
+            {roster.length === 0 ? (
+              <Card className="bg-[#111520]/50 border-white/5 py-16 text-center">
+                <CardContent className="flex flex-col items-center">
+                  <Users className="h-10 w-10 text-gray-500 mb-3" />
+                  <p className="text-gray-400">
+                    {debouncedStudentSearch ? `No students matching "${debouncedStudentSearch}".` : "No students have joined yet."}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {roster.map((s) => (
+                  <div key={s.studentId} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
+                    <div>
+                      <p className="text-white font-semibold text-sm">{s.name}</p>
+                      <p className="text-gray-500 text-xs">{s.email}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.status === "active" ? "bg-emerald-600/10 text-emerald-400 border border-emerald-500/20" : "bg-gray-500/10 text-gray-400 border border-gray-500/20"}`}>
+                        {s.status}
+                      </span>
+                      <span className="text-gray-500 text-xs">Joined {formatDate(s.enrolledAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="teachers">
@@ -310,25 +488,135 @@ export default function ManagerClassroomDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-2">
-            {teachers.map((t) => (
-              <div key={t.id} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
-                <div>
-                  <p className="text-white font-semibold text-sm">{t.name}</p>
-                  <p className="text-gray-500 text-xs">{t.email}</p>
-                </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                  onClick={() => handleRemoveTeacher(t.id)}
-                  title="Remove teacher"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+          <div className="relative w-full sm:w-72 mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search teachers by name or email..."
+              value={teacherSearchQuery}
+              onChange={(e) => setTeacherSearchQuery(e.target.value)}
+              className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+            />
           </div>
+
+          {teachers.length === 0 ? (
+            <Card className="bg-[#111520] border-white/5 py-10 text-center">
+              <CardContent>
+                <Users className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+                <p className="text-gray-400">
+                  {debouncedTeacherSearch ? `No teachers matching "${debouncedTeacherSearch}".` : "No co-teachers yet."}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {teachers.map((t) => (
+                <div key={t.id} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
+                  <div>
+                    <p className="text-white font-semibold text-sm">{t.name}</p>
+                    <p className="text-gray-500 text-xs">{t.email}</p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                    onClick={() => handleRemoveTeacher(t.id)}
+                    title="Remove teacher"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="exams">
+          <div className="flex flex-col gap-4 mb-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-400">Exams can be class-wide or restricted to a group.</p>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => router.push(`/teacher/exams/new?classroomId=${classroomId}`)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> New Exam
+              </Button>
+            </div>
+
+            {groups.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-500">Or create for a specific group:</span>
+                {groups.map((g) => (
+                  <Button
+                    key={g.id}
+                    size="sm"
+                    variant="outline"
+                    className="bg-transparent border-white/10 text-white hover:bg-white/5"
+                    onClick={() => router.push(`/teacher/exams/new?classroomId=${classroomId}&groupId=${g.id}`)}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> {g.name}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {exams.length === 0 ? (
+            <Card className="bg-[#111520] border-white/5 py-10 text-center">
+              <CardContent>
+                <FileText className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+                <p className="text-gray-400">No exams yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {exams.map((e) => {
+                const groupName = groups.find((g) => g.id === e.groupId)?.name;
+                return (
+                  <div
+                    key={e.id}
+                    className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all"
+                  >
+                    <div
+                      className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                      onClick={() => router.push(`/teacher/exams/${e.id}`)}
+                    >
+                      <div className="h-9 w-9 bg-yellow-600/20 text-yellow-400 rounded-lg flex items-center justify-center border border-yellow-500/20 shrink-0">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">{e.title}</p>
+                        <p className="text-gray-500 text-xs">
+                          {groupName ? `Group: ${groupName}` : "Class-wide"} · {e.totalMarks} marks · {e.duration}min
+                          {e.type === "SCHEDULED" && e.startTime && ` · Starts ${formatDateTime(e.startTime)}`}
+                          {e.type === "ON_DEMAND" && " · On-demand"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent border-white/10 text-white hover:bg-white/5"
+                        onClick={() => router.push(`/teacher/exams/${e.id}/results`)}
+                      >
+                        Results
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                        onClick={() => handleDeleteExam(e.id, e.title)}
+                        title="Delete exam"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -1,8 +1,8 @@
 import api from "@/utils/axios";
 
 // ------------- ORGANISATION TEACHERS -------------
-export const getMyOrganisationTeachersService = async () => {
-  const res = await api.get("/organisations/mine/teachers");
+export const getMyOrganisationTeachersService = async (search?: string) => {
+  const res = await api.get("/organisations/mine/teachers", { params: { search } });
   return res.data;
 };
 

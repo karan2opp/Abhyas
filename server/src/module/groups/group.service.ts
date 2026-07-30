@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, ilike, inArray, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { groups, groupStudents, classroomStudents, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -42,12 +42,23 @@ const deleteGroup = async (groupId: string, teacherId: string) => {
     await db.delete(groups).where(eq(groups.id, groupId));
 };
 
-// ── List Groups (for a classroom) ─────────────────────────────────────────────
-const listGroups = async (classroomId: string, teacherId: string) => {
-    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
+// ── List Groups (for a classroom; teacher co-teacher or manager of the org) ────
+const listGroups = async (classroomId: string, requester: { id: string; role: string; organisationId: string | null }) => {
+    const hasAccess = requester.role === "manager"
+        ? await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId)
+        : await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this classroom");
 
-    return await db.select().from(groups).where(eq(groups.classroomId, classroomId));
+    const groupRows = await db.select().from(groups).where(eq(groups.classroomId, classroomId));
+    if (groupRows.length === 0) return [];
+
+    const counts = await db.select({ groupId: groupStudents.groupId, value: count() })
+        .from(groupStudents)
+        .where(inArray(groupStudents.groupId, groupRows.map(g => g.id)))
+        .groupBy(groupStudents.groupId);
+    const countMap = new Map(counts.map(c => [c.groupId, Number(c.value)]));
+
+    return groupRows.map(g => ({ ...g, memberCount: countMap.get(g.id) ?? 0 }));
 };
 
 // ── Add Student to Group ──────────────────────────────────────────────────────
@@ -93,20 +104,45 @@ const removeStudentFromGroup = async (groupId: string, studentId: string, teache
     );
 };
 
+// ── Get My Groups (student; the group(s) they belong to in a classroom) ──────
+const getMyGroups = async (studentId: string, classroomId: string) => {
+    const [membership] = await db.select().from(classroomStudents).where(
+        and(
+            eq(classroomStudents.classroomId, classroomId),
+            eq(classroomStudents.studentId, studentId),
+            eq(classroomStudents.status, "active"),
+        )
+    );
+    if (!membership) throw ApiError.forbidden("You are not an active member of this classroom");
+
+    return await db.select({
+        id: groups.id,
+        name: groups.name,
+        classroomId: groups.classroomId,
+    })
+        .from(groupStudents)
+        .innerJoin(groups, eq(groupStudents.groupId, groups.id))
+        .where(and(eq(groupStudents.studentId, studentId), eq(groups.classroomId, classroomId)));
+};
+
 // ── Get Group Members ─────────────────────────────────────────────────────────
-const getGroupMembers = async (groupId: string, teacherId: string) => {
+const getGroupMembers = async (groupId: string, teacherId: string, search?: string) => {
     const hasAccess = await PermissionService.teacher.canManageGroup(teacherId, groupId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this group");
+
+    const conditions = [eq(groupStudents.groupId, groupId)];
+    if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
 
     return await db.select({
         studentId: users.id,
         name: users.name,
         email: users.email,
+        avatarUrl: users.avatarUrl,
         addedAt: groupStudents.addedAt,
     })
         .from(groupStudents)
         .innerJoin(users, eq(groupStudents.studentId, users.id))
-        .where(eq(groupStudents.groupId, groupId));
+        .where(and(...conditions));
 };
 
 export {
@@ -117,4 +153,5 @@ export {
     addStudentToGroup,
     removeStudentFromGroup,
     getGroupMembers,
+    getMyGroups,
 };

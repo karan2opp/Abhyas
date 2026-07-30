@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { createOrganisationService, getOrganisationsService } from "./organisation.service";
+import { formatDate } from "@/lib/date";
 
 interface Organisation {
   id: string;
@@ -107,7 +108,7 @@ export default function OrganisationsPage() {
                 <div className="min-w-0">
                   <h3 className="text-[15px] font-bold text-white leading-tight truncate">{org.name}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Created {new Date(org.createdAt).toLocaleDateString()}
+                    Created {formatDate(org.createdAt)}
                   </p>
                 </div>
               </div>

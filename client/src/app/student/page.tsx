@@ -7,6 +7,7 @@ import { Play, CheckCircle, Clock, FileText, Search, MoreVertical, Calendar as C
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { joinExamService, getMySubmissionsService, verifyJoinCodeService } from "./student.service";
+import { formatDateTime } from "@/lib/date";
 
 export default function StudentDashboard() {
   const [joinCode, setJoinCode] = useState("");
@@ -172,15 +173,7 @@ export default function StudentDashboard() {
                 const { submission, exam } = item;
                 const isCompleted = submission.status === "submitted" || submission.status === "timeout";
                 const examDate = new Date(exam.startTime || submission.createdAt);
-                
-                const formattedDate = examDate.toLocaleString('en-GB', { 
-                  day: '2-digit', 
-                  month: '2-digit', 
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
-                }).replace(',', '');
+                const formattedDate = formatDateTime(examDate);
 
                 return (
                   <div key={submission.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4">

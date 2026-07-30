@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, UserPlus, Trash2, Crown } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Crown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -36,27 +36,46 @@ export default function OrganisationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [managerEmail, setManagerEmail] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const loadOrganisation = async () => {
+    try {
+      const orgsRes = await getOrganisationsService();
+      const found = (orgsRes.data || []).find((o: Organisation) => o.id === organisationId);
+      setOrganisation(found || null);
+    } catch (err) {
+      toast.error("Failed to load organisation");
+    }
+  };
+
+  const loadManagers = async (search: string) => {
+    try {
+      const managersRes = await getOrganisationManagersService(organisationId, search || undefined);
+      setManagers(managersRes.data || []);
+    } catch (err) {
+      toast.error("Failed to load managers");
+    }
+  };
 
   const loadAll = async () => {
     setLoading(true);
-    try {
-      const [orgsRes, managersRes] = await Promise.all([
-        getOrganisationsService(),
-        getOrganisationManagersService(organisationId),
-      ]);
-      const found = (orgsRes.data || []).find((o: Organisation) => o.id === organisationId);
-      setOrganisation(found || null);
-      setManagers(managersRes.data || []);
-    } catch (err) {
-      toast.error("Failed to load organisation");
-    } finally {
-      setLoading(false);
-    }
+    await Promise.all([loadOrganisation(), loadManagers(debouncedSearch)]);
+    setLoading(false);
   };
 
   useEffect(() => {
     if (organisationId) loadAll();
   }, [organisationId]);
+
+  useEffect(() => {
+    if (organisationId && !loading) loadManagers(debouncedSearch);
+  }, [debouncedSearch]);
 
   const handleAssignManager = async () => {
     if (!managerEmail.includes("@")) {
@@ -68,7 +87,7 @@ export default function OrganisationDetailPage() {
       await assignManagerService(organisationId, managerEmail.trim());
       toast.success(`${managerEmail} is now a manager of this organisation`);
       setManagerEmail("");
-      loadAll();
+      loadManagers(debouncedSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to assign manager");
     } finally {
@@ -81,7 +100,7 @@ export default function OrganisationDetailPage() {
     try {
       await revokeManagerService(organisationId, userId);
       toast.success("Manager revoked");
-      loadAll();
+      loadManagers(debouncedSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to revoke manager");
     }
@@ -129,11 +148,25 @@ export default function OrganisationDetailPage() {
       </Card>
 
       <h3 className="text-lg font-semibold text-white mb-3">Managers ({managers.length})</h3>
+
+      <div className="relative w-full sm:w-72 mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input
+          type="text"
+          placeholder="Search managers by name or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+        />
+      </div>
+
       {managers.length === 0 ? (
         <Card className="bg-[#111520]/50 border-white/5 py-10 text-center">
           <CardContent>
             <Crown className="h-8 w-8 text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-400">No managers assigned yet.</p>
+            <p className="text-gray-400">
+              {debouncedSearch ? `No managers matching "${debouncedSearch}".` : "No managers assigned yet."}
+            </p>
           </CardContent>
         </Card>
       ) : (

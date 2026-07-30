@@ -12,6 +12,9 @@ export const answers = pgTable("answers", {
   isCorrect: boolean("is_correct"),
   marksAwarded: doublePrecision("marks_awarded"),
   feedback: text("feedback"),
+  // Who last set marksAwarded/feedback. A teacher can always override an AI
+  // grade, but AI (re-)evaluation must never overwrite a teacher's grade.
+  evaluatedBy: text("evaluated_by").$type<"ai" | "teacher">(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

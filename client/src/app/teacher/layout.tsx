@@ -28,42 +28,57 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // Managers are let through onto /teacher/exams/* only — they arrive here via
+  // the "New Exam" / "Results" actions on their own classroom page, reusing the
+  // teacher's exam builder & results UI (the backend authorizes both roles on
+  // these endpoints). Every other /teacher/* page stays teacher-only.
+  const isManagerAllowedExamPath = pathname.startsWith("/teacher/exams");
+
+  // Inside a specific classroom (/teacher/classrooms/<id>/...), the classroom's
+  // own layout renders its own sidebar — hide this outer portal sidebar so we
+  // don't show two side-by-side. The bare list page (/teacher/classrooms) still
+  // uses this sidebar as normal.
+  const isInsideClassroomDetail = /^\/teacher\/classrooms\/[^/]+/.test(pathname);
+
   useEffect(() => {
     if (isInitialized) {
       if (!user) {
         router.push("/auth/login");
-      } else if (user.role !== "teacher") {
+      } else if (user.role !== "teacher" && !(user.role === "manager" && isManagerAllowedExamPath)) {
         router.replace(`/${user.role}`);
       }
     }
-  }, [user, isInitialized, router]);
+  }, [user, isInitialized, router, isManagerAllowedExamPath]);
 
   return (
     <TooltipProvider>
       <div className="flex flex-col md:flex-row h-screen w-full bg-[#0a0d14] text-gray-100 font-sans overflow-hidden">
         
         {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-1.5 rounded-md shadow-lg shadow-indigo-900/50">
-              <BookOpen className="h-5 w-5 text-white" />
+        {!isInsideClassroomDetail && (
+          <div className="md:hidden flex items-center justify-between p-4 bg-[#111520] border-b border-white/5 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-600 p-1.5 rounded-md shadow-lg shadow-indigo-900/50">
+                <BookOpen className="h-5 w-5 text-white" />
+              </div>
+              <span className="font-bold text-lg text-white tracking-tight">Abhyas</span>
             </div>
-            <span className="font-bold text-lg text-white tracking-tight">Abhyas</span>
+            <button onClick={() => setIsMobileOpen(true)} className="p-2 -mr-2 text-gray-400 hover:text-white">
+              <Menu className="h-6 w-6" />
+            </button>
           </div>
-          <button onClick={() => setIsMobileOpen(true)} className="p-2 -mr-2 text-gray-400 hover:text-white">
-            <Menu className="h-6 w-6" />
-          </button>
-        </div>
+        )}
 
         {/* Mobile Overlay */}
-        {isMobileOpen && (
-          <div 
+        {isMobileOpen && !isInsideClassroomDetail && (
+          <div
             className="fixed inset-0 bg-black/60 z-40 md:hidden"
             onClick={() => setIsMobileOpen(false)}
           />
         )}
 
         {/* Sidebar */}
+        {!isInsideClassroomDetail && (
         <aside className={cn(
           "fixed md:relative z-50 h-full border-r border-white/5 flex flex-col bg-[#111520] shrink-0 transition-all duration-300",
           isCollapsed ? "md:w-20" : "md:w-64",
@@ -148,6 +163,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             </button>
           </div>
         </aside>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#0b0f19]">

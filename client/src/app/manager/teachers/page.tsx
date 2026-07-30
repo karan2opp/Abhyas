@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Users, UserPlus, Trash2 } from "lucide-react";
+import { Users, UserPlus, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -23,11 +23,18 @@ export default function ManagerTeachersPage() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const fetchTeachers = async () => {
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const fetchTeachers = async (search: string) => {
     setLoading(true);
     try {
-      const res = await getMyOrganisationTeachersService();
+      const res = await getMyOrganisationTeachersService(search || undefined);
       setTeachers(res.data || []);
     } catch (err) {
       toast.error("Failed to load teachers");
@@ -37,8 +44,8 @@ export default function ManagerTeachersPage() {
   };
 
   useEffect(() => {
-    fetchTeachers();
-  }, []);
+    fetchTeachers(debouncedSearch);
+  }, [debouncedSearch]);
 
   const handleAssign = async () => {
     if (!email.includes("@")) {
@@ -50,7 +57,7 @@ export default function ManagerTeachersPage() {
       await assignTeacherToMyOrganisationService(email.trim());
       toast.success(`${email} added to your organisation`);
       setEmail("");
-      fetchTeachers();
+      fetchTeachers(debouncedSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to assign teacher");
     } finally {
@@ -63,13 +70,11 @@ export default function ManagerTeachersPage() {
     try {
       await removeTeacherFromMyOrganisationService(userId);
       toast.success("Teacher removed");
-      fetchTeachers();
+      fetchTeachers(debouncedSearch);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to remove teacher");
     }
   };
-
-  if (loading) return <div className="p-10 text-white text-center">Loading teachers...</div>;
 
   return (
     <div className="p-10 h-full overflow-y-auto custom-scrollbar">
@@ -106,11 +111,27 @@ export default function ManagerTeachersPage() {
       </Card>
 
       <h3 className="text-lg font-semibold text-white mb-3">Current Teachers ({teachers.length})</h3>
-      {teachers.length === 0 ? (
+
+      <div className="relative w-full sm:w-72 mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <input
+          type="text"
+          placeholder="Search teachers by name or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+        />
+      </div>
+
+      {loading ? (
+        <div className="text-white text-center py-10">Loading teachers...</div>
+      ) : teachers.length === 0 ? (
         <Card className="bg-[#111520]/50 border-white/5 py-10 text-center">
           <CardContent>
             <Users className="h-8 w-8 text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-400">No teachers in your organisation yet.</p>
+            <p className="text-gray-400">
+              {debouncedSearch ? `No teachers matching "${debouncedSearch}".` : "No teachers in your organisation yet."}
+            </p>
           </CardContent>
         </Card>
       ) : (

@@ -1,7 +1,8 @@
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { eq, and, or, inArray, isNull, ilike, desc, count, lt, gt, lte, gte } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import {
     assignments,
+    assignmentSeries,
     assignmentQuestions,
     assignmentOptions,
     assignmentSubmissions,
@@ -14,13 +15,18 @@ import {
 import { ApiError } from "../../common/utils/ApiError.js";
 import { PermissionService } from "../../common/permissions/index.js";
 import type {
+    CreateSeriesDto,
+    UpdateSeriesDto,
     CreateAssignmentDto,
     UpdateAssignmentDto,
+    ExtendAssignmentDto,
     CreateAssignmentQuestionDto,
     UpdateAssignmentQuestionDto,
     SaveAssignmentAnswerDto,
     GradeAssignmentSubmissionDto,
 } from "./dto/assignment.dto.js";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ── Validate Classroom/Group Scope ─────────────────────────────────────────────
 const validateAssignmentScope = async (classroomId: string, groupId: string | null | undefined, teacherId: string) => {
@@ -38,9 +44,95 @@ const validateAssignmentScope = async (classroomId: string, groupId: string | nu
     }
 };
 
+// ── Create Series ─────────────────────────────────────────────────────────────
+const createSeries = async (data: CreateSeriesDto, teacherId: string) => {
+    await validateAssignmentScope(data.classroomId, data.groupId, teacherId);
+
+    const [series] = await db.insert(assignmentSeries).values({
+        title: data.title,
+        type: data.type,
+        classroomId: data.classroomId,
+        groupId: data.groupId ?? null,
+        createdBy: teacherId,
+    }).returning();
+
+    if (!series) throw ApiError.internal("Failed to create series");
+    return series;
+};
+
+// ── List Series (for a classroom, teacher) ────────────────────────────────────
+const listSeriesForClassroom = async (classroomId: string, teacherId: string) => {
+    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this classroom");
+
+    return await db.select().from(assignmentSeries).where(eq(assignmentSeries.classroomId, classroomId));
+};
+
+// ── Update Series (rename) ──────────────────────────────────────────────────────
+const updateSeries = async (seriesId: string, data: UpdateSeriesDto, teacherId: string) => {
+    const [series] = await db.select().from(assignmentSeries).where(eq(assignmentSeries.id, seriesId));
+    if (!series) throw ApiError.notFound("Series not found");
+
+    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, series.classroomId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this series");
+
+    const [updated] = await db.update(assignmentSeries)
+        .set({ title: data.title, updatedAt: new Date() })
+        .where(eq(assignmentSeries.id, seriesId))
+        .returning();
+
+    return updated;
+};
+
+// ── Delete Series (cascades its assignments) ──────────────────────────────────
+const deleteSeries = async (seriesId: string, teacherId: string) => {
+    const [series] = await db.select().from(assignmentSeries).where(eq(assignmentSeries.id, seriesId));
+    if (!series) throw ApiError.notFound("Series not found");
+
+    const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, series.classroomId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to delete this series");
+
+    await db.delete(assignmentSeries).where(eq(assignmentSeries.id, seriesId));
+};
+
 // ── Create Assignment ────────────────────────────────────────────────────────
 const createAssignment = async (data: CreateAssignmentDto, teacherId: string) => {
     await validateAssignmentScope(data.classroomId, data.groupId, teacherId);
+
+    let sequenceOrder: number | null = null;
+    let unlockOffsetDays: number | null = null;
+    let dayGap: number | null = null;
+    let startDate: Date | null = data.startDate ?? null;
+    let dueDate: Date | null = data.dueDate ?? null;
+
+    if (data.seriesId) {
+        const [series] = await db.select().from(assignmentSeries).where(eq(assignmentSeries.id, data.seriesId));
+        if (!series || series.classroomId !== data.classroomId) {
+            throw ApiError.badRequest("Series does not belong to the given classroom");
+        }
+
+        // Chain from the last assignment currently in this series.
+        const existing = await db.select().from(assignments).where(eq(assignments.seriesId, data.seriesId));
+        const last = existing.length > 0
+            ? existing.reduce((a, b) => ((a.sequenceOrder ?? 0) > (b.sequenceOrder ?? 0) ? a : b))
+            : null;
+        sequenceOrder = (last?.sequenceOrder ?? 0) + 1;
+
+        if (series.type === "weekly") {
+            if (!data.dayGap) throw ApiError.badRequest("dayGap is required for a weekly series assignment");
+            if (data.dueDate) throw ApiError.badRequest("Weekly series assignments use dayGap, not a manual due date");
+            dayGap = data.dayGap;
+            // starts the day after the previous one ends (relative to each student's enrollment)
+            unlockOffsetDays = last ? (last.unlockOffsetDays ?? 0) + (last.dayGap ?? 0) + 1 : 0;
+            startDate = null;
+            dueDate = null;
+        } else {
+            if (!data.startDate || !data.dueDate) throw ApiError.badRequest("startDate and dueDate are required for a custom series assignment");
+            if (data.dayGap) throw ApiError.badRequest("Custom series assignments use explicit dates, not dayGap");
+            startDate = data.startDate;
+            dueDate = data.dueDate;
+        }
+    }
 
     const [assignment] = await db.insert(assignments).values({
         title: data.title,
@@ -49,11 +141,107 @@ const createAssignment = async (data: CreateAssignmentDto, teacherId: string) =>
         groupId: data.groupId ?? null,
         createdBy: teacherId,
         totalMarks: data.totalMarks,
-        dueDate: data.dueDate ?? null,
+        startDate,
+        dueDate,
+        seriesId: data.seriesId ?? null,
+        dayGap,
+        sequenceOrder,
+        unlockOffsetDays,
     }).returning();
 
     if (!assignment) throw ApiError.internal("Failed to create assignment");
     return assignment;
+};
+
+// ── Extend Assignment (grow duration or shift window, with optional cascade) ──
+const extendAssignment = async (assignmentId: string, data: ExtendAssignmentDto, teacherId: string) => {
+    const hasAccess = await PermissionService.teacher.canManageAssignment(teacherId, assignmentId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized to modify this assignment");
+
+    const [assignment] = await db.select().from(assignments).where(eq(assignments.id, assignmentId));
+    if (!assignment) throw ApiError.notFound("Assignment not found");
+    if (!assignment.seriesId || assignment.sequenceOrder === null) {
+        throw ApiError.badRequest("Only series assignments can be extended this way");
+    }
+
+    const [series] = await db.select().from(assignmentSeries).where(eq(assignmentSeries.id, assignment.seriesId));
+    if (!series) throw ApiError.notFound("Series not found");
+
+    if (series.type === "weekly") {
+        return await db.transaction(async (tx) => {
+            let updatedFields: { dayGap?: number; unlockOffsetDays?: number };
+
+            if (data.mode === "grow") {
+                // Due date pushes out by `days`; start stays put.
+                updatedFields = { dayGap: (assignment.dayGap ?? 0) + data.days };
+            } else {
+                // Whole window slides later by `days`; duration unchanged.
+                updatedFields = { unlockOffsetDays: (assignment.unlockOffsetDays ?? 0) + data.days };
+            }
+
+            const [updated] = await tx.update(assignments)
+                .set({ ...updatedFields, updatedAt: new Date() })
+                .where(eq(assignments.id, assignmentId))
+                .returning();
+
+            if (!updated) throw ApiError.internal("Failed to extend assignment");
+
+            if (data.cascade) {
+                const later = await tx.select().from(assignments).where(eq(assignments.seriesId, assignment.seriesId!));
+                const sorted = later
+                    .filter(a => (a.sequenceOrder ?? 0) > (updated.sequenceOrder ?? 0))
+                    .sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0));
+
+                let cursorOffset = (updated.unlockOffsetDays ?? 0) + (updated.dayGap ?? 0) + 1;
+                for (const a of sorted) {
+                    await tx.update(assignments)
+                        .set({ unlockOffsetDays: cursorOffset, updatedAt: new Date() })
+                        .where(eq(assignments.id, a.id));
+                    cursorOffset = cursorOffset + (a.dayGap ?? 0) + 1;
+                }
+            }
+
+            return updated;
+        });
+    }
+
+    // Custom series: dates are fixed classroom-wide columns, not offsets.
+    if (!assignment.startDate || !assignment.dueDate) {
+        throw ApiError.badRequest("This assignment doesn't have dates set yet");
+    }
+
+    return await db.transaction(async (tx) => {
+        const extraMs = data.days * DAY_MS;
+        const newStartDate = data.mode === "shift" ? new Date(assignment.startDate!.getTime() + extraMs) : assignment.startDate!;
+        const newDueDate = new Date(assignment.dueDate!.getTime() + extraMs);
+
+        const [updated] = await tx.update(assignments)
+            .set({ startDate: newStartDate, dueDate: newDueDate, updatedAt: new Date() })
+            .where(eq(assignments.id, assignmentId))
+            .returning();
+
+        if (!updated) throw ApiError.internal("Failed to extend assignment");
+
+        if (data.cascade) {
+            const later = await tx.select().from(assignments).where(eq(assignments.seriesId, assignment.seriesId!));
+            const sorted = later
+                .filter(a => (a.sequenceOrder ?? 0) > (updated.sequenceOrder ?? 0))
+                .sort((a, b) => (a.sequenceOrder ?? 0) - (b.sequenceOrder ?? 0));
+
+            let cursorDue = updated.dueDate!;
+            for (const a of sorted) {
+                const duration = a.startDate && a.dueDate ? a.dueDate.getTime() - a.startDate.getTime() : 0;
+                const nextStart = new Date(cursorDue.getTime() + DAY_MS);
+                const nextDue = new Date(nextStart.getTime() + duration);
+                await tx.update(assignments)
+                    .set({ startDate: nextStart, dueDate: nextDue, updatedAt: new Date() })
+                    .where(eq(assignments.id, a.id));
+                cursorDue = nextDue;
+            }
+        }
+
+        return updated;
+    });
 };
 
 // ── Update Assignment ────────────────────────────────────────────────────────
@@ -66,6 +254,21 @@ const updateAssignment = async (assignmentId: string, data: UpdateAssignmentDto,
 
     if (data.groupId !== undefined && data.groupId !== null) {
         await validateAssignmentScope(existing.classroomId, data.groupId, teacherId);
+    }
+
+    // Weekly series assignments have their schedule computed and chained from
+    // dayGap/unlockOffsetDays — use extendAssignment to change it, not a plain
+    // update. Custom series assignments store fixed dates directly, so those
+    // can be edited here like a standalone assignment (dayGap never applies).
+    if (existing.seriesId) {
+        const [series] = await db.select().from(assignmentSeries).where(eq(assignmentSeries.id, existing.seriesId));
+        const isWeekly = series?.type === "weekly";
+        if (isWeekly && (data.startDate !== undefined || data.dueDate !== undefined || data.dayGap !== undefined)) {
+            throw ApiError.badRequest("Use the extend action to change a weekly series assignment's schedule");
+        }
+        if (!isWeekly && data.dayGap !== undefined) {
+            throw ApiError.badRequest("Custom series assignments don't use dayGap");
+        }
     }
 
     const [updated] = await db.update(assignments)
@@ -85,11 +288,60 @@ const deleteAssignment = async (assignmentId: string, teacherId: string) => {
 };
 
 // ── List Assignments (for a classroom, teacher) ──────────────────────────────
-const listAssignmentsForClassroom = async (classroomId: string, teacherId: string) => {
+const listAssignmentsForClassroom = async (
+    classroomId: string,
+    teacherId: string,
+    options?: {
+        standaloneOnly?: boolean | undefined;
+        groupId?: string | undefined;
+        search?: string | undefined;
+        status?: "upcoming" | "live" | "closed" | undefined;
+        page?: number | undefined;
+        limit?: number | undefined;
+    }
+) => {
     const hasAccess = await PermissionService.teacher.canManageClassroom(teacherId, classroomId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this classroom");
 
-    return await db.select().from(assignments).where(eq(assignments.classroomId, classroomId));
+    const conditions = [eq(assignments.classroomId, classroomId)];
+    if (options?.standaloneOnly) conditions.push(isNull(assignments.seriesId));
+    if (options?.groupId) conditions.push(eq(assignments.groupId, options.groupId));
+    if (options?.search) conditions.push(ilike(assignments.title, `%${options.search}%`));
+
+    // Only meaningful for assignments with a fixed date (standalone / custom
+    // series) — weekly-series assignments have no fixed startDate/dueDate on
+    // the row itself (computed per-student), so they never match these.
+    const now = new Date();
+    if (options?.status === "upcoming") {
+        conditions.push(gt(assignments.startDate, now));
+    } else if (options?.status === "closed") {
+        conditions.push(lt(assignments.dueDate, now));
+    } else if (options?.status === "live") {
+        conditions.push(or(isNull(assignments.startDate), lte(assignments.startDate, now))!);
+        conditions.push(or(isNull(assignments.dueDate), gte(assignments.dueDate, now))!);
+    }
+
+    // Paginated form (used by the Standalone Assignments list) — opted into by
+    // passing `page`. Without it, returns the full unpaginated array as before
+    // (used for series grouping and landing-page counts).
+    if (options?.page) {
+        const page = options.page;
+        const limit = options.limit ?? 10;
+        const offset = (page - 1) * limit;
+
+        const data = await db.select().from(assignments)
+            .where(and(...conditions))
+            .orderBy(desc(assignments.createdAt))
+            .limit(limit)
+            .offset(offset);
+
+        const [totalCount] = await db.select({ value: count() }).from(assignments).where(and(...conditions));
+        const total = Number(totalCount?.value) || 0;
+
+        return { data, total, page, limit, hasMore: offset + data.length < total };
+    }
+
+    return await db.select().from(assignments).where(and(...conditions)).orderBy(desc(assignments.createdAt));
 };
 
 // ── Get Assignment By Id (teacher) ───────────────────────────────────────────
@@ -243,7 +495,9 @@ const assertStudentCanAccessAssignment = async (assignmentId: string, studentId:
 
 // ── Get Assignment By Id (student) ───────────────────────────────────────────
 const getAssignmentForStudent = async (assignmentId: string, studentId: string) => {
-    return await assertStudentCanAccessAssignment(assignmentId, studentId);
+    const assignment = await assertStudentCanAccessAssignment(assignmentId, studentId);
+    const { startDate, dueDate } = await getComputedAssignmentDates(assignment, studentId);
+    return { ...assignment, startDate, dueDate };
 };
 
 // ── Get Questions (student, hides correct answers/model answer) ─────────────
@@ -269,25 +523,113 @@ const getQuestionsForStudent = async (assignmentId: string, studentId: string) =
     }));
 };
 
+// ── Computed start/due dates for a student (series assignments only) ─────────
+// Standalone assignments already store real startDate/dueDate columns; series
+// ones are relative-to-enrollment, so the actual calendar dates are derived
+// per student here rather than stored.
+const getComputedAssignmentDates = async (
+    assignment: typeof assignments.$inferSelect,
+    studentId: string
+): Promise<{ startDate: Date | null; dueDate: Date | null }> => {
+    // Standalone, or a custom-series assignment (fixed classroom-wide dates,
+    // identifiable by unlockOffsetDays never having been set) — use the
+    // stored columns directly. Only weekly-series assignments are computed
+    // relative to the student's enrollment date.
+    if (!assignment.seriesId || assignment.unlockOffsetDays === null) {
+        return { startDate: assignment.startDate, dueDate: assignment.dueDate };
+    }
+
+    const [membership] = await db.select().from(classroomStudents).where(
+        and(eq(classroomStudents.classroomId, assignment.classroomId), eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active"))
+    );
+    if (!membership) return { startDate: null, dueDate: null };
+
+    const startDate = new Date(membership.enrolledAt.getTime() + (assignment.unlockOffsetDays ?? 0) * DAY_MS);
+    const dueDate = new Date(startDate.getTime() + (assignment.dayGap ?? 0) * DAY_MS);
+    return { startDate, dueDate };
+};
+
+// ── Unlock status ─────────────────────────────────────────────────────────────
+// Standalone assignments: locked only if a manually-set startDate is in the
+// future. Series assignments: locked until (a) unlockOffsetDays have passed
+// since the student's classroom enrollment, and (b) the previous assignment
+// in the same series has been submitted (not just started).
+const getAssignmentUnlockStatus = async (
+    assignment: typeof assignments.$inferSelect,
+    studentId: string
+): Promise<{ locked: boolean; unlocksAt: string | null; reason: "time" | "previous_incomplete" | null }> => {
+    if (!assignment.seriesId) {
+        if (assignment.startDate && new Date() < assignment.startDate) {
+            return { locked: true, unlocksAt: assignment.startDate.toISOString(), reason: "time" };
+        }
+        return { locked: false, unlocksAt: null, reason: null };
+    }
+
+    const { startDate: unlocksAt } = await getComputedAssignmentDates(assignment, studentId);
+    if (!unlocksAt) return { locked: true, unlocksAt: null, reason: "time" };
+    if (new Date() < unlocksAt) return { locked: true, unlocksAt: unlocksAt.toISOString(), reason: "time" };
+
+    if (assignment.sequenceOrder === 1) return { locked: false, unlocksAt: null, reason: null };
+
+    const [prevAssignment] = await db.select().from(assignments).where(
+        and(eq(assignments.seriesId, assignment.seriesId), eq(assignments.sequenceOrder, (assignment.sequenceOrder ?? 1) - 1))
+    );
+    if (!prevAssignment) return { locked: false, unlocksAt: null, reason: null };
+
+    const [prevSubmission] = await db.select().from(assignmentSubmissions).where(
+        and(eq(assignmentSubmissions.assignmentId, prevAssignment.id), eq(assignmentSubmissions.studentId, studentId))
+    );
+    const prevCompleted = prevSubmission && (prevSubmission.status === "submitted" || prevSubmission.status === "graded");
+
+    if (!prevCompleted) return { locked: true, unlocksAt: unlocksAt.toISOString(), reason: "previous_incomplete" };
+
+    return { locked: false, unlocksAt: null, reason: null };
+};
+
 // ── List Assignments Visible to a Student ────────────────────────────────────
-const getMyAssignments = async (studentId: string) => {
+const getMyAssignments = async (studentId: string, classroomId?: string) => {
     const memberships = await db.select().from(classroomStudents).where(
         and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active"))
     );
-    if (memberships.length === 0) return [];
+    const memberClassroomIds = memberships.map(m => m.classroomId);
+    if (memberClassroomIds.length === 0) return [];
+    if (classroomId && !memberClassroomIds.includes(classroomId)) return [];
 
-    const classroomIds = memberships.map(m => m.classroomId);
+    const classroomIds = classroomId ? [classroomId] : memberClassroomIds;
     const myGroups = await db.select().from(groupStudents).where(eq(groupStudents.studentId, studentId));
     const myGroupIds = new Set(myGroups.map(g => g.groupId));
 
     const classWideAndMyGroups = await db.select().from(assignments).where(inArray(assignments.classroomId, classroomIds));
+    const visible = classWideAndMyGroups.filter(a => !a.groupId || myGroupIds.has(a.groupId));
+    if (visible.length === 0) return [];
 
-    return classWideAndMyGroups.filter(a => !a.groupId || myGroupIds.has(a.groupId));
+    const mySubmissions = await db.select().from(assignmentSubmissions).where(
+        and(inArray(assignmentSubmissions.assignmentId, visible.map(a => a.id)), eq(assignmentSubmissions.studentId, studentId))
+    );
+    const submissionByAssignment = new Map(mySubmissions.map(s => [s.assignmentId, s]));
+
+    return await Promise.all(visible.map(async (a) => {
+        const { startDate, dueDate } = await getComputedAssignmentDates(a, studentId);
+        return {
+            ...a,
+            startDate,
+            dueDate,
+            submissionStatus: submissionByAssignment.get(a.id)?.status ?? null,
+            ...(await getAssignmentUnlockStatus(a, studentId)),
+        };
+    }));
 };
 
 // ── Start Assignment (creates or resumes an in-progress submission) ─────────
 const startAssignment = async (assignmentId: string, studentId: string) => {
-    await assertStudentCanAccessAssignment(assignmentId, studentId);
+    const assignment = await assertStudentCanAccessAssignment(assignmentId, studentId);
+
+    const { locked, unlocksAt } = await getAssignmentUnlockStatus(assignment, studentId);
+    if (locked) {
+        throw ApiError.forbidden(
+            unlocksAt ? `This assignment unlocks on ${new Date(unlocksAt).toLocaleDateString()}, after completing the previous one.` : "This assignment is locked."
+        );
+    }
 
     const [existing] = await db.select().from(assignmentSubmissions).where(
         and(
@@ -296,10 +638,7 @@ const startAssignment = async (assignmentId: string, studentId: string) => {
             isNull(assignmentSubmissions.deletedAt),
         )
     );
-    if (existing) {
-        if (existing.status === "in_progress") return existing;
-        throw ApiError.conflict("You have already submitted this assignment");
-    }
+    if (existing) return existing;
 
     const [submission] = await db.insert(assignmentSubmissions).values({
         assignmentId,
@@ -316,7 +655,12 @@ const saveAnswer = async (data: SaveAssignmentAnswerDto, studentId: string) => {
     const [submission] = await db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.id, data.submissionId));
     if (!submission) throw ApiError.notFound("Submission not found");
     if (submission.studentId !== studentId) throw ApiError.forbidden("You are not authorized to answer for this submission");
-    if (submission.status !== "in_progress") throw ApiError.badRequest("This assignment has already been submitted");
+    if (submission.status === "graded") throw ApiError.badRequest("This assignment has already been graded");
+    if (submission.status === "submitted") {
+        const [assignment] = await db.select().from(assignments).where(eq(assignments.id, submission.assignmentId));
+        const { dueDate } = assignment ? await getComputedAssignmentDates(assignment, studentId) : { dueDate: null };
+        if (dueDate && new Date() > dueDate) throw ApiError.badRequest("The due date has passed; you can no longer edit your submission");
+    }
 
     const [question] = await db.select().from(assignmentQuestions).where(eq(assignmentQuestions.id, data.questionId));
     if (!question) throw ApiError.notFound("Question not found");
@@ -368,11 +712,20 @@ const submitAssignment = async (submissionId: string, studentId: string) => {
     const [submission] = await db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.id, submissionId));
     if (!submission) throw ApiError.notFound("Submission not found");
     if (submission.studentId !== studentId) throw ApiError.forbidden("You are not authorized to submit this");
-    if (submission.status !== "in_progress") throw ApiError.badRequest("This assignment has already been submitted");
+    if (submission.status === "graded") throw ApiError.badRequest("This assignment has already been graded");
 
     const [assignment] = await db.select().from(assignments).where(eq(assignments.id, submission.assignmentId));
     const now = new Date();
-    const isLate = !!(assignment?.dueDate && now > assignment.dueDate);
+    const { dueDate } = assignment ? await getComputedAssignmentDates(assignment, studentId) : { dueDate: null };
+
+    // Re-submitting an already-submitted assignment (editing an answer) is only
+    // allowed up until the due date; the first submission is always allowed
+    // (even late, tracked via isLate) so a student can't be locked out entirely.
+    if (submission.status === "submitted" && dueDate && now > dueDate) {
+        throw ApiError.badRequest("The due date has passed; you can no longer edit your submission");
+    }
+
+    const isLate = !!(dueDate && now > dueDate);
 
     const [updated] = await db.update(assignmentSubmissions)
         .set({ status: "submitted", submittedAt: now, isLate, updatedAt: now })
@@ -394,15 +747,29 @@ const getMySubmission = async (assignmentId: string, studentId: string) => {
 };
 
 // ── List Submissions (teacher, grading queue) ────────────────────────────────
-const getSubmissionsForAssignment = async (assignmentId: string, teacherId: string) => {
+const getSubmissionsForAssignment = async (
+    assignmentId: string,
+    teacherId: string,
+    options?: { search?: string | undefined; page?: number | undefined; limit?: number | undefined }
+) => {
     const hasAccess = await PermissionService.teacher.canManageAssignment(teacherId, assignmentId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this assignment");
 
-    return await db.select({
+    const conditions = [
+        eq(assignmentSubmissions.assignmentId, assignmentId),
+        isNull(assignmentSubmissions.deletedAt),
+        inArray(assignmentSubmissions.status, ["submitted", "graded"]),
+    ];
+    if (options?.search) {
+        conditions.push(or(ilike(users.name, `%${options.search}%`), ilike(users.email, `%${options.search}%`))!);
+    }
+
+    const baseQuery = () => db.select({
         id: assignmentSubmissions.id,
         studentId: users.id,
         studentName: users.name,
         studentEmail: users.email,
+        avatarUrl: users.avatarUrl,
         status: assignmentSubmissions.status,
         submittedAt: assignmentSubmissions.submittedAt,
         isLate: assignmentSubmissions.isLate,
@@ -410,7 +777,28 @@ const getSubmissionsForAssignment = async (assignmentId: string, teacherId: stri
     })
         .from(assignmentSubmissions)
         .innerJoin(users, eq(assignmentSubmissions.studentId, users.id))
-        .where(and(eq(assignmentSubmissions.assignmentId, assignmentId), isNull(assignmentSubmissions.deletedAt)));
+        .where(and(...conditions));
+
+    // Paginated form (used by the dedicated Submissions page) — opted into by
+    // passing `page`. Without it, returns the full unpaginated array as before
+    // (used by the assignment detail page's Submissions tab).
+    if (options?.page) {
+        const page = options.page;
+        const limit = options.limit ?? 10;
+        const offset = (page - 1) * limit;
+
+        const data = await baseQuery().orderBy(desc(assignmentSubmissions.submittedAt)).limit(limit).offset(offset);
+
+        const [totalCount] = await db.select({ value: count() })
+            .from(assignmentSubmissions)
+            .innerJoin(users, eq(assignmentSubmissions.studentId, users.id))
+            .where(and(...conditions));
+        const total = Number(totalCount?.value) || 0;
+
+        return { data, total, page, limit, hasMore: offset + data.length < total };
+    }
+
+    return await baseQuery();
 };
 
 // ── Get Submission By Id (teacher, full detail for grading) ──────────────────
@@ -437,6 +825,17 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
 
     return await db.transaction(async (tx) => {
         for (const graded of data.answers) {
+            const [answerRow] = await tx.select().from(assignmentAnswers).where(
+                and(eq(assignmentAnswers.id, graded.answerId), eq(assignmentAnswers.submissionId, submissionId))
+            );
+            if (!answerRow) throw ApiError.notFound(`Answer ${graded.answerId} not found for this submission`);
+
+            const [question] = await tx.select().from(assignmentQuestions).where(eq(assignmentQuestions.id, answerRow.questionId));
+            if (!question) throw ApiError.notFound("Question not found");
+            if (graded.marksAwarded > question.marks) {
+                throw ApiError.badRequest(`Marks awarded (${graded.marksAwarded}) cannot exceed this question's max marks (${question.marks})`);
+            }
+
             await tx.update(assignmentAnswers)
                 .set({ marksAwarded: graded.marksAwarded, feedback: graded.feedback ?? null, updatedAt: new Date() })
                 .where(and(eq(assignmentAnswers.id, graded.answerId), eq(assignmentAnswers.submissionId, submissionId)));
@@ -462,7 +861,12 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
 };
 
 export {
+    createSeries,
+    listSeriesForClassroom,
+    updateSeries,
+    deleteSeries,
     createAssignment,
+    extendAssignment,
     updateAssignment,
     deleteAssignment,
     listAssignmentsForClassroom,

@@ -3,11 +3,19 @@ import { exams, users, sections, classrooms, classroomTeachers, groups, assignme
 import { eq, and } from "drizzle-orm";
 
 class TeacherPermissions {
+    // Manageable by the exam's creator, or (co-teacher parity, matching
+    // canManageAssignment/canManageGroup) any teacher assigned to its classroom.
     static async canManageExam(teacherId: string, examId: string): Promise<boolean> {
         const exam = await db.select().from(exams)
             .where(and(eq(exams.id, examId), eq(exams.createdBy, teacherId)));
+        if (exam.length > 0) return true;
 
-        return exam.length > 0;
+        const [coTeacherRow] = await db.select({ id: exams.id })
+            .from(exams)
+            .innerJoin(classroomTeachers, eq(exams.classroomId, classroomTeachers.classroomId))
+            .where(and(eq(exams.id, examId), eq(classroomTeachers.teacherId, teacherId)));
+
+        return !!coTeacherRow;
     }
 
     // Any co-teacher assigned to the classroom (via classroom_teachers) can manage its content.
@@ -85,6 +93,18 @@ class ManagerPermissions {
         if (!classroom) return false;
 
         return classroom.organisationId === managerOrganisationId;
+    }
+
+    // A manager can manage an exam if it's scoped to a classroom in their own organisation.
+    static async canManageExam(managerOrganisationId: string | null, examId: string): Promise<boolean> {
+        if (!managerOrganisationId) return false;
+
+        const [row] = await db.select({ id: exams.id })
+            .from(exams)
+            .innerJoin(classrooms, eq(exams.classroomId, classrooms.id))
+            .where(and(eq(exams.id, examId), eq(classrooms.organisationId, managerOrganisationId)));
+
+        return !!row;
     }
 }
 

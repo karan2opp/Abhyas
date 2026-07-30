@@ -6,6 +6,7 @@ import { ChevronLeft, Users, CheckCircle, Clock, AlertCircle, Trophy } from "luc
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExamByIdService, getExamSubmissionsService } from "../../exam.service";
+import { formatDateTime } from "@/lib/date";
 
 export default function ExamResultsPage() {
   const params = useParams();
@@ -149,8 +150,8 @@ export default function ExamResultsPage() {
                         {row.submission.score !== null ? row.submission.score : "-"}
                       </td>
                       <td className="px-6 py-4 text-gray-500">
-                        {row.submission.submittedAt 
-                          ? new Date(row.submission.submittedAt).toLocaleString() 
+                        {row.submission.submittedAt
+                          ? formatDateTime(row.submission.submittedAt)
                           : "Not yet"}
                       </td>
                       <td className="px-6 py-4 text-right">

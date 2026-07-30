@@ -18,7 +18,11 @@ export const deleteGroup = async (req: Request, res: Response) => {
 };
 
 export const listGroups = async (req: Request, res: Response) => {
-    const result = await groupService.listGroups(req.params.classroomId as string, req.user!.id);
+    const result = await groupService.listGroups(req.params.classroomId as string, {
+        id: req.user!.id,
+        role: req.user!.role,
+        organisationId: req.user!.organisationId ?? null,
+    });
     return ApiResponse.ok(res, "Groups", result);
 };
 
@@ -33,6 +37,13 @@ export const removeStudentFromGroup = async (req: Request, res: Response) => {
 };
 
 export const getGroupMembers = async (req: Request, res: Response) => {
-    const result = await groupService.getGroupMembers(req.params.id as string, req.user!.id);
+    const result = await groupService.getGroupMembers(req.params.id as string, req.user!.id, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Group members", result);
+};
+
+export const getMyGroups = async (req: Request, res: Response) => {
+    const classroomId = req.query.classroomId as string | undefined;
+    if (!classroomId) return ApiResponse.ok(res, "My groups", []);
+    const result = await groupService.getMyGroups(req.user!.id, classroomId);
+    return ApiResponse.ok(res, "My groups", result);
 };

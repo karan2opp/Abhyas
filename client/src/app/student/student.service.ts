@@ -5,6 +5,16 @@ export const joinExamService = async (joinCode: string) => {
   return res.data;
 };
 
+export const startScopedExamService = async (examId: string) => {
+  const res = await api.post(`/submissions/start/${examId}`);
+  return res.data;
+};
+
+export const getMyExamsService = async (classroomId?: string) => {
+  const res = await api.get("/exams/me", { params: { classroomId } });
+  return res.data;
+};
+
 export const verifyJoinCodeService = async (joinCode: string) => {
   const res = await api.get(`/submissions/verify/${joinCode}`);
   return res.data;

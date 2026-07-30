@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { eq, and, lt, sql } from "drizzle-orm";
+import { eq, and, lt, sql, ilike, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -108,6 +108,15 @@ const updateClassroom = async (classroomId: string, data: UpdateClassroomDto, re
     return updated;
 };
 
+// ── Delete Classroom (cascades teachers, students, invites, groups, exams, assignments) ──
+const deleteClassroom = async (classroomId: string, requester: Requester) => {
+    await assertCanManageClassroomTeachers(requester, classroomId);
+
+    const [deleted] = await db.delete(classrooms).where(eq(classrooms.id, classroomId)).returning();
+    if (!deleted) throw ApiError.notFound("Classroom not found");
+    return deleted;
+};
+
 // ── Add Teacher ──────────────────────────────────────────────────────────────
 const addTeacher = async (classroomId: string, data: AddTeacherDto, requester: Requester) => {
     await assertCanManageClassroomTeachers(requester, classroomId);
@@ -151,17 +160,21 @@ const removeTeacher = async (classroomId: string, teacherIdToRemove: string, req
 };
 
 // ── List Teachers ────────────────────────────────────────────────────────────
-const listTeachers = async (classroomId: string, requester: Requester) => {
+const listTeachers = async (classroomId: string, requester: Requester, search?: string) => {
     await assertCanManageClassroom(requester, classroomId);
+
+    const conditions = [eq(classroomTeachers.classroomId, classroomId)];
+    if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
 
     return await db.select({
         id: users.id,
         name: users.name,
         email: users.email,
+        avatarUrl: users.avatarUrl,
     })
         .from(classroomTeachers)
         .innerJoin(users, eq(classroomTeachers.teacherId, users.id))
-        .where(eq(classroomTeachers.classroomId, classroomId));
+        .where(and(...conditions));
 };
 
 // ── Regenerate Join Code ──────────────────────────────────────────────────────
@@ -320,16 +333,22 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
 };
 
 // ── Get My Classrooms (teacher) ──────────────────────────────────────────────
-const getMyClassrooms = async (teacherId: string) => {
+const getMyClassrooms = async (teacherId: string, search?: string) => {
+    const conditions = [eq(classroomTeachers.teacherId, teacherId)];
+    if (search) conditions.push(ilike(classrooms.name, `%${search}%`));
+
     return await db.select({ classroom: classrooms })
         .from(classroomTeachers)
         .innerJoin(classrooms, eq(classroomTeachers.classroomId, classrooms.id))
-        .where(eq(classroomTeachers.teacherId, teacherId));
+        .where(and(...conditions));
 };
 
 // ── List Classrooms in Organisation (manager) ────────────────────────────────
-const listOrganisationClassrooms = async (organisationId: string) => {
-    return await db.select().from(classrooms).where(eq(classrooms.organisationId, organisationId));
+const listOrganisationClassrooms = async (organisationId: string, search?: string) => {
+    const conditions = [eq(classrooms.organisationId, organisationId)];
+    if (search) conditions.push(ilike(classrooms.name, `%${search}%`));
+
+    return await db.select().from(classrooms).where(and(...conditions));
 };
 
 // ── Get My Classrooms (student) ──────────────────────────────────────────────
@@ -341,25 +360,30 @@ const getMyClassroomsAsStudent = async (studentId: string) => {
 };
 
 // ── Get Classroom Roster (teacher or manager) ────────────────────────────────
-const getClassroomRoster = async (classroomId: string, requester: Requester) => {
+const getClassroomRoster = async (classroomId: string, requester: Requester, search?: string) => {
     await assertCanManageClassroom(requester, classroomId);
+
+    const conditions = [eq(classroomStudents.classroomId, classroomId)];
+    if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
 
     return await db.select({
         studentId: users.id,
         name: users.name,
         email: users.email,
+        avatarUrl: users.avatarUrl,
         status: classroomStudents.status,
         enrolledAt: classroomStudents.enrolledAt,
         leftAt: classroomStudents.leftAt,
     })
         .from(classroomStudents)
         .innerJoin(users, eq(classroomStudents.studentId, users.id))
-        .where(eq(classroomStudents.classroomId, classroomId));
+        .where(and(...conditions));
 };
 
 export {
     createClassroom,
     updateClassroom,
+    deleteClassroom,
     addTeacher,
     removeTeacher,
     listTeachers,

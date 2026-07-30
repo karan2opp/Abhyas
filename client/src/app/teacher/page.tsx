@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getTeacherOverviewStatsService } from "./exams/exam.service";
+import { formatDate } from "@/lib/date";
 
 export default function TeacherDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -114,7 +115,7 @@ export default function TeacherDashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-blue-400" />
-                      <span>Created: {new Date(exam.createdAt).toLocaleDateString()}</span>
+                      <span>Created: {formatDate(exam.createdAt)}</span>
                     </div>
                   </div>
                   

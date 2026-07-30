@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Clock, Hourglass, CalendarDays, Loader2, ArrowRight, ListChecks, Flag, CheckCircle } from "lucide-react";
 import { verifyJoinCodeService, joinExamService } from "../../student.service";
+import { formatDateTime } from "@/lib/date";
 
 export default function WaitingRoomPage() {
   const params = useParams();
@@ -184,7 +185,7 @@ export default function WaitingRoomPage() {
                   <CalendarDays className="h-5 w-5 text-blue-400/70" />
                   <div>
                     <p className="text-xs text-gray-500">Scheduled Start</p>
-                    <p className="font-medium">{new Date(examData.startTime).toLocaleString()}</p>
+                    <p className="font-medium">{formatDateTime(examData.startTime)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-gray-300">

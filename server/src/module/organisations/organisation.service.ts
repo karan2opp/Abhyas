@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, ilike, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { organisations, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -68,13 +68,16 @@ const revokeManager = async (userId: string) => {
 };
 
 // ── Get Organisation Managers ─────────────────────────────────────────────────
-const getOrganisationManagers = async (organisationId: string) => {
+const getOrganisationManagers = async (organisationId: string, search?: string) => {
+    const conditions = [eq(users.organisationId, organisationId), eq(users.role, "manager")];
+    if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
+
     return await db.select({
         id: users.id,
         name: users.name,
         email: users.email,
         createdAt: users.createdAt,
-    }).from(users).where(and(eq(users.organisationId, organisationId), eq(users.role, "manager")));
+    }).from(users).where(and(...conditions));
 };
 
 // ── Assign Teacher to Organisation (manager, scoped to their own org) ────────
@@ -112,13 +115,16 @@ const removeTeacherFromOrganisation = async (organisationId: string, userId: str
 };
 
 // ── Get Organisation Teachers ──────────────────────────────────────────────────
-const getOrganisationTeachers = async (organisationId: string) => {
+const getOrganisationTeachers = async (organisationId: string, search?: string) => {
+    const conditions = [eq(users.organisationId, organisationId), eq(users.role, "teacher")];
+    if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
+
     return await db.select({
         id: users.id,
         name: users.name,
         email: users.email,
         createdAt: users.createdAt,
-    }).from(users).where(and(eq(users.organisationId, organisationId), eq(users.role, "teacher")));
+    }).from(users).where(and(...conditions));
 };
 
 export {

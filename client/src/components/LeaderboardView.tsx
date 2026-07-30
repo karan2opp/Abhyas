@@ -5,6 +5,7 @@ import { Trophy, Medal, Clock, ArrowLeft, Search } from "lucide-react";
 import { getExamLeaderboardService } from "@/app/student/student.service"; // Adjust import if needed
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { formatDateTime } from "@/lib/date";
 
 export function LeaderboardView({
   examId,
@@ -233,7 +234,7 @@ export function LeaderboardView({
                               </span>
                               <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
                                 <Clock className="h-3 w-3" />
-                                {new Date(entry.submittedAt).toLocaleString()}
+                                {formatDateTime(entry.submittedAt)}
                               </span>
                             </div>
                           </td>

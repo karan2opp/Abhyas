@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot } from "lucide-react";
+import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot, User } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
+import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from "../../../exam.service";
 import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { formatDate } from "@/lib/date";
 
 export default function ResultsPage() {
   const params = useParams();
@@ -23,6 +25,13 @@ export default function ResultsPage() {
 
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
+
+  const [marksByAnswer, setMarksByAnswer] = useState<Record<string, string>>({});
+  const [feedbackByAnswer, setFeedbackByAnswer] = useState<Record<string, string>>({});
+  const [overallFeedbackInput, setOverallFeedbackInput] = useState("");
+  const [savingGrade, setSavingGrade] = useState(false);
+  const [evaluatingAi, setEvaluatingAi] = useState(false);
+  const gradingInitializedRef = useRef(false);
 
   useEffect(() => {
     if (!submissionId) return;
@@ -74,6 +83,89 @@ export default function ResultsPage() {
       if (interval) clearInterval(interval);
     };
   }, [submissionId, router, submission?.status, selectedSectionId]);
+
+  // Populate editable marks/feedback once the submission has actually finished
+  // evaluating (the "evaluating" screen below short-circuits rendering until then).
+  useEffect(() => {
+    if (submission && submission.status !== "evaluating" && !gradingInitializedRef.current) {
+      const marks: Record<string, string> = {};
+      const feedback: Record<string, string> = {};
+      (submission.answers || []).forEach((a: any) => {
+        marks[a.id] = a.marksAwarded !== null && a.marksAwarded !== undefined ? String(a.marksAwarded) : "";
+        feedback[a.id] = a.feedback || "";
+      });
+      setMarksByAnswer(marks);
+      setFeedbackByAnswer(feedback);
+      setOverallFeedbackInput(submission.overallFeedback || "");
+      gradingInitializedRef.current = true;
+    }
+  }, [submission]);
+
+  const refetchSubmission = async () => {
+    try {
+      const subRes = await getSubmissionByIdService(submissionId);
+      gradingInitializedRef.current = false;
+      setSubmission(subRes.data || subRes);
+    } catch (err) {
+      toast.error("Failed to refresh submission");
+    }
+  };
+
+  const findQuestion = (questionId: string) => {
+    for (const section of exam?.sections || []) {
+      const q = section.questions?.find((q: any) => q.id === questionId);
+      if (q) return q;
+    }
+    return null;
+  };
+
+  const handleSaveGrade = async () => {
+    if (!submission) return;
+    for (const a of submission.answers) {
+      const q = findQuestion(a.questionId);
+      const val = marksByAnswer[a.id];
+      if (val === undefined || val === "" || isNaN(parseFloat(val))) {
+        toast.error("Enter marks for every question before saving");
+        return;
+      }
+      const parsed = parseFloat(val);
+      if (parsed < 0 || (q && parsed > q.marks)) {
+        toast.error(`Marks for "${q?.description?.slice(0, 40)}..." cannot exceed ${q?.marks}`);
+        return;
+      }
+    }
+
+    setSavingGrade(true);
+    try {
+      await gradeExamSubmissionService(submissionId, {
+        answers: submission.answers.map((a: any) => ({
+          answerId: a.id,
+          marksAwarded: parseFloat(marksByAnswer[a.id]),
+          feedback: feedbackByAnswer[a.id] || undefined,
+        })),
+        overallFeedback: overallFeedbackInput.trim() || undefined,
+      });
+      toast.success("Grade saved");
+      await refetchSubmission();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save grade");
+    } finally {
+      setSavingGrade(false);
+    }
+  };
+
+  const handleEvaluateWithAi = async () => {
+    setEvaluatingAi(true);
+    try {
+      await evaluateExamSubmissionWithAiService(submissionId, { mode: "marks_and_feedback" });
+      toast.success("AI evaluation complete");
+      await refetchSubmission();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to run AI evaluation");
+    } finally {
+      setEvaluatingAi(false);
+    }
+  };
 
   if (loading) return <div className="p-10 text-white text-center">Loading results...</div>;
   if (!submission || !exam) return <div className="p-10 text-white text-center">Result not found.</div>;
@@ -245,7 +337,7 @@ export default function ResultsPage() {
           <div className="flex items-center gap-6 text-sm text-gray-400">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              <span>{new Date(submission.submittedAt || submission.updatedAt).toLocaleDateString()}</span>
+              <span>{formatDate(submission.submittedAt || submission.updatedAt)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
@@ -353,14 +445,25 @@ export default function ResultsPage() {
                         </ReactMarkdown>
                       </CardTitle>
                     </div>
-                    <div className="flex flex-col items-end shrink-0">
-                      <div className={`text-sm font-bold px-3 py-1 rounded-full border ${
-                        isDescriptive 
-                          ? (selectedAnswer?.marksAwarded >= selectedQuestion.marks ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : selectedAnswer?.marksAwarded > 0 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
-                          : (selectedAnswer?.isCorrect ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
-                      }`}>
-                        {selectedAnswer?.marksAwarded ?? 0} / {selectedQuestion.marks} Marks
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max={selectedQuestion.marks}
+                          value={selectedAnswer ? (marksByAnswer[selectedAnswer.id] ?? "") : ""}
+                          onChange={(e) => selectedAnswer && setMarksByAnswer((prev) => ({ ...prev, [selectedAnswer.id]: e.target.value }))}
+                          className="w-20 bg-[#09090b] border border-white/10 rounded-lg px-2 py-1 text-white text-sm font-bold text-right focus:outline-none focus:ring-1 focus:ring-white/30"
+                        />
+                        <span className="text-sm text-gray-400">/ {selectedQuestion.marks} Marks</span>
                       </div>
+                      {selectedAnswer?.evaluatedBy && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${selectedAnswer.evaluatedBy === "teacher" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>
+                          {selectedAnswer.evaluatedBy === "teacher" ? <User className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
+                          Graded by {selectedAnswer.evaluatedBy === "teacher" ? "you" : "AI"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -368,26 +471,22 @@ export default function ResultsPage() {
                   {isDescriptive ? (
                     <div className="space-y-4">
                       <div>
-                        <div className="text-sm text-gray-400 mb-2 font-medium">Your Answer:</div>
+                        <div className="text-sm text-gray-400 mb-2 font-medium">Student's Answer:</div>
                         <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-gray-300 whitespace-pre-wrap font-mono text-sm max-h-[300px] sm:max-h-[400px] overflow-y-auto custom-scrollbar">
                           {selectedAnswer?.textAnswer || <span className="text-gray-600 italic">No answer provided.</span>}
                         </div>
                       </div>
-                      
-                      {selectedAnswer?.feedback && (
-                        <div className="mt-6 p-5 rounded-xl bg-blue-900/10 border border-blue-500/20 relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-                          <div className="flex items-start gap-3">
-                            <div className="mt-1 bg-blue-500/20 p-2 rounded-lg shrink-0">
-                              <Bot className="h-5 w-5 text-blue-400" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm text-blue-400 mb-1 font-semibold tracking-wide uppercase">AI Evaluation</div>
-                              <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap max-h-[300px] sm:max-h-[400px] overflow-y-auto custom-scrollbar pr-2">{selectedAnswer.feedback}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+
+                      <div>
+                        <div className="text-sm text-gray-400 mb-2 font-medium">Feedback for this answer</div>
+                        <textarea
+                          value={selectedAnswer ? (feedbackByAnswer[selectedAnswer.id] ?? "") : ""}
+                          onChange={(e) => selectedAnswer && setFeedbackByAnswer((prev) => ({ ...prev, [selectedAnswer.id]: e.target.value }))}
+                          rows={4}
+                          placeholder="Feedback for this answer..."
+                          className="w-full bg-[#09090b] border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -421,6 +520,44 @@ export default function ResultsPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Grading Actions */}
+            <Card className="bg-[#111520] border-white/5 shrink-0">
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-300">Overall Feedback</label>
+                  <textarea
+                    value={overallFeedbackInput}
+                    onChange={(e) => setOverallFeedbackInput(e.target.value)}
+                    rows={3}
+                    placeholder="Overall comments for the student..."
+                    className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
+                  />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    className="bg-transparent border-white/10 text-white hover:bg-white/5"
+                    onClick={handleEvaluateWithAi}
+                    disabled={evaluatingAi || savingGrade}
+                    title="Re-runs AI evaluation for any descriptive answer you haven't manually graded yet"
+                  >
+                    <Bot className="mr-2 h-4 w-4" />
+                    {evaluatingAi ? "Evaluating..." : "Evaluate with AI"}
+                  </Button>
+                  <Button
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={handleSaveGrade}
+                    disabled={savingGrade || evaluatingAi}
+                  >
+                    {savingGrade ? "Saving..." : "Save Grade"}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Saving a grade marks those answers as graded by you — AI evaluation will never overwrite them afterwards.
+                </p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Right Column - Navigation Sidebar (Desktop) */}

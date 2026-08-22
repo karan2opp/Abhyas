@@ -1,11 +1,24 @@
 import { eq, and, isNull, desc, or, ilike, gte, count } from "drizzle-orm";
+import pLimit from "p-limit";
 import db from "../../common/db/index.js";
 import { submissions, exams, answers, options, questions, sections, users, classroomStudents, groupStudents, classrooms, classroomTeachers } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
-import { evaluateSingleAnswer, type TextAnswer, type ResponseMode } from "../evalutaion/evalutaion.js";
+import { evaluateAnswer, type TextAnswer, type ResponseMode } from "../evalutaion/evalutaion.js";
 import type { GradeExamSubmissionDto, EvaluateWithAiDto } from "./dto/submission.dto.js";
+import { evaluationQueue } from "../../common/queue/queues.js";
+import { assertQuota, recordUsage } from "../billing/usage.service.js";
 
 type Requester = { id: string; role: string; organisationId: string | null };
+
+// ── Resolve the organisation that owns a submission (submission → exam → classroom) ─
+const getOrganisationIdForSubmission = async (submissionId: string): Promise<string | null> => {
+    const [submission] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
+    if (!submission) return null;
+    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
+    if (!exam?.classroomId) return null;
+    const [classroom] = await db.select().from(classrooms).where(eq(classrooms.id, exam.classroomId));
+    return classroom?.organisationId ?? null;
+};
 
 // ── Whether a teacher (co-teacher of the exam's classroom, or its creator) or a
 // manager (whose org owns the exam's classroom) has staff-level access to an exam ─
@@ -34,80 +47,87 @@ const assertCanManageExamSubmissions = async (requester: Requester, examId: stri
     return exam;
 };
 
-// ── Run the 3-round AI evaluation for one descriptive answer (pure — no DB writes) ─
-const evaluateOneDescriptiveAnswer = async (answer: TextAnswer, mode: ResponseMode): Promise<{ answerId: string; marksAwarded: number; feedback: string | null }> => {
-    try {
-        // Round 1
-        const r1 = await evaluateSingleAnswer(answer, { evaluationMode: "initial_evaluation", mode });
-
-        // Round 2
-        const r2 = await evaluateSingleAnswer(answer, {
-            evaluationMode: "comparison_evaluation",
-            mode,
-            idealAnswer: r1.idealAnswer,
-            keyPoints: r1.keyPoints
-        });
-
-        let finalMarks = r2.marksAwarded;
-        let finalFeedback = r2.feedback;
-
-        let needsTiebreaker = false;
-        if (r1.confidence === "low" || r2.confidence === "low") {
-            needsTiebreaker = true;
-        } else if ((r1.confidence === "medium" || r2.confidence === "medium") && Math.abs(r1.marksAwarded - r2.marksAwarded) > 1) {
-            needsTiebreaker = true;
-        }
-
-        if (!needsTiebreaker) {
-            // Average the scores if high/medium and close, round to nearest 0.5
-            finalMarks = Math.round(((r1.marksAwarded + r2.marksAwarded) / 2) * 2) / 2;
-        } else {
-            // Round 3
-            const r3 = await evaluateSingleAnswer(answer, {
-                evaluationMode: "tiebreaker_evaluation",
-                mode,
-                idealAnswer: r1.idealAnswer,
-                round1Score: r1.marksAwarded,
-                round2Score: r2.marksAwarded
-            });
-
-            finalMarks = r3.marksAwarded;
-            finalFeedback = r3.feedback;
-        }
-
-        let feedbackString = null;
-        if (finalFeedback && typeof finalFeedback === 'object') {
-            feedbackString = `Strengths: ${finalFeedback.strengths || ''}\nImprovements: ${finalFeedback.improvements || ''}\nSuggestion: ${finalFeedback.suggestion || ''}`;
-        } else if (typeof finalFeedback === 'string') {
-            feedbackString = finalFeedback;
-        }
-
-        return { answerId: answer.answerId, marksAwarded: finalMarks, feedback: feedbackString };
-    } catch (err) {
-        console.error(`Failed to evaluate answer ${answer.answerId}`, err);
-        return { answerId: answer.answerId, marksAwarded: 0, feedback: null }; // fallback score on error
-    }
-};
-
 // ── Run AI evaluation for a batch of descriptive answers and persist the results ─
 // Writes evaluatedBy: "ai" — callers are responsible for excluding any answer
 // that has already been manually graded by a teacher (evaluatedBy === "teacher"),
 // so AI evaluation can never overwrite a manual grade.
 const runAndPersistAiEvaluation = async (textAnswersToEvaluate: TextAnswer[], mode: ResponseMode): Promise<number> => {
-    const results = await Promise.all(textAnswersToEvaluate.map((answer) => evaluateOneDescriptiveAnswer(answer, mode)));
+    const limit = pLimit(3);
+    const results = await Promise.all(textAnswersToEvaluate.map((answer) => limit(() => evaluateAnswer(answer))));
 
-    for (const result of results) {
+    for (let i = 0; i < textAnswersToEvaluate.length; i++) {
+        const answer = textAnswersToEvaluate[i]!;
+        const result = results[i]!;
         await db.update(answers)
             .set({
-                isCorrect: result.marksAwarded === textAnswersToEvaluate.find(a => a.answerId === result.answerId)?.maxMarks,
+                isCorrect: result.marksAwarded === answer.maxMarks,
                 marksAwarded: result.marksAwarded,
                 feedback: result.feedback,
                 evaluatedBy: "ai",
             })
-            .where(eq(answers.id, result.answerId));
+            .where(eq(answers.id, answer.answerId));
     }
 
     return results.reduce((sum, r) => sum + (r.marksAwarded || 0), 0);
+};
+
+// ── Build the list of descriptive answers eligible for AI evaluation ───────────
+// Skips any answer already graded by a teacher, so AI never overwrites a manual grade.
+const buildTextAnswersForEvaluation = async (submissionId: string, difficulty: string): Promise<TextAnswer[]> => {
+    const submissionAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
+
+    const textAnswersToEvaluate: TextAnswer[] = [];
+    for (const answer of submissionAnswers) {
+        if (answer.evaluatedBy === "teacher") continue;
+        const [question] = await db.select().from(questions).where(eq(questions.id, answer.questionId));
+        if (!question || question.type !== "descriptive") continue;
+        textAnswersToEvaluate.push({
+            answerId: answer.id,
+            questionId: question.id,
+            question: question.description,
+            modelAnswer: question.modelAnswer || "",
+            studentAnswer: answer.textAnswer ?? "",
+            maxMarks: question.marks,
+            questionImages: question.images as any,
+            rubric: question.rubric,
+            difficulty,
+        });
+    }
+    return textAnswersToEvaluate;
+};
+
+// ── Evaluate a submission's descriptive answers (called by the BullMQ worker) ──
+// Re-fetches answers from the DB, runs the multi-round AI evaluation, and marks
+// the submission as submitted with the recomputed total score.
+export const evaluateDescriptiveAnswers = async (submissionId: string, mode: string): Promise<void> => {
+    const [submission] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
+    if (!submission) throw ApiError.notFound("Submission not found");
+
+    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
+    const difficulty = exam?.difficulty || "medium";
+
+    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId, difficulty);
+
+    if (textAnswersToEvaluate.length > 0) {
+        const evalMode: ResponseMode = (mode === "detailed" || mode === "marks_and_feedback") ? "marks_and_feedback" : "marks_only";
+        await runAndPersistAiEvaluation(textAnswersToEvaluate, evalMode);
+
+        const organisationId = await getOrganisationIdForSubmission(submissionId);
+        if (organisationId) {
+            try {
+                await recordUsage(organisationId, "question_evaluation", textAnswersToEvaluate.length);
+            } catch (meterErr) {
+                console.error(`[Billing] Failed to record evaluation usage for org ${organisationId}:`, meterErr);
+            }
+        }
+    }
+
+    const allAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
+    const totalScore = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+
+    await db.update(submissions)
+        .set({ status: "submitted", score: totalScore, updatedAt: new Date() })
+        .where(eq(submissions.id, submissionId));
 };
 
 // ── Shared: start (or resume) a submission for a resolved exam ─────────────────
@@ -116,31 +136,30 @@ const startSubmissionForExam = async (exam: typeof exams.$inferSelect, studentId
     const now = new Date();
     if (exam.startTime && now < exam.startTime) throw ApiError.badRequest("Exam has not started yet");
     if (exam.endTime && now > exam.endTime) throw ApiError.badRequest("Exam has already ended");
+    if (exam.publishTime && now < exam.publishTime) throw ApiError.badRequest("This exam is not published yet");
 
-    // check student hasn't already joined
-    const [existing] = await db.select().from(submissions).where(
+    // Create (or resume) the submission atomically. The partial unique index on
+    // (examId, userId) WHERE deletedAt IS NULL guarantees a single active
+    // submission even under concurrent requests.
+    await db.insert(submissions).values({
+        examId: exam.id,
+        userId: studentId,
+        status: "inprogress",
+    }).onConflictDoNothing();
+
+    const [submission] = await db.select().from(submissions).where(
         and(
             eq(submissions.examId, exam.id),
             eq(submissions.userId, studentId),
             isNull(submissions.deletedAt)
         )
     );
-    if (existing) {
-        if (existing.status === "inprogress") {
-            return { submission: existing, exam };
-        } else {
-            throw ApiError.conflict("You have already submitted this exam");
-        }
-    }
-
-    // create submission
-    const [submission] = await db.insert(submissions).values({
-        examId: exam.id,
-        userId: studentId,
-        status: "inprogress",
-    }).returning();
 
     if (!submission) throw ApiError.internal("Failed to join exam");
+
+    if (submission.status !== "inprogress") {
+        throw ApiError.conflict("You have already submitted this exam");
+    }
 
     return { submission, exam };
 };
@@ -198,7 +217,8 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
     );
 
     let totalScore = 0;
-    const textAnswersToEvaluate: TextAnswer[] = [];
+    let hasDescriptive = false;
+    let descriptiveCount = 0;
 
     // --- MCQ evaluation (sync, no AI) ---
     for (const answer of submissionAnswers) {
@@ -225,66 +245,32 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
                 .where(eq(answers.id, answer.id));
 
         } else if (question.type === "descriptive") {
-            textAnswersToEvaluate.push({
-                answerId: answer.id,
-                questionId: question.id,
-                question: question.description,
-                modelAnswer: question.modelAnswer || "",
-                studentAnswer: answer.textAnswer ?? "",
-                maxMarks: question.marks,
-                questionImages: question.images as any
-            });
+            hasDescriptive = true;
+            descriptiveCount++;
         }
     }
 
-    // --- Text/Code evaluation (AI, batched) ---
-    if (textAnswersToEvaluate.length > 0) {
-        // --- Update submission to evaluating first ---
-        const [updated] = await db.update(submissions)
-            .set({
-                status: "evaluating",
-                score: totalScore,
-                submittedAt: new Date(),
-                updatedAt: new Date(),
-            })
-            .where(eq(submissions.id, submissionId))
-            .returning();
-
-        // --- Run AI Evaluation in Background ---
-        (async () => {
-            try {
-                const evalMode: ResponseMode = (mode === "detailed" || mode === "marks_and_feedback") ? "marks_and_feedback" : "marks_only";
-                const additionalScore = await runAndPersistAiEvaluation(textAnswersToEvaluate, evalMode);
-
-                await db.update(submissions)
-                    .set({
-                        status: "submitted",
-                        score: totalScore + additionalScore,
-                        updatedAt: new Date(),
-                    })
-                    .where(eq(submissions.id, submissionId));
-            } catch (error) {
-                console.error("Background evaluation failed", error);
-                // Even on failure, mark as submitted so student isn't stuck
-                await db.update(submissions)
-                    .set({ status: "submitted" })
-                    .where(eq(submissions.id, submissionId));
-            }
-        })();
-
-        return updated;
-    }
-
-    // --- Update submission ---
+    // --- Set evaluating (descriptive) or submitted (MCQ only), then enqueue AI eval ---
     const [updated] = await db.update(submissions)
         .set({
-            status: "submitted",
+            status: hasDescriptive ? "evaluating" : "submitted",
             score: totalScore,
             submittedAt: new Date(),
             updatedAt: new Date(),
         })
         .where(eq(submissions.id, submissionId))
         .returning();
+
+    if (hasDescriptive) {
+        const organisationId = await getOrganisationIdForSubmission(submissionId);
+        if (organisationId) {
+            await assertQuota(organisationId, "question_evaluation", descriptiveCount);
+        }
+        await evaluationQueue.add("evaluate-submission", { submissionId, mode }, {
+            attempts: 3,
+            backoff: { type: "exponential", delay: 5000 },
+        });
+    }
 
     return updated;
 };
@@ -351,29 +337,29 @@ const evaluateSubmissionWithAI = async (submissionId: string, data: EvaluateWith
 
     await assertCanManageExamSubmissions(requester, submission.examId);
 
-    const submissionAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
+    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
+    const difficulty = exam?.difficulty || "medium";
 
-    const textAnswersToEvaluate: TextAnswer[] = [];
-    for (const answer of submissionAnswers) {
-        if (answer.evaluatedBy === "teacher") continue; // never overwrite a manual grade
-        const [question] = await db.select().from(questions).where(eq(questions.id, answer.questionId));
-        if (!question || question.type !== "descriptive") continue;
-        textAnswersToEvaluate.push({
-            answerId: answer.id,
-            questionId: question.id,
-            question: question.description,
-            modelAnswer: question.modelAnswer || "",
-            studentAnswer: answer.textAnswer ?? "",
-            maxMarks: question.marks,
-            questionImages: question.images as any,
-        });
-    }
+    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId, difficulty);
 
     if (textAnswersToEvaluate.length === 0) {
         throw ApiError.badRequest("No descriptive answers are eligible for AI evaluation (they may already be manually graded)");
     }
 
+    const organisationId = await getOrganisationIdForSubmission(submissionId);
+    if (organisationId) {
+        await assertQuota(organisationId, "question_evaluation", textAnswersToEvaluate.length);
+    }
+
     await runAndPersistAiEvaluation(textAnswersToEvaluate, data.mode);
+
+    if (organisationId) {
+        try {
+            await recordUsage(organisationId, "question_evaluation", textAnswersToEvaluate.length);
+        } catch (meterErr) {
+            console.error(`[Billing] Failed to record re-evaluation usage for org ${organisationId}:`, meterErr);
+        }
+    }
 
     const allAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
     const totalScore = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
@@ -577,7 +563,6 @@ const getExamForSubmission = async (submissionId: string, requester: Requester) 
 
     return { ...exam, sections: sectionsWithQuestions };
 };
-// ── Verify Join Code ─────────────────────────────────────────────────────────────
 const verifyJoinCode = async (joinCode: string, studentId: string) => {
     const [exam] = await db.select({
         id: exams.id,
@@ -585,12 +570,14 @@ const verifyJoinCode = async (joinCode: string, studentId: string) => {
         startTime: exams.startTime,
         endTime: exams.endTime,
         duration: exams.duration,
+        publishTime: exams.publishTime,
     }).from(exams).where(eq(exams.joinCode, joinCode));
 
     if (!exam) throw ApiError.notFound("Invalid join code");
 
-    // We can also check if the exam has already ended
+    // We can also check if the exam has already ended or not published yet
     const now = new Date();
+    if (exam.publishTime && now < exam.publishTime) throw ApiError.badRequest("This exam is not published yet");
     if (exam.endTime && now > exam.endTime) throw ApiError.badRequest("Exam has already ended");
 
     // Check if user already submitted

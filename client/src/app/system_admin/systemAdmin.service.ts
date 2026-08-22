@@ -14,3 +14,8 @@ export const revokeAdminService = async (email: string) => {
   const res = await api.post("/superadmin/revoke-admin", { email });
   return res.data;
 };
+
+export const searchUserService = async (email: string) => {
+  const res = await api.post("/superadmin/search-user", { email });
+  return res.data;
+};

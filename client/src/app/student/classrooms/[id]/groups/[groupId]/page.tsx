@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Layers, ClipboardList, FileText } from "lucide-react";
+import { ArrowLeft, Users, ClipboardList, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { getMyGroupsService } from "../../../../classrooms/group.service";
@@ -49,8 +49,8 @@ export default function StudentGroupDetailPage() {
       </button>
 
       <div className="flex items-center gap-3 mb-8">
-        <div className="h-12 w-12 rounded-full bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
-          <Layers className="h-5 w-5" />
+        <div className="h-12 w-12 rounded-full bg-orange-600/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shrink-0">
+          <Users className="h-5 w-5" />
         </div>
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">{group.name}</h2>
@@ -61,7 +61,7 @@ export default function StudentGroupDetailPage() {
       <div className="flex gap-3">
         <Button
           size="lg"
-          className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          className="bg-orange-600 hover:bg-orange-700 text-white"
           onClick={() => router.push(`/student/classrooms/${classroomId}/groups/${groupId}/assignments`)}
         >
           <ClipboardList className="mr-2 h-4 w-4" /> Group Assignments

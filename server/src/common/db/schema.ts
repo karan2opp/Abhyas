@@ -10,4 +10,6 @@ export * from "../../module/options/option.schema.js";
 export * from "../../module/submissions/submission.schema.js";
 export * from "../../module/answers/answer.schema.js";
 export * from "../../module/feedback/feedback.schema.js";
-export * from "../../module/chat/chat.schema.js";
+export * from "../../module/billing/billing.schema.js";
+export * from "../../module/blocks/block.schema.js";
+export * from "../../module/questions/question-type.enum.js";

@@ -15,7 +15,7 @@ export function UserAvatar({
   return (
     <Avatar size={size} className="border border-white/10 bg-white/5 shrink-0">
       {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-      <AvatarFallback className="bg-indigo-600/20 text-indigo-400 font-semibold">{initial}</AvatarFallback>
+      <AvatarFallback className="bg-orange-600/20 text-orange-400 font-semibold">{initial}</AvatarFallback>
     </Avatar>
   );
 }

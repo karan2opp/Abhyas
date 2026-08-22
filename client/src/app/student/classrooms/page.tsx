@@ -75,14 +75,14 @@ export default function StudentClassroomsPage() {
           <h2 className="text-3xl font-bold text-white tracking-tight">Classrooms</h2>
           <p className="text-gray-400 mt-1">Classrooms you've joined.</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={() => setDialogOpen(true)}>
+        <Button className="bg-orange-600 hover:bg-orange-700 text-white font-semibold" onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-5 w-5" />
           Join Classroom
         </Button>
       </div>
 
       {classrooms.length === 0 ? (
-        <Card className="bg-[#111520]/50 border-white/5 py-16 text-center">
+        <Card className="bg-[#0f0f11]/50 border-white/5 py-16 text-center">
           <CardContent className="flex flex-col items-center">
             <div className="h-16 w-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
               <School className="h-8 w-8 text-gray-500" />
@@ -91,7 +91,7 @@ export default function StudentClassroomsPage() {
             <p className="text-gray-400 max-w-sm mb-6">
               Enter a join code from your teacher, or use the code from your invite email, to get started.
             </p>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setDialogOpen(true)}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => setDialogOpen(true)}>
               Join Classroom
             </Button>
           </CardContent>
@@ -102,10 +102,10 @@ export default function StudentClassroomsPage() {
             <div
               key={classroom.id}
               onClick={() => router.push(`/student/classrooms/${classroom.id}`)}
-              className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4 cursor-pointer"
+              className="flex items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl hover:bg-[#18181b] hover:border-white/10 transition-all gap-4 cursor-pointer"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="h-10 w-10 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center shrink-0 border border-blue-500/20">
+                <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center shrink-0 border border-orange-500/30">
                   <School className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
@@ -122,7 +122,7 @@ export default function StudentClassroomsPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-md">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white">Join a Classroom</DialogTitle>
           </DialogHeader>
@@ -148,7 +148,7 @@ export default function StudentClassroomsPage() {
             <Button variant="ghost" className="text-gray-300 hover:text-white" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleJoin} disabled={joining}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleJoin} disabled={joining}>
               {joining ? "Joining..." : "Join"}
             </Button>
           </DialogFooter>

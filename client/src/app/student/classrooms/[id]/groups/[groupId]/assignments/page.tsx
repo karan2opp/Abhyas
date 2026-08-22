@@ -68,7 +68,7 @@ export default function StudentGroupAssignmentsPage() {
       </div>
 
       {assignments.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
             <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No assignments for this group yet.</p>
@@ -79,17 +79,17 @@ export default function StudentGroupAssignmentsPage() {
           {assignments.map((a) => (
             <div
               key={a.id}
-              className={`flex items-center justify-between p-4 border rounded-xl ${a.locked ? "bg-[#111520]/50 border-white/5" : "bg-[#111520] border-white/5"}`}
+              className={`flex items-center justify-between p-4 border rounded-xl ${a.locked ? "bg-[#0f0f11]/50 border-white/5" : "bg-[#0f0f11] border-white/5"}`}
             >
               <div className="flex items-center gap-3">
-                <div className={`h-9 w-9 rounded-lg flex items-center justify-center border ${a.locked ? "bg-gray-500/10 text-gray-500 border-gray-500/20" : "bg-indigo-600/20 text-indigo-400 border-indigo-500/20"}`}>
+                <div className={`h-9 w-9 rounded-lg flex items-center justify-center border ${a.locked ? "bg-zinc-800 text-white/60 border-zinc-700" : "bg-orange-600/20 text-indigo-200 border-indigo-500/30"}`}>
                   {a.locked ? <Lock className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
                 </div>
                 <div>
-                  <p className={`font-semibold text-sm ${a.locked ? "text-gray-500" : "text-white"}`}>
+                  <p className={`font-semibold text-sm ${a.locked ? "text-white/60" : "text-white"}`}>
                     {a.sequenceOrder && `#${a.sequenceOrder}: `}{a.title}
                   </p>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-white/60 text-xs">
                     {a.totalMarks} marks
                     {!a.locked && a.startDate && ` · Started ${formatDateTime(a.startDate)}`}
                     {a.dueDate && ` · Due ${formatDateTime(a.dueDate)}`}
@@ -99,7 +99,7 @@ export default function StudentGroupAssignmentsPage() {
                 </div>
               </div>
               <Button
-                className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40"
+                className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-40"
                 onClick={() => router.push(`/student/assignments/${a.id}`)}
                 disabled={a.locked}
               >

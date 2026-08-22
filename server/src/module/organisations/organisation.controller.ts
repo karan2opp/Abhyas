@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
+import { ApiError } from "../../common/utils/ApiError.js";
 import * as organisationService from "./organisation.service.js";
 
 export const createOrganisation = async (req: Request, res: Response) => {
@@ -10,6 +11,38 @@ export const createOrganisation = async (req: Request, res: Response) => {
 export const listOrganisations = async (req: Request, res: Response) => {
     const result = await organisationService.listOrganisations();
     return ApiResponse.ok(res, "Organisations", result);
+};
+
+// ── Org details (manager sees/updates own org; system_admin manages any org) ─
+export const getMyOrganisation = async (req: Request, res: Response) => {
+    const result = await organisationService.getOrganisationById(req.user!.organisationId!);
+    return ApiResponse.ok(res, "Organisation details", result);
+};
+
+export const getMyOrganisationForStudent = async (req: Request, res: Response) => {
+    const result = await organisationService.getOrganisationForStudent(req.user!.id);
+    return ApiResponse.ok(res, "Organisation details", result);
+};
+
+export const updateMyOrganisation = async (req: Request, res: Response) => {
+    const result = await organisationService.updateOrganisation(req.user!.organisationId!, req.body);
+    return ApiResponse.ok(res, "Organisation updated successfully", result);
+};
+
+export const uploadMyOrganisationLogo = async (req: Request, res: Response) => {
+    if (!req.file) throw ApiError.badRequest("No logo file provided");
+    const result = await organisationService.uploadOrganisationLogo(req.user!.organisationId!, req.file);
+    return ApiResponse.ok(res, "Organisation logo uploaded successfully", result);
+};
+
+export const getOrganisationById = async (req: Request, res: Response) => {
+    const result = await organisationService.getOrganisationById(req.params.id as string);
+    return ApiResponse.ok(res, "Organisation details", result);
+};
+
+export const updateOrganisationById = async (req: Request, res: Response) => {
+    const result = await organisationService.updateOrganisation(req.params.id as string, req.body);
+    return ApiResponse.ok(res, "Organisation updated successfully", result);
 };
 
 export const assignUser = async (req: Request, res: Response) => {

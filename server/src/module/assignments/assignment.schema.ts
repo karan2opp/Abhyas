@@ -3,7 +3,8 @@ import { createId } from "@paralleldrive/cuid2";
 import { users } from "../auth/user.schema.js";
 import { classrooms } from "../classrooms/classroom.schema.js";
 import { groups } from "../groups/group.schema.js";
-import { questionTypeEnum } from "../questions/question.schema.js";
+import { questionTypeEnum } from "../questions/question-type.enum.js";
+import { blocks } from "../blocks/block.schema.js";
 
 // weekly = dates computed per student, relative to their enrollment date
 // (chained via dayGap/unlockOffsetDays). custom = teacher sets a fixed
@@ -47,6 +48,7 @@ export const assignments = pgTable("assignments", {
   sequenceOrder: integer("sequence_order"),
   dayGap: integer("day_gap"),
   unlockOffsetDays: integer("unlock_offset_days"),
+  difficulty: text("difficulty").$type<"easy" | "medium" | "hard">().default("medium").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -55,11 +57,13 @@ export const assignments = pgTable("assignments", {
 export const assignmentQuestions = pgTable("assignment_questions", {
   id: text("id").primaryKey().$defaultFn(() => createId()),
   assignmentId: text("assignment_id").references(() => assignments.id, { onDelete: "cascade" }).notNull(),
+  blockId: text("block_id").references(() => blocks.id, { onDelete: "cascade" }),
   type: questionTypeEnum("type").notNull(),
   description: text("description").notNull(),
   images: jsonb("images").$type<{ url: string; publicId: string }[]>(),
   marks: doublePrecision("marks").notNull(),
   modelAnswer: text("model_answer"),
+  rubric: jsonb("rubric").$type<{ categories: { name: string; weight: number; key_points: string[] }[] }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -77,7 +81,7 @@ export const assignmentSubmissions = pgTable("assignment_submissions", {
   id: text("id").primaryKey().$defaultFn(() => createId()),
   assignmentId: text("assignment_id").references(() => assignments.id, { onDelete: "cascade" }).notNull(),
   studentId: text("student_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  status: text("status").$type<"in_progress" | "submitted" | "graded">().default("in_progress").notNull(),
+  status: text("status").$type<"in_progress" | "submitted" | "graded" | "evaluating">().default("in_progress").notNull(),
   submittedAt: timestamp("submitted_at"),
   isLate: boolean("is_late").default(false).notNull(),
   totalMarksAwarded: doublePrecision("total_marks_awarded"),

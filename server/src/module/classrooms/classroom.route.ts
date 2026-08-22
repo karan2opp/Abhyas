@@ -13,8 +13,8 @@ import {
 
 const router = Router();
 
-router.post("/", authenticate, authorize("teacher"), validate(createClassroomSchema), controller.createClassroom);
-router.get("/", authenticate, authorize("teacher"), controller.getMyClassrooms);
+router.post("/", authenticate, authorize("teacher", "manager"), validate(createClassroomSchema), controller.createClassroom);
+router.get("/", authenticate, authorize("teacher", "manager"), controller.getMyClassrooms);
 router.get("/org", authenticate, authorize("manager"), controller.listOrganisationClassrooms);
 router.patch("/:id", authenticate, authorize("teacher", "manager"), validate(updateClassroomSchema), controller.updateClassroom);
 router.delete("/:id", authenticate, authorize("teacher", "manager"), controller.deleteClassroom);

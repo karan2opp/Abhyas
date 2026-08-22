@@ -70,7 +70,7 @@ export default function StudentGroupExamsPage() {
       </div>
 
       {exams.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
             <FileText className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No exams for this group yet.</p>
@@ -79,9 +79,9 @@ export default function StudentGroupExamsPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {exams.map((exam) => (
-            <div key={exam.id} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
+            <div key={exam.id} className="flex items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center border border-blue-500/20">
+                <div className="h-9 w-9 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30">
                   <FileText className="h-4 w-4" />
                 </div>
                 <div>
@@ -96,7 +96,7 @@ export default function StudentGroupExamsPage() {
                 </div>
               </div>
               <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
                 onClick={() => handleStartExam(exam.id)}
                 disabled={startingExamId === exam.id}
               >

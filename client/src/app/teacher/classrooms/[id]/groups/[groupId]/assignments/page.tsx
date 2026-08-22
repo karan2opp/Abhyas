@@ -37,7 +37,7 @@ export default function GroupAssignmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [totalMarks, setTotalMarks] = useState("100");
+  const [totalMarks, setTotalMarks] = useState("0");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [creating, setCreating] = useState(false);
@@ -67,11 +67,7 @@ export default function GroupAssignmentsPage() {
       toast.error("Assignment title must be at least 3 characters");
       return;
     }
-    const marks = parseFloat(totalMarks);
-    if (!marks || marks < 1) {
-      toast.error("Total marks must be at least 1");
-      return;
-    }
+    const marks = 0;
     setCreating(true);
     try {
       const res = await createAssignmentService({
@@ -87,7 +83,7 @@ export default function GroupAssignmentsPage() {
       setDialogOpen(false);
       setTitle("");
       setInstructions("");
-      setTotalMarks("100");
+      setTotalMarks("0");
       setStartDate("");
       setDueDate("");
       router.push(`/teacher/classrooms/${classroomId}/assignments/${res.data.id}`);
@@ -114,13 +110,13 @@ export default function GroupAssignmentsPage() {
           <h3 className="text-2xl font-bold text-white">Group Assignments</h3>
           <p className="text-gray-400 text-base mt-1">Assignments for {group?.name || "this group"}.</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={() => setDialogOpen(true)}>
+        <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> New Assignment
         </Button>
       </div>
 
       {assignments.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
             <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No assignments for this group yet.</p>
@@ -132,14 +128,14 @@ export default function GroupAssignmentsPage() {
             <Card
               key={a.id}
               onClick={() => router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}`)}
-              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="h-9 w-9 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center border border-blue-500/20 shrink-0">
+                  <div className="h-9 w-9 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 shrink-0">
                     <ClipboardList className="h-4 w-4" />
                   </div>
-                  <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                  <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-[#18181b]mber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                     {a.totalMarks} marks
                   </span>
                 </div>
@@ -156,11 +152,11 @@ export default function GroupAssignmentsPage() {
 
       {/* ── Create Assignment Dialog ─────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-lg">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl font-bold">Create New Assignment</DialogTitle>
             <p className="text-sm text-gray-400">
-              Adding for <span className="text-blue-400 font-semibold">{group?.name}</span>
+              Adding for <span className="text-orange-400 font-semibold">{group?.name}</span>
             </p>
           </DialogHeader>
 
@@ -173,7 +169,7 @@ export default function GroupAssignmentsPage() {
                 placeholder="e.g. Chapter 3 Homework"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -183,18 +179,10 @@ export default function GroupAssignmentsPage() {
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 rows={3}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-300">Total Marks</label>
-              <input
-                type="number"
-                value={totalMarks}
-                onChange={(e) => setTotalMarks(e.target.value)}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
-              />
-            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-gray-300">Start Date (optional)</label>
@@ -202,7 +190,7 @@ export default function GroupAssignmentsPage() {
                   type="datetime-local"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                  className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                 />
               </div>
               <div className="space-y-1.5">
@@ -211,7 +199,7 @@ export default function GroupAssignmentsPage() {
                   type="datetime-local"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                  className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                 />
               </div>
             </div>
@@ -221,7 +209,7 @@ export default function GroupAssignmentsPage() {
             <Button variant="ghost" size="lg" className="text-gray-300 hover:text-white" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreate} disabled={creating}>
+            <Button size="lg" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreate} disabled={creating}>
               {creating ? "Creating..." : "Continue to Questions"}
             </Button>
           </DialogFooter>

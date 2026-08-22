@@ -112,10 +112,10 @@ export default function StudentDashboard() {
       <div className="flex gap-4">
         <input type="text" value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
           placeholder="enter the join code"
-          className="outline-none bg-gray-900 border border-white/10 text-white placeholder:text-gray-500 focus:border-blue-500/50 p-2.5 px-4 rounded-lg w-full max-w-sm transition-all"
+          className="outline-none bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 border border-white/10 text-white placeholder:text-gray-500 focus:border-orange-500/50 p-2.5 px-4 rounded-lg w-full max-w-sm transition-all"
         />
         <button 
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg transition-all" 
+          className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-all shadow-lg shadow-orange-950/40" 
           onClick={handleJoinExam}
           disabled={isJoining}
         >
@@ -131,13 +131,13 @@ export default function StudentDashboard() {
           <div className="flex items-center gap-3 w-full sm:w-auto">
             {/* Search Bar */}
             <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
               <input 
                 type="text" 
                 placeholder="Search exams..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+                className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
               />
             </div>
             
@@ -145,7 +145,7 @@ export default function StudentDashboard() {
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="bg-[#111520] border border-white/10 text-white py-2 px-3 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm cursor-pointer appearance-none"
+              className="bg-[#0f0f11] border border-white/10 text-white py-2 px-3 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm cursor-pointer appearance-none"
               style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.5rem center', backgroundSize: '1em 1em', paddingRight: '2rem' }}
             >
               <option value="1">Last 1 Day</option>
@@ -161,7 +161,7 @@ export default function StudentDashboard() {
         ) : (
           <>
           {submissions.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5 py-10 text-center">
+            <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
               <CardContent>
                 <FileText className="h-10 w-10 text-gray-500 mx-auto mb-3" />
                 <p className="text-gray-400">No exams found matching your criteria.</p>
@@ -176,11 +176,11 @@ export default function StudentDashboard() {
                 const formattedDate = formatDateTime(examDate);
 
                 return (
-                  <div key={submission.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4">
+                  <div key={submission.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl hover:bg-[#18181b] hover:border-white/10 transition-all gap-4">
                     {/* Left Side: Icon & Title & Date */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 w-full sm:w-auto flex-1">
                       <div className="flex items-center gap-4">
-                        <div className="h-10 w-10 bg-[#1652F0]/20 text-[#1652F0] rounded-lg flex items-center justify-center shrink-0 border border-[#1652F0]/20">
+                        <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center shrink-0 border border-orange-500/20">
                           <FileText className="h-5 w-5" />
                         </div>
                         <div className="w-[200px] xl:w-[250px] shrink-0">
@@ -197,7 +197,7 @@ export default function StudentDashboard() {
                     {/* Right Side: Badge, Score, Button, Menu */}
                     <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-4 sm:gap-6">
                       <div className="w-[70px] flex justify-center shrink-0">
-                        <div className="px-3 py-1 bg-blue-600/10 border border-blue-500/20 rounded-full text-blue-400 text-xs font-semibold whitespace-nowrap">
+                        <div className="px-3 py-1 bg-[#18181b]mber-500/10 border border-amber-500/20 rounded-full text-amber-300 text-xs font-semibold whitespace-nowrap">
                           Exam
                         </div>
                       </div>
@@ -219,7 +219,7 @@ export default function StudentDashboard() {
                         ) : (
                           <Button
                             size="sm"
-                            className="h-9 px-3 sm:px-4 bg-blue-600 hover:bg-blue-700 text-white text-[12px] sm:text-[13px] transition-all"
+                            className="h-9 px-3 sm:px-4 bg-orange-600 hover:bg-orange-700 text-white text-[12px] sm:text-[13px] transition-all"
                             onClick={() => router.push(`/student/exams/${submission.id}`)}
                           >
                             Resume <Play className="h-3 w-3 ml-1.5" />

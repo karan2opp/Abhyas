@@ -6,8 +6,8 @@ import { createOptionSchema, updateOptionSchema } from "./dto/option.dto.js";
 
 const router = Router();
 
-router.post("/", authenticate, authorize("teacher"), validate(createOptionSchema), controller.createOption);
-router.patch("/:id", authenticate, authorize("teacher"), validate(updateOptionSchema), controller.updateOption);
-router.delete("/:id", authenticate, authorize("teacher"), controller.deleteOption);
+router.post("/", authenticate, authorize("teacher", "manager"), validate(createOptionSchema), controller.createOption);
+router.patch("/:id", authenticate, authorize("teacher", "manager"), validate(updateOptionSchema), controller.updateOption);
+router.delete("/:id", authenticate, authorize("teacher", "manager"), controller.deleteOption);
 
 export default router;

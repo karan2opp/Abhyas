@@ -21,8 +21,8 @@ export const getExamByIdService = async (id: string) => {
   return res.data;
 };
 
-export const listExamsForClassroomService = async (classroomId: string, groupId?: string) => {
-  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { groupId } });
+export const listExamsForClassroomService = async (classroomId: string, groupId?: string, search?: string) => {
+  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { groupId, search } });
   return res.data;
 };
 
@@ -68,14 +68,29 @@ export const createQuestionService = async (data: any) => {
   return res.data;
 };
 
-export const generateQuestionService = async (data: any) => {
-  const res = await api.post("/questions/generate", data);
-  return res.data;
-};
-
 
 export const saveGeneratedExamService = async (data: any) => {
   const res = await api.post("/exams/save-generated", data);
+  return res.data;
+};
+
+export const generateBlueprintService = async (data: any) => {
+  const res = await api.post("/generation/blueprint", data);
+  return res.data;
+};
+
+export const verifyBlueprintService = async (blueprint: any) => {
+  const res = await api.post("/generation/verify-blueprint", blueprint);
+  return res.data;
+};
+
+export const enqueueGenerateFromBlueprintService = async (blueprint: any) => {
+  const res = await api.post("/generation/generate-from-blueprint/async", blueprint);
+  return res.data;
+};
+
+export const getGenerationJobService = async (jobId: string) => {
+  const res = await api.get(`/jobs/${jobId}`);
   return res.data;
 };
 

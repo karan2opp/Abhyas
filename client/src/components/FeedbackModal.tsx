@@ -69,8 +69,8 @@ export function FeedbackModal({ examId, submissionId, hasTextQuestions, onClose,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <Card className="w-full max-w-lg bg-[#111520] border-white/10 text-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/60 backdrop-blur-sm">
+      <Card className="w-full max-w-lg bg-[#0f0f11] border-white/10 text-white shadow-2xl">
         <CardHeader>
           <CardTitle className="text-xl">Assessment Feedback</CardTitle>
           <CardDescription className="text-gray-400">
@@ -85,7 +85,7 @@ export function FeedbackModal({ examId, submissionId, hasTextQuestions, onClose,
               value={experienceText}
               onChange={(e) => setExperienceText(e.target.value)}
               placeholder="Tell us more about your experience (optional)"
-              className="bg-[#0b0f19] border-white/10 text-white mt-2 resize-none"
+              className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 mt-2 resize-none"
               rows={3}
             />
           </div>
@@ -98,7 +98,7 @@ export function FeedbackModal({ examId, submissionId, hasTextQuestions, onClose,
                 value={aiEvaluationText}
                 onChange={(e) => setAiEvaluationText(e.target.value)}
                 placeholder="Any comments on the AI grading? (optional)"
-                className="bg-[#0b0f19] border-white/10 text-white mt-2 resize-none"
+                className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 mt-2 resize-none"
                 rows={3}
               />
             </div>

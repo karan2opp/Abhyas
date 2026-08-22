@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Clock, Send, Shield, Flag, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Clock, Send, Flag, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
@@ -46,6 +46,10 @@ export default function ExamAttemptPage() {
 
   // Feedback State
   const [showFeedback, setShowFeedback] = useState(false);
+
+  // Exam Instructions State
+  const [hasAcceptedInstructions, setHasAcceptedInstructions] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   useEffect(() => {
     if (!submissionId) return;
@@ -286,18 +290,188 @@ export default function ExamAttemptPage() {
     );
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Loading Exam...</div>;
-  if (!examData) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">Exam not found.</div>;
-  if (flattenedQuestions.length === 0) return <div className="flex items-center justify-center h-full bg-[#0b0f19] text-white">No questions in this exam.</div>;
+  if (loading) return <div className="flex items-center justify-center h-full bg-[#050505] text-white">Loading Exam...</div>;
+  if (!examData) return <div className="flex items-center justify-center h-full bg-[#050505] text-white">Exam not found.</div>;
+  if (flattenedQuestions.length === 0) return <div className="flex items-center justify-center h-full bg-[#050505] text-white">No questions in this exam.</div>;
+
+  if (!hasAcceptedInstructions) {
+    const totalMarks = flattenedQuestions.reduce((acc, q) => acc + (q.marks || 0), 0);
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col justify-between p-4 sm:p-6 md:p-10 custom-scrollbar overflow-y-auto">
+        <div className="max-w-4xl mx-auto w-full space-y-6 md:space-y-8">
+          
+          {/* Header Banner */}
+          <div className="bg-[#12131a] border border-white/10 rounded-2xl p-6 md:p-8 relative overflow-hidden shadow-2xl">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6 mb-6">
+              <div>
+                <span className="text-[11px] font-bold text-orange-400 uppercase tracking-widest bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/30">
+                  Exam Instructions
+                </span>
+                <h1 className="text-2xl md:text-3xl font-extrabold text-white mt-3 tracking-tight">
+                  {examData.title}
+                </h1>
+                <p className="text-zinc-400 text-sm mt-1">
+                  Please read all instructions and navigation guidelines carefully before starting your test.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="bg-[#14151f] border border-white/15 px-4 py-2 rounded-xl text-xs font-semibold text-zinc-300">
+                  {examData.type === "SCHEDULED" ? "Scheduled (Fixed)" : "On-Demand (Flexible)"}
+                </span>
+              </div>
+            </div>
+
+            {/* Key Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-[#14151f] border border-white/10 p-4 rounded-xl">
+                <p className="text-xs font-medium text-zinc-400">Total Duration</p>
+                <p className="text-xl font-bold text-white mt-1">{examData.duration || 60} mins</p>
+              </div>
+              <div className="bg-[#14151f] border border-white/10 p-4 rounded-xl">
+                <p className="text-xs font-medium text-zinc-400">Total Questions</p>
+                <p className="text-xl font-bold text-white mt-1">{flattenedQuestions.length} Questions</p>
+              </div>
+              <div className="bg-[#14151f] border border-white/10 p-4 rounded-xl">
+                <p className="text-xs font-medium text-zinc-400">Total Marks</p>
+                <p className="text-xl font-bold text-orange-400 mt-1">{totalMarks} Marks</p>
+              </div>
+              <div className="bg-[#14151f] border border-white/10 p-4 rounded-xl">
+                <p className="text-xs font-medium text-zinc-400">Sections</p>
+                <p className="text-xl font-bold text-white mt-1">{examData.sections?.length || 1} Sections</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Teacher's Instructions Section */}
+          <div className="bg-[#12131a] border border-orange-500/30 rounded-2xl p-6 space-y-3 shadow-xl">
+            <h3 className="text-sm font-bold text-orange-400 uppercase tracking-wider flex items-center gap-2">
+              Teacher's Instructions
+            </h3>
+            {examData.specialInstructions && examData.specialInstructions.trim() ? (
+              <p className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">
+                {examData.specialInstructions}
+              </p>
+            ) : (
+              <p className="text-zinc-400 text-sm leading-relaxed">
+                No special instructions provided by the teacher. Follow standard online exam rules: maintain an active internet connection, do not switch browser tabs, and ensure all questions are answered before submitting.
+              </p>
+            )}
+          </div>
+
+          {/* How to Give the Exam (Platform Controls Guide) */}
+          <div className="bg-[#12131a] border border-white/10 rounded-2xl p-6 md:p-8 space-y-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white border-b border-white/10 pb-3">
+              How to Give the Exam & Navigation Guide
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-[#14151f] border border-white/10 p-4.5 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="bg-emerald-600 text-white text-xs font-bold px-2.5 py-1 rounded-md">
+                    Save
+                  </span>
+                  <span className="text-sm font-semibold text-white">Save Current Answer</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Saves your selected option or typed answer to the database without changing your current question.
+                </p>
+              </div>
+
+              <div className="bg-[#14151f] border border-white/10 p-4.5 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="bg-orange-600 text-white text-xs font-bold px-2.5 py-1 rounded-md">
+                    Save & Next
+                  </span>
+                  <span className="text-sm font-semibold text-white">Save & Advance</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Saves your current answer and automatically advances to the next question in the exam.
+                </p>
+              </div>
+
+              <div className="bg-[#14151f] border border-white/10 p-4.5 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="bg-white/10 text-zinc-300 text-xs font-bold px-2.5 py-1 rounded-md border border-white/10">
+                    Next (Skip) / Previous
+                  </span>
+                  <span className="text-sm font-semibold text-white">Navigate Questions</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Browse between questions freely without saving any modifications.
+                </p>
+              </div>
+
+              <div className="bg-[#14151f] border border-white/10 p-4.5 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="bg-orange-600 text-white text-xs font-bold px-2.5 py-1 rounded-md">
+                    Submit Exam
+                  </span>
+                  <span className="text-sm font-semibold text-white">Final Submission</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Located at the top right of your screen. Click when you have finished all questions to complete your exam submission.
+                </p>
+              </div>
+            </div>
+
+            {/* Question Palette / Navigator Guide */}
+            <div className="bg-[#14151f] border border-white/10 p-5 rounded-xl space-y-3">
+              <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                Question Navigator Box Color Indicators
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 bg-emerald-600 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0">1</div>
+                  <span className="text-xs text-zinc-300">Answered & Saved</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 border border-white/20 rounded-lg flex items-center justify-center text-xs font-bold text-zinc-400 shrink-0">2</div>
+                  <span className="text-xs text-zinc-300">Unanswered</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 border-2 border-orange-500 bg-orange-500/20 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0">3</div>
+                  <span className="text-xs text-zinc-300">Current Question</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Confirmation Checkbox & Start CTA */}
+          <div className="bg-[#12131a] border border-white/10 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-2xl mb-8">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-1 w-4 h-4 rounded border-white/20 text-orange-600 focus:ring-orange-500 bg-[#14151f] cursor-pointer"
+              />
+              <span className="text-xs md:text-sm text-zinc-300 leading-snug">
+                I have read and understood all instructions. I am ready to start my exam.
+              </span>
+            </label>
+
+            <Button
+              disabled={!agreedToTerms}
+              onClick={() => setHasAcceptedInstructions(true)}
+              className="bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-bold text-sm h-12 px-8 rounded-xl shrink-0 shadow-lg shadow-orange-950/50 transition-all"
+            >
+              Proceed to Exam
+            </Button>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
 
   const currentQuestion = flattenedQuestions[currentIndex];
   const selectedOptions = answers[currentQuestion.id] || [];
   const textAnswer = textAnswers[currentQuestion.id] || "";
 
   return (
-    <div className="flex flex-col h-full bg-[#0b0f19]">
+    <div className="flex flex-col h-full bg-[#050505]">
       {/* Top Header */}
-      <header className="shrink-0 bg-[#111520] border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-md">
+      <header className="shrink-0 bg-[#0f0f11] border-b border-white/5 px-6 py-4 flex items-center justify-between shadow-md">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">{examData.title}</h1>
         </div>
@@ -318,7 +492,7 @@ export default function ExamAttemptPage() {
         <Button 
           onClick={handleSubmitClick} 
           disabled={isSubmitting}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-all shadow-lg shadow-indigo-900/20"
+          className="bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-all shadow-lg shadow-orange-950/40"
         >
           {isSubmitting ? "Submitting..." : "Submit Exam"}
         </Button>
@@ -332,7 +506,7 @@ export default function ExamAttemptPage() {
           
           {/* Question Header */}
           <div className="px-8 py-6 pb-2 border-b border-white/5">
-            <p className="text-blue-400 font-bold text-xs uppercase tracking-widest mb-1">
+            <p className="text-amber-400 font-bold text-xs uppercase tracking-widest mb-1">
               {currentQuestion.sectionTitle}
             </p>
             <div className="flex items-center justify-between">
@@ -355,9 +529,9 @@ export default function ExamAttemptPage() {
                     code: ({node, ...props}) => {
                       const isInline = !props.className?.includes('language-');
                       return isInline 
-                        ? <code className="bg-blue-500/10 px-2 py-1 rounded text-lg text-blue-300 font-mono border border-blue-500/20 font-normal" {...props} /> 
+                        ? <code className="bg-orange-500/10 px-2 py-1 rounded text-lg text-orange-300 font-mono border border-orange-500/30 font-normal" {...props} /> 
                         : (
-                          <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl font-normal">
+                          <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl font-normal">
                             <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
                               <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56]" />
                               <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]" />
@@ -378,7 +552,7 @@ export default function ExamAttemptPage() {
               </div>
               {currentQuestion.images && currentQuestion.images.length > 0 && (
                 <div className="mt-6 mb-2">
-                  <img src={currentQuestion.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-black/50" />
+                  <img src={currentQuestion.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/50" />
                 </div>
               )}
             </div>
@@ -389,7 +563,7 @@ export default function ExamAttemptPage() {
                   value={textAnswer}
                   onChange={(e) => handleTextAnswerChange(currentQuestion.id, e.target.value)}
                   placeholder="Type your descriptive answer here..."
-                  className="w-full min-h-[400px] bg-[#111520] text-white border border-white/10 rounded-xl p-6 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y"
+                  className="w-full min-h-[400px] bg-[#14151f] text-white border border-white/15 rounded-2xl p-6 focus:outline-none focus:border-white/30 transition-all resize-y shadow-inner text-base font-mono leading-relaxed placeholder:text-zinc-500"
                 />
               </div>
             ) : (
@@ -405,7 +579,7 @@ export default function ExamAttemptPage() {
                     className={`
                       relative flex items-center p-4 cursor-pointer rounded-xl border-2 transition-all duration-200 group
                       ${isSelected 
-                        ? "bg-indigo-500/10 border-indigo-500/50 text-white" 
+                        ? "bg-[#18181b]mber-500/10 border-amber-500/50 text-white" 
                         : "bg-transparent border-white/10 text-gray-300 hover:border-white/30 hover:bg-white/5"}
                     `}
                   >
@@ -420,7 +594,7 @@ export default function ExamAttemptPage() {
                     {/* Letter Avatar */}
                     <div className={`
                       flex items-center justify-center w-8 h-8 rounded-md border mr-4 shrink-0 transition-colors font-bold text-sm
-                      ${isSelected ? "border-indigo-500 bg-indigo-500 text-white" : "border-gray-600 text-gray-400 group-hover:border-gray-400"}
+                      ${isSelected ? "border-amber-500 bg-[#18181b]mber-600 text-white" : "border-zinc-700 text-white/80 group-hover:border-white/40"}
                     `}>
                       {letter}
                     </div>
@@ -434,7 +608,7 @@ export default function ExamAttemptPage() {
           </div>
 
           {/* Question Footer Actions */}
-          <div className="shrink-0 p-6 px-8 border-t border-white/5 bg-[#111520]/50 flex items-center justify-end">
+          <div className="shrink-0 p-6 px-8 border-t border-white/5 bg-[#0f0f11]/50 flex items-center justify-end">
             <div className="flex gap-4">
               <Button 
                 variant="outline" 
@@ -458,7 +632,7 @@ export default function ExamAttemptPage() {
                 variant="outline"
                 onClick={() => handleSaveAction(false)}
                 disabled={isSavingAnswer || (currentQuestion.type === "mcq" ? selectedOptions.length === 0 : (!textAnswer || textAnswer.trim() === ""))}
-                className="bg-emerald-600/10 border-emerald-500/50 hover:bg-emerald-600 hover:text-white text-emerald-400 font-semibold min-w-[100px]"
+                className="bg-[#18181b]merald-600/10 border-emerald-500/50 hover:bg-[#18181b]merald-600 hover:text-white text-emerald-400 font-semibold min-w-[100px]"
               >
                 {isSavingAnswer ? "Saving..." : "Save"}
               </Button>
@@ -466,7 +640,7 @@ export default function ExamAttemptPage() {
               <Button 
                 onClick={() => handleSaveAction(true)}
                 disabled={isSavingAnswer || currentIndex === flattenedQuestions.length - 1 || (currentQuestion.type === "mcq" ? selectedOptions.length === 0 : (!textAnswer || textAnswer.trim() === ""))}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold min-w-[140px]"
+                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold min-w-[140px]"
               >
                 Save & Next
               </Button>
@@ -475,11 +649,11 @@ export default function ExamAttemptPage() {
         </div>
 
         {/* Right Pane: Navigator */}
-        <aside className="w-56 md:w-64 lg:w-80 border-l border-white/5 bg-[#111520] shrink-0 flex flex-col">
+        <aside className="w-56 md:w-64 lg:w-80 border-l border-white/5 bg-[#0f0f11] shrink-0 flex flex-col">
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <h3 className="text-lg font-bold text-white">Navigator</h3>
             {/* Compute answered count based on local state */}
-            <span className="text-xs font-semibold text-gray-400 bg-black/20 px-2 py-1 rounded">
+            <span className="text-xs font-semibold text-gray-400 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/20 px-2 py-1 rounded">
               {Object.keys(savedAnswers).filter(k => savedAnswers[k].length > 0).length} / {flattenedQuestions.length} Answered
             </span>
           </div>
@@ -499,7 +673,7 @@ export default function ExamAttemptPage() {
                     className={`
                       px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap
                       ${isActive 
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-900/20" 
+                        ? "bg-orange-600 text-white shadow-md shadow-blue-900/20" 
                         : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"}
                     `}
                   >
@@ -521,18 +695,18 @@ export default function ExamAttemptPage() {
                   ? (savedAnswers[q.id] && savedAnswers[q.id].length > 0)
                   : (savedTextAnswers[q.id] && savedTextAnswers[q.id].trim() !== "");
                 let bgColor = "bg-transparent";
-                let borderColor = "border-white/10";
+                let borderColor = "border-white/15";
                 let textColor = "text-gray-400";
 
-                if (isCurrent) {
-                  borderColor = "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-[#111520]";
-                  textColor = "text-white";
-                }
-                
                 if (isAnswered) {
                   bgColor = "bg-emerald-600";
-                  borderColor = isCurrent ? "border-emerald-400 ring-2 ring-emerald-500 ring-offset-2 ring-offset-[#111520]" : "border-emerald-500";
+                  borderColor = "border-emerald-500";
                   textColor = "text-white";
+                }
+
+                if (isCurrent) {
+                  borderColor = "border-2 border-orange-500 ring-2 ring-orange-500/30";
+                  textColor = "text-white font-bold";
                 }
 
                 return (
@@ -540,8 +714,8 @@ export default function ExamAttemptPage() {
                     key={q.id}
                     onClick={() => setCurrentIndex(idx)}
                     className={`
-                      aspect-square rounded flex items-center justify-center text-sm font-semibold border transition-all
-                      hover:border-gray-400
+                      aspect-square rounded-lg flex items-center justify-center text-sm font-bold border transition-all cursor-pointer outline-none focus:outline-none
+                      hover:border-orange-400
                       ${bgColor} ${borderColor} ${textColor}
                     `}
                   >
@@ -552,28 +726,18 @@ export default function ExamAttemptPage() {
             </div>
           </div>
 
-          {/* Navigator Legend & Integrity Banner */}
-          <div className="shrink-0 p-6 border-t border-white/5 bg-[#0b0f19]/50">
-            <div className="grid grid-cols-2 gap-y-3 mb-6">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
+          {/* Navigator Legend */}
+          <div className="shrink-0 p-6 border-t border-white/5 bg-[#050505]/50">
+            <div className="grid grid-cols-2 gap-y-3">
+              <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
                 <div className="w-3 h-3 bg-emerald-600 rounded-sm"></div> Answered
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
                 <div className="w-3 h-3 border border-white/20 rounded-sm"></div> Unanswered
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-gray-400">
-                <div className="w-3 h-3 border border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0b0f19] rounded-sm"></div> Current
-              </div>
-            </div>
-
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex gap-3">
-              <Shield className="h-5 w-5 text-blue-400 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-blue-200">Exam Integrity Active</p>
-                <p className="text-[11px] text-blue-300/70 leading-tight mt-1">
-                  Activity is monitored. Stay on this screen.
-                </p>
+              <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+                <div className="w-3 h-3 border-2 border-orange-500 rounded-sm bg-orange-500/20"></div> Current
               </div>
             </div>
           </div>

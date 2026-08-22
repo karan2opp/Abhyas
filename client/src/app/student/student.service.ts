@@ -1,5 +1,10 @@
 import api from "@/utils/axios";
 
+export const getMyOrganisationService = async () => {
+  const res = await api.get("/organisations/student-mine");
+  return res.data;
+};
+
 export const joinExamService = async (joinCode: string) => {
   const res = await api.post("/submissions/join", { joinCode });
   return res.data;

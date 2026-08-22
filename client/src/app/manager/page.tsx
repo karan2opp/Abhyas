@@ -36,7 +36,7 @@ export default function ManagerDashboardPage() {
 
       <div className="grid sm:grid-cols-2 gap-4 mt-8">
         <Link href="/manager/classrooms">
-          <Card className="bg-[#111520] border-white/5 hover:bg-[#1a1f2e] hover:border-white/10 transition-all cursor-pointer">
+          <Card className="bg-[#0f0f11] border-white/5 hover:bg-[#18181b] hover:border-white/10 transition-all cursor-pointer">
             <CardContent className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 bg-[#1652F0]/20 text-[#1652F0] rounded-lg flex items-center justify-center border border-[#1652F0]/20">
@@ -53,10 +53,10 @@ export default function ManagerDashboardPage() {
         </Link>
 
         <Link href="/manager/teachers">
-          <Card className="bg-[#111520] border-white/5 hover:bg-[#1a1f2e] hover:border-white/10 transition-all cursor-pointer">
+          <Card className="bg-[#0f0f11] border-white/5 hover:bg-[#18181b] hover:border-white/10 transition-all cursor-pointer">
             <CardContent className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 bg-emerald-600/20 text-emerald-400 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                <div className="h-12 w-12 bg-[#18181b]merald-600/20 text-emerald-400 rounded-lg flex items-center justify-center border border-emerald-500/20">
                   <Users className="h-6 w-6" />
                 </div>
                 <div>

@@ -89,7 +89,7 @@ export default function AssignmentsPage() {
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [newAssignmentTitle, setNewAssignmentTitle] = useState("");
   const [newAssignmentInstructions, setNewAssignmentInstructions] = useState("");
-  const [newAssignmentMarks, setNewAssignmentMarks] = useState("100");
+  const [newAssignmentMarks, setNewAssignmentMarks] = useState("0");
   const [newAssignmentGroupId, setNewAssignmentGroupId] = useState("");
   const [newAssignmentSeriesId, setNewAssignmentSeriesId] = useState("");
   const [newAssignmentDayGap, setNewAssignmentDayGap] = useState("7");
@@ -126,6 +126,17 @@ export default function AssignmentsPage() {
   useEffect(() => {
     if (classroomId) loadOverview();
   }, [classroomId]);
+
+  useEffect(() => {
+    const seriesIdParam = searchParams.get("seriesId");
+    if (seriesIdParam && series.length > 0) {
+      const found = series.find((s) => s.id === seriesIdParam);
+      if (found) {
+        setSelectedSeries(found);
+        setView("seriesDetail");
+      }
+    }
+  }, [series, searchParams]);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedStandaloneSearch(standaloneSearchQuery), 400);
@@ -300,11 +311,7 @@ export default function AssignmentsPage() {
       toast.error("Assignment title must be at least 3 characters");
       return;
     }
-    const marks = parseFloat(newAssignmentMarks);
-    if (!marks || marks < 1) {
-      toast.error("Total marks must be at least 1");
-      return;
-    }
+    const marks = 0;
     const isWeeklySeries = !!newAssignmentSeriesId && !isCustomSeriesAssignment;
     if (isWeeklySeries && (!newAssignmentDayGap || parseInt(newAssignmentDayGap) < 1)) {
       toast.error("Day gap must be at least 1");
@@ -332,7 +339,7 @@ export default function AssignmentsPage() {
       setAssignmentDialogOpen(false);
       setNewAssignmentTitle("");
       setNewAssignmentInstructions("");
-      setNewAssignmentMarks("100");
+      setNewAssignmentMarks("0");
       setNewAssignmentGroupId("");
       setNewAssignmentSeriesId("");
       setNewAssignmentDayGap("7");
@@ -365,7 +372,7 @@ export default function AssignmentsPage() {
           key={key}
           onClick={() => onChange(key)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-            active === key ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-transparent border-white/10 text-gray-400 hover:bg-white/5"
+            active === key ? "bg-orange-600/20 border-orange-500/50 text-orange-300 font-semibold" : "bg-transparent border-white/10 text-white/70 hover:bg-white/5"
           }`}
         >
           {label} ({count})
@@ -377,8 +384,8 @@ export default function AssignmentsPage() {
   const renderAssignmentCard = (a: AssignmentEntry, showSequence: boolean) => (
     <Card
       key={a.id}
-      onClick={() => router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}`)}
-      className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+      onClick={() => router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}` + (a.seriesId ? `?seriesId=${a.seriesId}` : ""))}
+      className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
     >
       <CardContent className="p-5">
         <p className="text-white font-semibold text-base truncate mb-1">
@@ -395,7 +402,7 @@ export default function AssignmentsPage() {
           ) : (
             <div className="flex gap-3">
               <div className="flex flex-col items-center">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                <span className="h-2 w-2 rounded-full bg-[#18181b]merald-400 shrink-0" />
                 <span className="w-px flex-1 bg-white/10 my-1" />
                 <span className="h-2 w-2 rounded-full bg-red-400 shrink-0" />
               </div>
@@ -414,15 +421,15 @@ export default function AssignmentsPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600/10 text-emerald-400 border border-emerald-500/20">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#18181b]merald-600/10 text-emerald-400 border border-emerald-500/20">
             {a.totalMarks} marks
           </span>
           <Button
             size="lg"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-6"
+            className="bg-orange-600 hover:bg-orange-700 text-white px-6"
             onClick={(e) => {
               e.stopPropagation();
-              router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}/submissions`);
+              router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}/submissions` + (a.seriesId ? `?seriesId=${a.seriesId}` : ""));
             }}
           >
             <ClipboardCheck className="mr-2 h-4 w-4" /> Submissions
@@ -446,10 +453,10 @@ export default function AssignmentsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
             <Card
               onClick={() => setView("series")}
-              className="bg-[#111520] border-white/5 hover:border-indigo-500/30 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-indigo-500/30 transition-all cursor-pointer"
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="h-14 w-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center border border-indigo-500/20 mb-4">
+                <div className="h-14 w-14 bg-orange-600/20 text-orange-400 rounded-2xl flex items-center justify-center border border-orange-500/30 mb-4">
                   <Layers className="h-7 w-7" />
                 </div>
                 <h4 className="text-white font-bold text-xl">Weekly Assignments</h4>
@@ -458,10 +465,10 @@ export default function AssignmentsPage() {
             </Card>
             <Card
               onClick={() => setView("standalone")}
-              className="bg-[#111520] border-white/5 hover:border-blue-500/30 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-orange-500/30 transition-all cursor-pointer"
             >
               <CardContent className="p-8 flex flex-col items-center text-center">
-                <div className="h-14 w-14 bg-blue-600/20 text-blue-400 rounded-2xl flex items-center justify-center border border-blue-500/20 mb-4">
+                <div className="h-14 w-14 bg-orange-600/20 text-orange-400 rounded-2xl flex items-center justify-center border border-orange-500/30 mb-4">
                   <ClipboardList className="h-7 w-7" />
                 </div>
                 <h4 className="text-white font-bold text-xl">Standard Assignments</h4>
@@ -483,13 +490,13 @@ export default function AssignmentsPage() {
               <h3 className="text-2xl font-bold text-white">Weekly Assignments ({series.length})</h3>
               <p className="text-gray-400 text-base mt-1">Ordered assignment series — open one to see its assignments.</p>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={() => setSeriesDialogOpen(true)}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={() => setSeriesDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" /> New Series
             </Button>
           </div>
 
           {series.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5 py-10 text-center">
+            <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
               <CardContent>
                 <Layers className="h-8 w-8 text-gray-500 mx-auto mb-3" />
                 <p className="text-gray-400">No series yet.</p>
@@ -507,15 +514,15 @@ export default function AssignmentsPage() {
                       setSeriesDetailStatus("all");
                       setView("seriesDetail");
                     }}
-                    className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+                    className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
                   >
                     <CardContent className="p-5">
-                      <div className="h-9 w-9 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/20 mb-3">
+                      <div className="h-9 w-9 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 mb-3">
                         <Layers className="h-4 w-4" />
                       </div>
                       <p className="text-white font-semibold text-base truncate">{s.title}</p>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${s.type === "custom" ? "bg-purple-500/20 text-purple-300" : "bg-indigo-500/20 text-indigo-300"}`}>
+                        <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${s.type === "custom" ? "bg-purple-500/20 text-purple-300" : "bg-orange-500/20 text-orange-300"}`}>
                           {s.type === "custom" ? "Custom" : "Weekly"}
                         </span>
                         <span className="text-base text-gray-400">{inSeriesCount} assignments</span>
@@ -539,7 +546,7 @@ export default function AssignmentsPage() {
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="text-2xl font-bold text-white">{selectedSeries.title}</h3>
-              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${selectedSeries.type === "custom" ? "bg-purple-500/20 text-purple-300" : "bg-indigo-500/20 text-indigo-300"}`}>
+              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${selectedSeries.type === "custom" ? "bg-purple-500/20 text-purple-300" : "bg-orange-500/20 text-orange-300"}`}>
                 {selectedSeries.type === "custom" ? "Custom" : "Weekly"}
               </span>
             </div>
@@ -547,7 +554,7 @@ export default function AssignmentsPage() {
               <Button variant="outline" className="bg-transparent border-white/10 text-white hover:bg-white/5" onClick={openSeriesSettings}>
                 <Settings className="mr-2 h-4 w-4" /> Update Series
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => openCreateAssignment(selectedSeries.id)}>
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={() => openCreateAssignment(selectedSeries.id)}>
                 <Plus className="mr-2 h-4 w-4" /> Add Assignment
               </Button>
             </div>
@@ -570,7 +577,7 @@ export default function AssignmentsPage() {
               <>
                 {inSeries.length > 0 && renderStatusTabs(counts, seriesDetailStatus, setSeriesDetailStatus)}
                 {filtered.length === 0 ? (
-                  <Card className="bg-[#111520] border-white/5 py-10 text-center">
+                  <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
                     <CardContent>
                       <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
                       <p className="text-gray-400">
@@ -601,7 +608,7 @@ export default function AssignmentsPage() {
             <p className="text-gray-400 text-base mt-1">Update this series' name, or delete it entirely.</p>
           </div>
 
-          <Card className="bg-[#111520] border-white/5 mb-6">
+          <Card className="bg-[#0f0f11] border-white/5 mb-6">
             <CardContent className="space-y-3">
               <label className="text-sm font-medium text-gray-300">Series Name</label>
               <div className="flex gap-2">
@@ -612,14 +619,14 @@ export default function AssignmentsPage() {
                   onKeyDown={(e) => e.key === "Enter" && handleSaveSeriesName()}
                   className="flex-1 bg-[#09090b] border border-white/10 rounded-xl px-4 py-2.5 text-white text-base focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
                 />
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={handleSaveSeriesName} disabled={savingSeriesName}>
+                <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={handleSaveSeriesName} disabled={savingSeriesName}>
                   {savingSeriesName ? "Saving..." : "Save"}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-[#111520] border-red-500/20">
+          <Card className="bg-[#0f0f11] border-red-500/20">
             <CardContent className="space-y-3">
               <div>
                 <p className="text-base font-semibold text-red-400">Danger Zone</p>
@@ -628,7 +635,6 @@ export default function AssignmentsPage() {
                 </p>
               </div>
               <Button variant="destructive" onClick={() => handleDeleteSeries(selectedSeries.id, selectedSeries.title)} disabled={deletingSeries}>
-                <Trash2 className="mr-2 h-4 w-4" />
                 {deletingSeries ? "Deleting..." : "Delete Series"}
               </Button>
             </CardContent>
@@ -647,19 +653,18 @@ export default function AssignmentsPage() {
               <h3 className="text-2xl font-bold text-white">Standard Assignments ({standaloneTotal})</h3>
               <p className="text-gray-400 text-base mt-1">Class-wide or group-restricted assignments outside any series.</p>
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={() => openCreateAssignment()}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={() => openCreateAssignment()}>
               <Plus className="mr-2 h-4 w-4" /> New Standalone Assignment
             </Button>
           </div>
 
           <div className="relative max-w-md mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
             <input
               type="text"
               placeholder="Search assignments..."
               value={standaloneSearchQuery}
-              onChange={(e) => setStandaloneSearchQuery(e.target.value)}
-              className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+              onChange={(e) => setStandaloneSearchQuery(e.target.value)} className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
             />
           </div>
 
@@ -668,7 +673,7 @@ export default function AssignmentsPage() {
           {standaloneLoading ? (
             <div className="text-gray-400 text-center py-10">Loading...</div>
           ) : standaloneAssignments.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5 py-10 text-center">
+            <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
               <CardContent>
                 <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
                 <p className="text-gray-400">
@@ -718,12 +723,12 @@ export default function AssignmentsPage() {
 
       {/* ── Create Assignment Dialog ─────────────────────────────────── */}
       <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-lg">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl font-bold">Create New Assignment</DialogTitle>
             {newAssignmentSeriesId ? (
               <p className="text-sm text-gray-400">
-                Adding to <span className="text-blue-400 font-semibold">{series.find((s) => s.id === newAssignmentSeriesId)?.title?.toUpperCase()}</span>
+                Adding to <span className="text-orange-400 font-semibold">{series.find((s) => s.id === newAssignmentSeriesId)?.title?.toUpperCase()}</span>
               </p>
             ) : (
               <p className="text-sm text-gray-400">Standalone assignment for this classroom</p>
@@ -739,7 +744,7 @@ export default function AssignmentsPage() {
                 placeholder={newAssignmentSeriesId ? "e.g. Week 1: Intro to Neural Nets" : "e.g. Chapter 3 Homework"}
                 value={newAssignmentTitle}
                 onChange={(e) => setNewAssignmentTitle(e.target.value)}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -749,38 +754,26 @@ export default function AssignmentsPage() {
                 value={newAssignmentInstructions}
                 onChange={(e) => setNewAssignmentInstructions(e.target.value)}
                 rows={3}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
               />
             </div>
 
-            <div className={newAssignmentSeriesId && !isCustomSeriesAssignment ? "grid grid-cols-2 gap-3" : ""}>
+            {newAssignmentSeriesId && !isCustomSeriesAssignment && (
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-300">Total Marks</label>
+                <label className="text-sm font-medium text-gray-300">Schedule Gap (Days)</label>
                 <input
                   type="number"
-                  value={newAssignmentMarks}
-                  onChange={(e) => setNewAssignmentMarks(e.target.value)}
-                  className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                  min="1"
+                  value={newAssignmentDayGap}
+                  onChange={(e) => setNewAssignmentDayGap(e.target.value)}
+                  className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
                 />
               </div>
-
-              {newAssignmentSeriesId && !isCustomSeriesAssignment && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-gray-300">Schedule Gap (Days)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={newAssignmentDayGap}
-                    onChange={(e) => setNewAssignmentDayGap(e.target.value)}
-                    className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
-                  />
-                </div>
-              )}
-            </div>
+            )}
 
             {newAssignmentSeriesId && !isCustomSeriesAssignment && (
-              <div className="flex items-start gap-2.5 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2.5 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <Info className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-gray-300">
                   The <span className="font-semibold text-white">Schedule Gap</span> determines when this assignment becomes available after the previous one in the series ends. A gap of {newAssignmentDayGap || "N"} days means students have a {newAssignmentDayGap || "N"}-day window.
                 </p>
@@ -795,7 +788,7 @@ export default function AssignmentsPage() {
                     type="datetime-local"
                     value={newAssignmentStartDate}
                     onChange={(e) => setNewAssignmentStartDate(e.target.value)}
-                    className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                    className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -804,7 +797,7 @@ export default function AssignmentsPage() {
                     type="datetime-local"
                     value={newAssignmentDueDate}
                     onChange={(e) => setNewAssignmentDueDate(e.target.value)}
-                    className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                    className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                   />
                 </div>
               </div>
@@ -819,7 +812,7 @@ export default function AssignmentsPage() {
                       type="datetime-local"
                       value={newAssignmentStartDate}
                       onChange={(e) => setNewAssignmentStartDate(e.target.value)}
-                      className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                      className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -828,7 +821,7 @@ export default function AssignmentsPage() {
                       type="datetime-local"
                       value={newAssignmentDueDate}
                       onChange={(e) => setNewAssignmentDueDate(e.target.value)}
-                      className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
+                      className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm [color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -837,7 +830,7 @@ export default function AssignmentsPage() {
                   <select
                     value={newAssignmentGroupId}
                     onChange={(e) => setNewAssignmentGroupId(e.target.value)}
-                    className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-xl h-12 px-4 focus:outline-none focus:ring-1 focus:ring-white/30 text-sm"
+                    className="w-full bg-[#18181b] border border-white/10 text-white rounded-xl h-12 px-4 focus:outline-none focus:ring-1 focus:ring-white/30 text-sm"
                   >
                     <option value="">Class-wide (all students)</option>
                     {groups.map((g) => (
@@ -853,7 +846,7 @@ export default function AssignmentsPage() {
             <Button variant="ghost" size="lg" className="text-gray-300 hover:text-white" onClick={() => setAssignmentDialogOpen(false)}>
               Cancel
             </Button>
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateAssignment} disabled={creatingAssignment}>
+            <Button size="lg" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreateAssignment} disabled={creatingAssignment}>
               {creatingAssignment ? "Creating..." : "Continue to Questions"}
             </Button>
           </DialogFooter>
@@ -862,7 +855,7 @@ export default function AssignmentsPage() {
 
       {/* ── Create Series Dialog ─────────────────────────────────────── */}
       <Dialog open={seriesDialogOpen} onOpenChange={setSeriesDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-lg">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl font-bold">Create Assignment Series</DialogTitle>
             <p className="text-sm text-gray-400">A series is an ordered set of assignments students work through.</p>
@@ -878,7 +871,7 @@ export default function AssignmentsPage() {
                 value={newSeriesTitle}
                 onChange={(e) => setNewSeriesTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateSeries()}
-                className="w-full bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -886,7 +879,7 @@ export default function AssignmentsPage() {
               <select
                 value={newSeriesGroupId}
                 onChange={(e) => setNewSeriesGroupId(e.target.value)}
-                className="w-full bg-[#1a1f2e] border border-white/10 text-white rounded-xl h-12 px-4 focus:outline-none focus:ring-1 focus:ring-white/30 text-sm"
+                className="w-full bg-[#18181b] border border-white/10 text-white rounded-xl h-12 px-4 focus:outline-none focus:ring-1 focus:ring-white/30 text-sm"
               >
                 <option value="">Class-wide (all students)</option>
                 {groups.map((g) => (
@@ -910,7 +903,7 @@ export default function AssignmentsPage() {
                 ).map((opt) => (
                   <label
                     key={opt.value}
-                    className={`flex items-start gap-3 text-left p-4 rounded-xl border cursor-pointer transition-all ${newSeriesType === opt.value ? "bg-blue-500/20 border-blue-500/50" : "bg-[#1a1f2e] border-white/10 hover:bg-white/5"}`}
+                    className={`flex items-start gap-3 text-left p-4 rounded-xl border cursor-pointer transition-all ${newSeriesType === opt.value ? "bg-orange-500/20 border-orange-500/50" : "bg-[#18181b] border-white/10 hover:bg-white/5"}`}
                   >
                     <RadioGroupItem value={opt.value} className="mt-0.5 border-gray-500 data-[checked]:border-blue-400" />
                     <div>
@@ -927,7 +920,7 @@ export default function AssignmentsPage() {
             <Button variant="ghost" size="lg" className="text-gray-300 hover:text-white" onClick={() => setSeriesDialogOpen(false)}>
               Cancel
             </Button>
-            <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateSeries} disabled={creatingSeries}>
+            <Button size="lg" className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreateSeries} disabled={creatingSeries}>
               {creatingSeries ? "Creating..." : "Create Series"}
             </Button>
           </DialogFooter>

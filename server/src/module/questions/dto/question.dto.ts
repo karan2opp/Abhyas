@@ -9,6 +9,7 @@ const optionSchema = z.object({
 export const createQuestionSchema = z.object({
   sectionId: z.string({ message: "Section ID is required" })
     .min(1, { message: "Section ID cannot be empty" }),
+  blockId: z.string().optional(),
   type: z.enum(["mcq", "descriptive"], {
     message: "Question type must be mcq or descriptive"
   }),
@@ -76,32 +77,3 @@ export const updateQuestionSchema = z.object({
 })
 
 export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>
-
-export const subTopicSchema = z.object({
-  name: z.string({ message: "Subtopic name is required" }),
-  count: z.number({ message: "Count is required" }).min(1, { message: "Count must be at least 1" }),
-  questionTypes: z.array(z.enum(["mcq", "text"]), { message: "Question types are required" })
-    .min(1, { message: "At least one question type is required" }),
-})
-
-export type SubTopic = z.infer<typeof subTopicSchema>
-
-export const topicSchema = z.object({
-  name: z.string({ message: "Topic name is required" }),
-  subtopics: z.array(subTopicSchema, { message: "Subtopics are required" })
-    .min(1, { message: "At least one subtopic is required" }),
-})
-
-export type Topic = z.infer<typeof topicSchema>
-
-export const generateQuestionConfigSchema = z.object({
-  subject: z.string({ message: "Subject is required" }),
-  difficulty: z.string({ message: "Difficulty is required" }),
-  topics: z.array(topicSchema, { message: "Topics are required" })
-    .min(1, { message: "At least one topic is required" }),
-  textMarks: z.number().min(0.5).optional(),
-  customInstructions: z.string().optional(),
-  includeExplanation: z.boolean().optional(),
-})
-
-export type GenerateQuestionConfig = z.infer<typeof generateQuestionConfigSchema>

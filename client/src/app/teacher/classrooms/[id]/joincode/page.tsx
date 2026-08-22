@@ -77,7 +77,7 @@ export default function JoinCodePage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <Card className="bg-[#111520] border-white/5">
+        <Card className="bg-[#0f0f11] border-white/5">
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 text-gray-300 text-sm font-semibold">
               <KeyRound className="h-4 w-4" /> Shared Join Code
@@ -89,7 +89,7 @@ export default function JoinCodePage() {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="flex-1 px-4 py-3 bg-[#09090b] border border-white/10 rounded-lg font-mono text-lg text-emerald-400 tracking-widest text-center">
+                <div className="flex-1 px-4 py-3 bg-[#18181b] border border-white/10 rounded-lg font-mono text-lg text-emerald-400 tracking-widest text-center shadow-inner">
                   {classroom.joinCode}
                 </div>
                 <Button size="icon" variant="ghost" className="text-gray-400 hover:text-white" onClick={handleCopyCode}>
@@ -123,7 +123,7 @@ export default function JoinCodePage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-[#111520] border-white/5">
+        <Card className="bg-[#0f0f11] border-white/5">
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 text-gray-300 text-sm font-semibold">
               <Mail className="h-4 w-4" /> Invite a Student by Email
@@ -138,9 +138,9 @@ export default function JoinCodePage() {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                className="flex-1 bg-[#09090b] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                className="flex-1 bg-[#18181b] border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-sm shadow-inner"
               />
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={handleInvite} disabled={inviting}>
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={handleInvite} disabled={inviting}>
                 {inviting ? "Sending..." : "Send Invite"}
               </Button>
             </div>

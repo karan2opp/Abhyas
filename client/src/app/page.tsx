@@ -138,7 +138,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-blue-500/20">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
       <style dangerouslySetInnerHTML={{
         __html: `
         @keyframes draw {
@@ -168,18 +168,18 @@ export default function LandingPage() {
             {/* Desktop Nav */}
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-8">
-                <a href="#features" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-3 py-2 text-sm font-medium">Features</a>
-                <a href="#how-it-works" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-3 py-2 text-sm font-medium">How it works</a>
-                <a href="#faq" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-3 py-2 text-sm font-medium">FAQ</a>
+                <a href="#features" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">Features</a>
+                <a href="#how-it-works" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">How it works</a>
+                <a href="#faq" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">FAQ</a>
               </div>
             </div>
 
             <div className="hidden md:flex items-center space-x-4">
               <ThemeToggle />
-              <Link href="/auth/login" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium text-sm transition-colors">
+              <Link href="/auth/login" className="text-zinc-600 dark:text-zinc-300 hover:text-orange-500 font-medium text-sm transition-colors">
                 Login
               </Link>
-              <Link href="/auth/login" className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2.5 rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg">
+              <Link href="/auth/login" className="bg-orange-600 text-white hover:bg-orange-700 px-5 py-2.5 rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg">
                 Get Started
               </Link>
             </div>
@@ -220,13 +220,13 @@ export default function LandingPage() {
 
             <h1 className="text-5xl md:text-7xl font-bold font-heading leading-[1.1] tracking-tight mb-6 text-zinc-900 dark:text-zinc-50">
               Practice Smarter, <br className="hidden md:block" />
-              <span className="text-blue-600">Grow Faster</span>
+              <span className="text-orange-500">Grow Faster</span>
             </h1>
             <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-300 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               AI-powered exam preparation for any subject. Automatically generate questions, evaluate descriptive answers, and give instant feedback to help your students excel.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <Link href="/auth/login" className="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold transition-colors flex items-center justify-center gap-2">
+              <Link href="/auth/login" className="w-full sm:w-auto px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-full font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-orange-950/40">
                 Get Started Free <ArrowRight className="w-4 h-4" />
               </Link>
               <a href="#how-it-works" className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 rounded-full font-semibold transition-all flex items-center justify-center shadow-sm hover:shadow-md">

@@ -12,9 +12,13 @@ import questionsRouter from "./module/questions/question.route.js";
 import optionsRouter from "./module/options/option.route.js";
 import submissionsRouter from "./module/submissions/submission.route.js";
 import answersRouter from "./module/answers/answer.route.js";
-import adminRouter from "./module/admin/admin.route.js";
 import superadminRouter from "./module/superadmin/superadmin.route.js";
 import feedbackRouter from "./module/feedback/feedback.route.js";
+import ragRouter from "./module/generation/rag/rag.route.js";
+import jobsRouter from "./module/jobs/jobs.route.js";
+import { generationRouter } from "./module/generation/generation.route.js";
+import billingRouter from "./module/billing/billing.route.js";
+import studentProfileRouter from "./module/student-profile/student-profile.route.js";
 import errorHandler from "./common/middleware/error.middleware.js";
 import 'dotenv/config'
 const app = express();
@@ -39,10 +43,15 @@ app.use("/api/questions", questionsRouter)
 app.use("/api/options", optionsRouter)
 app.use("/api/submissions", submissionsRouter)
 app.use("/api/answers", answersRouter)
-app.use("/api/admin", adminRouter)
 app.use("/api/superadmin", superadminRouter)
 app.use("/api/feedback", feedbackRouter)
+app.use("/api/generation", generationRouter);
+app.use("/api/jobs", jobsRouter);
+app.use("/api/billing", billingRouter);
+app.use("/api/student-profile", studentProfileRouter);
+app.use("/", ragRouter);
 app.use(errorHandler)
 
 export default app;
+
 // Trigger restart

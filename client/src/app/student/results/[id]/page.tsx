@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot } from "lucide-react";
+import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
 import { formatDate } from "@/lib/date";
 import { toast } from "sonner";
@@ -20,6 +20,9 @@ export default function ResultsPage() {
   const [submission, setSubmission] = useState<any>(null);
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Sidebar toggle state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
@@ -67,7 +70,7 @@ export default function ResultsPage() {
     if (submission?.status === "evaluating") {
       interval = setInterval(() => {
         fetchResult();
-      }, 5000); // Check every 5 seconds
+      }, 5000);
     }
     
     return () => {
@@ -85,7 +88,7 @@ export default function ResultsPage() {
   if (submission.status === "evaluating") {
     return (
       <div className="p-10 h-full flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
         <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Evaluating Your Results...</h2>
         <p className="text-gray-400 text-center max-w-md">
           Our AI is currently reviewing and scoring your descriptive answers. This page will automatically update in a few moments once the evaluation is complete.
@@ -94,21 +97,21 @@ export default function ResultsPage() {
     );
   }
 
-  let colorClass = "text-red-500";
+  let colorClass = "text-red-400";
   let bgClass = "bg-red-500/10";
   let borderClass = "border-red-500/20";
-  let message = "Keep practicing!";
+  let message = "Keep Practicing";
   
   if (percentage >= 80) {
-    colorClass = "text-emerald-500";
-    bgClass = "bg-emerald-500/10";
+    colorClass = "text-emerald-400";
+    bgClass = "bg-[#18181b]merald-500/10";
     borderClass = "border-emerald-500/20";
-    message = "Excellent work!";
+    message = "Excellent";
   } else if (percentage >= 50) {
-    colorClass = "text-yellow-500";
+    colorClass = "text-yellow-400";
     bgClass = "bg-yellow-500/10";
     borderClass = "border-yellow-500/20";
-    message = "Good effort!";
+    message = "Good Effort";
   }
 
   let correctCount = 0;
@@ -140,15 +143,27 @@ export default function ResultsPage() {
 
   const renderNavigationSidebar = (containerClass: string) => (
     <div className={containerClass}>
-      <Card className="bg-[#111520] border-white/5 md:h-full flex flex-col md:max-h-full md:overflow-hidden">
-        <CardHeader className="pb-4 border-b border-white/5 shrink-0">
-          <CardTitle className="text-lg text-white">Questions</CardTitle>
+      <Card className="bg-[#0f0f11] border-white/5 md:h-full flex flex-col md:max-h-full md:overflow-hidden rounded-2xl">
+        <CardHeader className="pb-3 border-b border-white/5 shrink-0 px-5 pt-4">
+          <CardTitle className="text-base font-bold text-white flex items-center justify-between">
+            <span>Questions Bar</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400 font-normal">{totalQuestions} Total</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg"
+                onClick={() => setIsSidebarOpen(false)}
+                title="Collapse Questions Bar"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-4 flex-1 md:overflow-y-auto custom-scrollbar">
-          
-          {/* Section Selector */}
           {exam.sections?.length > 1 && (
-            <div className="mb-6 flex flex-col gap-2">
+            <div className="mb-4 flex flex-col gap-1.5">
               {exam.sections.map((section: any) => (
                 <button
                   key={section.id}
@@ -158,9 +173,9 @@ export default function ResultsPage() {
                       setSelectedQuestionId(section.questions[0].id);
                     }
                   }}
-                  className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  className={`text-left px-3 py-1.5 rounded-lg text-xs transition-colors ${
                     selectedSectionId === section.id
-                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium"
+                      ? "bg-orange-500/20 text-orange-400 border border-orange-500/30 font-medium"
                       : "text-gray-400 hover:bg-white/5"
                   }`}
                 >
@@ -170,16 +185,15 @@ export default function ResultsPage() {
             </div>
           )}
           
-          {/* Question Grid */}
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-5 gap-2">
             {currentSection?.questions?.map((q: any, idx: number) => {
               const ans = submission.answers?.find((a: any) => a.questionId === q.id);
-              let btnClass = "bg-gray-500/10 text-gray-400 border-gray-500/20 hover:bg-gray-500/20"; // skipped / default
+              let btnClass = "bg-gray-500/10 text-gray-400 border-gray-500/20 hover:bg-gray-500/20";
               
               if (ans) {
                 if (q.type === 'descriptive') {
                   if (ans.marksAwarded >= q.marks) {
-                    btnClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20";
+                    btnClass = "bg-[#18181b]merald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-[#18181b]merald-500/20";
                   } else if (ans.marksAwarded > 0) {
                     btnClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/20 hover:bg-yellow-500/20";
                   } else {
@@ -187,7 +201,7 @@ export default function ResultsPage() {
                   }
                 } else {
                   if (ans.isCorrect === true) {
-                    btnClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20";
+                    btnClass = "bg-[#18181b]merald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-[#18181b]merald-500/20";
                   } else {
                     btnClass = "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20";
                   }
@@ -196,14 +210,14 @@ export default function ResultsPage() {
 
               const isSelected = selectedQuestionId === q.id;
               if (isSelected) {
-                btnClass += " ring-2 ring-blue-500 ring-offset-2 ring-offset-[#111520]";
+                btnClass += " ring-2 ring-blue-500 ring-offset-2 ring-offset-[#0f0f11]";
               }
               
               return (
                 <button
                   key={q.id}
                   onClick={() => setSelectedQuestionId(q.id)}
-                  className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center font-bold text-sm border transition-all ${btnClass}`}
+                  className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center font-bold text-xs border transition-all ${btnClass}`}
                 >
                   {idx + 1}
                 </button>
@@ -211,189 +225,154 @@ export default function ResultsPage() {
             })}
           </div>
 
-          {/* Legend */}
-          <div className="mt-8 pt-4 border-t border-white/5 space-y-3 text-xs text-gray-400">
+          <div className="mt-6 pt-4 border-t border-white/5 space-y-2 text-[11px] text-gray-400">
             {!isCurrentSectionDescriptive && (
               <>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/40"></div> Correct</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/40"></div> Incorrect</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#18181b]merald-500/20 border border-emerald-500/40"></div> Correct</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40"></div> Incorrect</div>
               </>
             )}
             {isCurrentSectionDescriptive && (
               <>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500/20 border border-emerald-500/40"></div> Full marks</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/40"></div> Partial marks</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/40"></div> Zero marks</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[#18181b]merald-500/20 border border-emerald-500/40"></div> Full marks</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/40"></div> Partial marks</div>
+                <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/40"></div> Zero marks</div>
               </>
             )}
-            <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-gray-500/20 border border-gray-500/40"></div> Skipped</div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-gray-500/20 border border-gray-500/40"></div> Skipped</div>
           </div>
-
         </CardContent>
       </Card>
     </div>
   );
 
   return (
-    <div className="p-4 sm:p-8 h-full flex-1 flex flex-col bg-[#0A0D14] overflow-y-auto md:overflow-hidden">
-      <div className="w-full max-w-7xl mx-auto flex flex-col min-h-full md:h-full md:overflow-hidden">
-        <div className="flex justify-between items-center mb-6 shrink-0">
-          <div className="flex items-center gap-4">
-            <Link href="/student" className="inline-flex items-center text-gray-400 hover:text-white transition-colors">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+    <div className="p-3 sm:p-4 h-full flex-1 flex flex-col bg-[#050505] overflow-y-auto md:overflow-hidden">
+      <div className="w-full flex flex-col min-h-full md:h-full md:overflow-hidden gap-3">
+        
+        {/* TOP BAR */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <Link href="/student" className="inline-flex items-center text-gray-400 hover:text-white transition-colors text-xs font-semibold">
+              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              Back
             </Link>
+            <span className="text-gray-700">|</span>
+            <h1 className="text-sm sm:text-base font-bold text-white truncate max-w-xs sm:max-w-md">{exam.title}</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
             <Link href={`/student/exams/${exam?.id}/leaderboard`}>
               <Button 
                 size="sm" 
-                className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold ml-2"
+                className="bg-yellow-600/90 hover:bg-yellow-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-md"
               >
-                <Trophy className="mr-2 h-4 w-4" /> View Leaderboard
+                <Trophy className="mr-1.5 h-3.5 w-3.5" /> Leaderboard
               </Button>
             </Link>
-          </div>
-          <div className="flex items-center gap-6 text-sm text-gray-400">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              <span>{formatDate(submission.submittedAt || submission.updatedAt)}</span>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${borderClass} ${bgClass} text-xs font-bold`}>
+              <span className="text-gray-400 font-normal">Your Marks:</span>
+              <span className={colorClass}>{score} / {totalMarks} ({percentage}%)</span>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span className="text-emerald-400 capitalize">{submission.status}</span>
-            </div>
+            <span className="text-xs px-2.5 py-1.5 rounded-xl bg-[#18181b]merald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase tracking-wider">
+              {submission.status}
+            </span>
+
+            {/* Questions Bar Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="bg-[#0f0f11] hover:bg-white/5 text-gray-300 hover:text-white border-white/10 text-xs h-8 px-3 rounded-xl flex items-center gap-1.5 ml-2"
+              title={isSidebarOpen ? "Collapse Questions Bar" : "Open Questions Bar"}
+            >
+              {isSidebarOpen ? (
+                <>
+                  <PanelRightClose className="h-3.5 w-3.5 text-orange-400" />
+                  <span>Hide Questions Bar</span>
+                </>
+              ) : (
+                <>
+                  <PanelRightOpen className="h-3.5 w-3.5 text-orange-400" />
+                  <span>Open Questions Bar</span>
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 md:min-h-0">
-          {/* Left Column - Main Content */}
-          <div className="md:col-span-3 flex flex-col gap-6 md:overflow-y-auto custom-scrollbar pr-2 pb-6 min-w-0">
-            
-            {/* Compact Result Summary */}
-            <Card className="bg-[#111520] border-white/5 shadow-2xl relative shrink-0">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-blue-600"></div>
-              <CardContent className="p-6">
-                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
-                  {/* Score Info */}
-                  <div className="flex items-center gap-4 w-full xl:w-auto">
-                    <div className={`shrink-0 relative flex items-center justify-center w-16 h-16 rounded-full border-[3px] ${borderClass} ${bgClass}`}>
-                      <div className="text-center">
-                        <div className={`text-lg font-bold ${colorClass}`}>{percentage}%</div>
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-xl sm:text-2xl font-bold text-white mb-1 truncate" title={exam.title}>{exam.title}</h2>
-                      <div className={`text-sm font-medium ${colorClass}`}>{message}</div>
-                    </div>
-                  </div>
-
-                  {/* Stats Grid */}
-                  <div className="flex flex-wrap gap-2 w-full xl:w-auto shrink-0 justify-start">
-                    <div className="bg-black/20 rounded-lg p-2 flex flex-col items-center justify-center border border-white/5 flex-1 min-w-[70px] sm:min-w-[80px]">
-                      <div className="text-lg font-bold text-white flex items-baseline gap-0.5">
-                        {score}<span className="text-[10px] text-gray-500">/{totalMarks}</span>
-                      </div>
-                      <div className="text-[9px] text-gray-400 uppercase tracking-wider font-semibold mt-0.5 text-center">Marks</div>
-                    </div>
-                    <div className="bg-blue-500/10 rounded-lg p-2 flex flex-col items-center justify-center border border-blue-500/20 flex-1 min-w-[70px] sm:min-w-[80px]">
-                      <div className="text-lg font-bold text-blue-400">{totalQuestions}</div>
-                      <div className="text-[9px] text-blue-500/70 uppercase tracking-wider font-semibold mt-0.5 text-center">Total Qs</div>
-                    </div>
-                    {!isCurrentSectionDescriptive && (
-                      <>
-                        <div className="bg-emerald-500/10 rounded-lg p-2 flex flex-col items-center justify-center border border-emerald-500/20 flex-1 min-w-[70px] sm:min-w-[80px]">
-                          <div className="text-lg font-bold text-emerald-400">{correctCount}</div>
-                          <div className="text-[9px] text-emerald-500/70 uppercase tracking-wider font-semibold mt-0.5 text-center">Correct</div>
-                        </div>
-                        <div className="bg-red-500/10 rounded-lg p-2 flex flex-col items-center justify-center border border-red-500/20 flex-1 min-w-[70px] sm:min-w-[80px]">
-                          <div className="text-lg font-bold text-red-400">{incorrectCount}</div>
-                          <div className="text-[9px] text-red-500/70 uppercase tracking-wider font-semibold mt-0.5 text-center">Incorrect</div>
-                        </div>
-                      </>
-                    )}
-                    <div className="bg-gray-500/10 rounded-lg p-2 flex flex-col items-center justify-center border border-gray-500/20 flex-1 min-w-[70px] sm:min-w-[80px]">
-                      <div className="text-lg font-bold text-gray-300">{skippedCount}</div>
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider font-semibold mt-0.5 text-center">Skipped</div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Mobile Navigation Sidebar */}
-            {renderNavigationSidebar("md:hidden flex flex-col gap-4")}
-
-            {/* Selected Question Detail */}
+        {/* MAIN WORKSPACE */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 md:min-h-0">
+          
+          {/* LEFT SIDE */}
+          <div className={`${isSidebarOpen ? "md:col-span-3" : "md:col-span-4"} flex flex-col gap-3 md:overflow-y-auto custom-scrollbar pr-1 min-w-0 transition-all duration-300`}>
             {selectedQuestion && (
-              <Card className="bg-[#111520]/80 border-white/5 shadow-xl backdrop-blur-xl shrink-0">
-                <CardHeader className="border-b border-white/5 pb-4 bg-white/[0.02]">
+              <Card className="bg-[#0f0f11] border-white/5 shadow-2xl flex-1 flex flex-col rounded-2xl min-h-0">
+                
+                {/* Question Header */}
+                <CardHeader className="border-b border-white/5 pb-3 p-4 shrink-0 bg-white/[0.01]">
                   <div className="flex justify-between items-start gap-4">
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider ${selectedQuestion.type === 'mcq' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
+                        <span className={`px-2.5 py-0.5 rounded-md text-[10px] uppercase font-bold tracking-wider ${selectedQuestion.type === 'mcq' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/30' : 'bg-[#18181b]mber-500/10 text-amber-400 border border-amber-500/20'}`}>
                           {selectedQuestion.type === 'mcq' ? 'Multiple Choice' : 'Descriptive'}
                         </span>
-                        <span className="border border-white/10 bg-white/5 px-2.5 py-1 rounded-md text-gray-300 text-[10px] font-bold">Marks: {selectedQuestion.marks || 1}</span>
                       </div>
-                      <CardTitle className="text-lg font-medium text-white leading-relaxed prose prose-invert max-w-none">
+                      <div className="text-base sm:text-lg font-medium text-white leading-relaxed prose prose-invert max-w-none">
                         <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
                           components={{
                             code: ({node, ...props}) => {
                               const isInline = !props.className?.includes('language-');
                               return isInline 
-                                ? <code className="bg-blue-500/10 px-1.5 py-0.5 rounded text-[13px] text-blue-300 font-mono border border-blue-500/20" {...props} /> 
+                                ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-xs text-orange-300 font-mono border border-orange-500/30" {...props} /> 
                                 : (
-                                  <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#0d1117] shadow-2xl">
-                                    <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
-                                      <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                                      <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                                      <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                                      <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace('language-', '') || 'code'}</span>
-                                    </div>
-                                    <div className="p-5 overflow-x-auto custom-scrollbar font-normal">
-                                      <code className="block font-mono text-[13px] leading-relaxed text-gray-300" {...props} />
+                                  <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-[#09090b]">
+                                    <div className="p-4 overflow-x-auto custom-scrollbar font-normal">
+                                      <code className="block font-mono text-xs leading-relaxed text-gray-300" {...props} />
                                     </div>
                                   </div>
                                 )
                             },
-                            p: ({node, ...props}) => <p className="mb-2 last:mb-0 inline-block" {...props} />
+                            p: ({node, ...props}) => <p className="mb-1 last:mb-0 inline-block" {...props} />
                           }}
                         >
                           {`**Q${questionIndex + 1}.** ${selectedQuestion.description}`}
                         </ReactMarkdown>
-                      </CardTitle>
+                      </div>
                     </div>
+
                     <div className="flex flex-col items-end shrink-0">
-                      <div className={`text-sm font-bold px-3 py-1 rounded-full border ${
+                      <div className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${
                         isDescriptive 
-                          ? (selectedAnswer?.marksAwarded >= selectedQuestion.marks ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : selectedAnswer?.marksAwarded > 0 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
-                          : (selectedAnswer?.isCorrect ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
+                          ? (selectedAnswer?.marksAwarded >= selectedQuestion.marks ? 'bg-[#18181b]merald-500/10 text-emerald-400 border-emerald-500/20' : selectedAnswer?.marksAwarded > 0 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
+                          : (selectedAnswer?.isCorrect ? 'bg-[#18181b]merald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
                       }`}>
                         {selectedAnswer?.marksAwarded ?? 0} / {selectedQuestion.marks} Marks
                       </div>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-6">
+
+                {/* Answer Content */}
+                <CardContent className="p-4 flex-1 flex flex-col space-y-3 overflow-y-auto custom-scrollbar min-h-0">
                   {isDescriptive ? (
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-sm text-gray-400 mb-2 font-medium">Your Answer:</div>
-                        <div className="p-4 rounded-xl bg-black/40 border border-white/10 text-gray-300 whitespace-pre-wrap font-mono text-sm max-h-[300px] sm:max-h-[400px] overflow-y-auto custom-scrollbar">
-                          {selectedAnswer?.textAnswer || <span className="text-gray-600 italic">No answer provided.</span>}
-                        </div>
+                    <div className="flex-1 flex flex-col space-y-2 min-h-0">
+                      <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Your Answer:</div>
+                      <div className="flex-1 p-5 rounded-2xl bg-[#0d111a] border border-white/10 text-gray-100 whitespace-pre-wrap font-mono text-base leading-relaxed overflow-y-auto custom-scrollbar shadow-inner min-h-[300px]">
+                        {selectedAnswer?.textAnswer || <span className="text-gray-500 italic">No answer provided.</span>}
                       </div>
                       
                       {selectedAnswer?.feedback && (
-                        <div className="mt-6 p-5 rounded-xl bg-blue-900/10 border border-blue-500/20 relative overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                        <div className="mt-4 p-5 rounded-2xl bg-blue-950/20 border border-orange-500/30 relative overflow-hidden shadow-lg">
+                          <div className="absolute top-0 left-0 w-1.5 h-full bg-orange-500"></div>
                           <div className="flex items-start gap-3">
-                            <div className="mt-1 bg-blue-500/20 p-2 rounded-lg shrink-0">
-                              <Bot className="h-5 w-5 text-blue-400" />
+                            <div className="mt-0.5 bg-orange-500/20 p-2 rounded-xl shrink-0">
+                              <Bot className="h-5 w-5 text-orange-400" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-sm text-blue-400 mb-1 font-semibold tracking-wide uppercase">AI Evaluation</div>
-                              <div className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap max-h-[300px] sm:max-h-[400px] overflow-y-auto custom-scrollbar pr-2">{selectedAnswer.feedback}</div>
+                              <div className="text-xs text-orange-400 mb-1 font-bold tracking-wider uppercase">Evaluation Feedback</div>
+                              <div className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar pr-2">{selectedAnswer.feedback}</div>
                             </div>
                           </div>
                         </div>
@@ -409,13 +388,13 @@ export default function ResultsPage() {
                         let icon = null;
                         
                         if (isSelected && isActualCorrect) {
-                          optBg = "bg-emerald-500/10 border-emerald-500/30 ring-1 ring-emerald-500/30";
+                          optBg = "bg-[#18181b]merald-500/10 border-emerald-500/30 ring-1 ring-emerald-500/30";
                           icon = <Check className="h-5 w-5 text-emerald-400" />;
                         } else if (isSelected && !isActualCorrect) {
                           optBg = "bg-red-500/10 border-red-500/30 ring-1 ring-red-500/30";
                           icon = <X className="h-5 w-5 text-red-400" />;
                         } else if (!isSelected && isActualCorrect) {
-                          optBg = "bg-emerald-500/5 border-emerald-500/30 border-dashed";
+                          optBg = "bg-[#18181b]merald-500/5 border-emerald-500/30 border-dashed";
                           icon = <Check className="h-5 w-5 text-emerald-400 opacity-50" />;
                         }
 
@@ -433,11 +412,10 @@ export default function ResultsPage() {
             )}
           </div>
 
-          {/* Right Column - Navigation Sidebar (Desktop) */}
-          {renderNavigationSidebar("hidden md:flex md:col-span-1 flex-col gap-4 min-h-0")}
+          {/* RIGHT SIDE */}
+          {isSidebarOpen && renderNavigationSidebar("hidden md:flex md:col-span-1 flex-col gap-4 md:min-h-0 animate-in fade-in duration-200")}
         </div>
       </div>
     </div>
   );
 }
-

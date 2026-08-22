@@ -90,7 +90,7 @@ export default function GroupSettingsPage() {
         <p className="text-gray-400 text-base mt-1">Update this group's name, or delete it entirely.</p>
       </div>
 
-      <Card className="bg-[#111520] border-white/5 mb-6">
+      <Card className="bg-[#0f0f11] border-white/5 mb-6">
         <CardContent className="space-y-3">
           <label className="text-sm font-medium text-gray-300">Group Name</label>
           <div className="flex gap-2">
@@ -101,14 +101,14 @@ export default function GroupSettingsPage() {
               onKeyDown={(e) => e.key === "Enter" && handleSaveName()}
               className="flex-1 bg-[#09090b] border border-white/10 rounded-xl px-4 py-2.5 text-white text-base focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
             />
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={handleSaveName} disabled={savingName}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={handleSaveName} disabled={savingName}>
               {savingName ? "Saving..." : "Save"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-[#111520] border-red-500/20">
+      <Card className="bg-[#0f0f11] border-red-500/20">
         <CardContent className="space-y-3">
           <div>
             <p className="text-base font-semibold text-red-400">Danger Zone</p>
@@ -117,7 +117,6 @@ export default function GroupSettingsPage() {
             </p>
           </div>
           <Button variant="destructive" onClick={handleDeleteGroup} disabled={deleting}>
-            <Trash2 className="mr-2 h-4 w-4" />
             {deleting ? "Deleting..." : "Delete Group"}
           </Button>
         </CardContent>

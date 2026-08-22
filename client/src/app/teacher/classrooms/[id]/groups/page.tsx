@@ -70,7 +70,7 @@ export default function GroupsPage() {
             Groups filter students within this classroom — assign exams/assignments to a group instead of the whole class.
           </p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={() => setGroupDialogOpen(true)}>
+        <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={() => setGroupDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" /> Create Group
         </Button>
       </div>
@@ -78,9 +78,9 @@ export default function GroupsPage() {
       {loading ? (
         <div className="text-gray-400 text-center py-10">Loading groups...</div>
       ) : groups.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
-            <Layers className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+            <Users className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No groups yet.</p>
           </CardContent>
         </Card>
@@ -90,11 +90,11 @@ export default function GroupsPage() {
             <Card
               key={g.id}
               onClick={() => router.push(`/teacher/classrooms/${classroomId}/groups/${g.id}`)}
-              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
             >
               <CardContent className="p-5">
-                <div className="h-10 w-10 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/20 mb-3">
-                  <Layers className="h-5 w-5" />
+                <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 mb-3">
+                  <Users className="h-5 w-5" />
                 </div>
                 <p className="text-white font-semibold text-base truncate">{g.name}</p>
                 <p className="text-gray-500 text-sm mt-1 flex items-center gap-1.5">
@@ -108,7 +108,7 @@ export default function GroupsPage() {
 
       {/* ── Create Group Dialog ──────────────────────────────────────── */}
       <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-md">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white">Create Group</DialogTitle>
           </DialogHeader>
@@ -128,7 +128,7 @@ export default function GroupsPage() {
             <Button variant="ghost" className="text-gray-300 hover:text-white" onClick={() => setGroupDialogOpen(false)}>
               Cancel
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateGroup} disabled={creatingGroup}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleCreateGroup} disabled={creatingGroup}>
               {creatingGroup ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>

@@ -24,6 +24,7 @@ const register = async (data: RegisterDto) => {
 
     const [newUser] = await db.insert(users).values({
         ...data,
+        role: "student", // public registration is always a student; staff are created by admins/managers
         password: hashedPassword,
         verificationToken: hashedToken,
         verificationExpires: new Date(Date.now() + 15 * 60 * 1000), // 15 mins

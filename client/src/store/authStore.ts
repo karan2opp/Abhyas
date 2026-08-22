@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       isLoggedIn: true,
       isAdmin,
       isSuperAdmin,
-      isInitialized: false,
+      isInitialized: true,
       loading: false,
       error: null,
     });

@@ -188,7 +188,7 @@ export default function GroupDetailPage() {
       {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="h-14 w-14 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+          <div className="h-14 w-14 rounded-full bg-orange-600/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shrink-0">
             <Users className="h-6 w-6" />
           </div>
           <div className="min-w-0">
@@ -201,7 +201,7 @@ export default function GroupDetailPage() {
           <div className="flex gap-2">
             <Button
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white text-base px-5"
+              className="bg-orange-600 hover:bg-orange-700 text-white text-base px-5"
               onClick={() => router.push(`/teacher/classrooms/${classroomId}/groups/${groupId}/assignments`)}
             >
               <ClipboardList className="mr-2 h-4 w-4" /> Group Assignments
@@ -225,11 +225,11 @@ export default function GroupDetailPage() {
       </div>
 
       {/* ── Stats bar ─────────────────────────────────────────────────── */}
-      <Card className="bg-[#111520] border-white/5 mb-8">
+      <Card className="bg-[#0f0f11] border-white/5 mb-8">
         <CardContent className="p-0">
           <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/5">
             <div className="p-5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
+              <div className="h-10 w-10 rounded-lg bg-orange-600/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shrink-0">
                 <Users className="h-5 w-5" />
               </div>
               <div>
@@ -239,7 +239,7 @@ export default function GroupDetailPage() {
               </div>
             </div>
             <div className="p-5 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+              <div className="h-10 w-10 rounded-lg bg-orange-600/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shrink-0">
                 <ClipboardList className="h-5 w-5" />
               </div>
               <div>
@@ -266,21 +266,21 @@ export default function GroupDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <h4 className="text-white font-semibold text-base mb-3">Students in this Group</h4>
-          <div className="relative max-w-md mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <div className="relative w-full max-w-md mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
             <input
               type="text"
               placeholder="Search students..."
               value={memberSearchQuery}
               onChange={(e) => setMemberSearchQuery(e.target.value)}
-              className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+              className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
             />
           </div>
 
           {membersLoading ? (
             <div className="text-gray-400 text-center py-6 text-sm">Loading...</div>
           ) : members.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5">
+            <Card className="bg-[#0f0f11] border-white/5">
               <CardContent className="py-14 flex flex-col items-center text-center">
                 <div className="h-14 w-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
                   <Users className="h-6 w-6 text-gray-500" />
@@ -296,7 +296,7 @@ export default function GroupDetailPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {members.map((m) => (
-                <Card key={m.studentId} className="bg-[#111520] border-white/5">
+                <Card key={m.studentId} className="bg-[#0f0f11] border-white/5">
                   <CardContent className="p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <UserAvatar name={m.name} avatarUrl={m.avatarUrl} />
@@ -324,19 +324,19 @@ export default function GroupDetailPage() {
 
         <div>
           <h4 className="text-white font-semibold text-base mb-3">Add Students from Roster</h4>
-          <div className="relative max-w-md mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <div className="relative w-full max-w-md mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
             <input
               type="text"
               placeholder="Search by name or email..."
               value={addSearchQuery}
               onChange={(e) => setAddSearchQuery(e.target.value)}
-              className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+              className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
             />
           </div>
 
           {!debouncedAddSearch ? (
-            <Card className="bg-[#111520] border-white/5">
+            <Card className="bg-[#0f0f11] border-white/5">
               <CardContent className="py-14 flex flex-col items-center text-center">
                 <div className="h-14 w-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
                   <UserPlus className="h-6 w-6 text-gray-500" />
@@ -348,7 +348,7 @@ export default function GroupDetailPage() {
           ) : addSearchLoading ? (
             <div className="text-gray-400 text-center py-6 text-sm">Searching...</div>
           ) : addableResults.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5">
+            <Card className="bg-[#0f0f11] border-white/5">
               <CardContent className="py-14 flex flex-col items-center text-center">
                 <div className="h-14 w-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
                   <UserPlus className="h-6 w-6 text-gray-500" />
@@ -360,7 +360,7 @@ export default function GroupDetailPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {addableResults.map((s) => (
-                <Card key={s.studentId} className="bg-[#111520] border-white/5">
+                <Card key={s.studentId} className="bg-[#0f0f11] border-white/5">
                   <CardContent className="p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <UserAvatar name={s.name} avatarUrl={s.avatarUrl} />
@@ -371,7 +371,7 @@ export default function GroupDetailPage() {
                     </div>
                     <Button
                       size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
+                      className="bg-orange-600 hover:bg-orange-700 text-white shrink-0"
                       onClick={() => handleAddStudent(s.studentId)}
                       disabled={addingStudentId === s.studentId}
                     >

@@ -1,14 +1,83 @@
-import { eq, and, ilike, or } from "drizzle-orm";
+import { eq, and, count, ilike, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { organisations, users } from "../../common/db/schema.js";
+import { organisations, users, classrooms, classroomStudents } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
-import type { CreateOrganisationDto } from "./dto/organisation.dto.js";
+import type { CreateOrganisationDto, UpdateOrganisationDto } from "./dto/organisation.dto.js";
 
 // ── Create Organisation ──────────────────────────────────────────────────────
 const createOrganisation = async (data: CreateOrganisationDto) => {
     const [organisation] = await db.insert(organisations).values({ name: data.name }).returning();
     if (!organisation) throw ApiError.internal("Failed to create organisation");
     return organisation;
+};
+
+// ── Get Organisation by ID ───────────────────────────────────────────────────
+const getOrganisationById = async (organisationId: string) => {
+    const [organisation] = await db.select().from(organisations).where(eq(organisations.id, organisationId));
+    if (!organisation) throw ApiError.notFound("Organisation not found");
+    return organisation;
+};
+
+// ── Update Organisation details ───────────────────────────────────────────────
+// Undefined fields are dropped; empty strings are stored as null so the
+// "cleared" state round-trips cleanly on the client.
+const updateOrganisation = async (organisationId: string, data: UpdateOrganisationDto) => {
+    const clean: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+        if (value === undefined) continue;
+        clean[key] = value === "" ? null : value;
+    }
+
+    const [updated] = await db.update(organisations)
+        .set({ ...clean, updatedAt: new Date() })
+        .where(eq(organisations.id, organisationId))
+        .returning();
+
+    if (!updated) throw ApiError.notFound("Organisation not found");
+    return updated;
+};
+
+// ── Upload Organisation Logo ────────────────────────────────────────────────
+const uploadOrganisationLogo = async (organisationId: string, file: Express.Multer.File) => {
+    const org = await getOrganisationById(organisationId);
+
+    const { uploadToCloudinary, deleteFromCloudinary } = await import("../../common/config/cloudinary.js");
+
+    if (org.logoPublicId) {
+        try {
+            await deleteFromCloudinary(org.logoPublicId);
+        } catch (err) {
+            console.error("Failed to delete old logo:", err);
+        }
+    }
+
+    const result = await uploadToCloudinary(file.buffer, "org-logos");
+
+    const [updated] = await db.update(organisations)
+        .set({ logoUrl: result.url, logoPublicId: result.publicId, updatedAt: new Date() })
+        .where(eq(organisations.id, organisationId))
+        .returning();
+
+    if (!updated) throw ApiError.notFound("Organisation not found");
+    return updated;
+};
+
+// ── Get Organisation for a Student ───────────────────────────────────────────
+// A student's organisation is derived via their active classroom memberships
+// (classroom_students -> classrooms.organisation_id). We assume a student
+// belongs to a single organisation and return the first active one.
+const getOrganisationForStudent = async (studentId: string) => {
+    const rows = await db.select({ organisationId: classrooms.organisationId })
+        .from(classroomStudents)
+        .innerJoin(classrooms, eq(classrooms.id, classroomStudents.classroomId))
+        .where(and(
+            eq(classroomStudents.studentId, studentId),
+            eq(classroomStudents.status, "active"),
+        ));
+
+    const orgId = rows[0]?.organisationId;
+    if (!orgId) throw ApiError.notFound("No organisation found for this student");
+    return getOrganisationById(orgId);
 };
 
 // ── List Organisations ───────────────────────────────────────────────────────
@@ -129,6 +198,10 @@ const getOrganisationTeachers = async (organisationId: string, search?: string) 
 
 export {
     createOrganisation,
+    getOrganisationById,
+    updateOrganisation,
+    uploadOrganisationLogo,
+    getOrganisationForStudent,
     listOrganisations,
     assignUserToOrganisation,
     assignManager,

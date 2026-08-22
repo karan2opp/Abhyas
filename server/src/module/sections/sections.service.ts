@@ -1,15 +1,14 @@
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { sections, exams, questions, options } from "../../common/db/schema.js";
+import { sections, questions, options, blocks } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { PermissionService, type Requester } from "../../common/permissions/index.js";
 import type { CreateSectionDto, UpdateSectionDto } from "./dto/section.dto.js";
 
-import { PermissionService } from "../../common/permissions/index.js";
-
 // ── Create Section ─────────────────────────────────────────────────────────────
-const createSection = async (data: CreateSectionDto, teacherId: string) => {
-    // verify exam belongs to teacher
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, data.examId);
+const createSection = async (data: CreateSectionDto, requester: Requester) => {
+    // verify the requester (creator, opted-in co-teacher, or manager) can manage this exam
+    const hasAccess = await PermissionService.canManageExam(requester, data.examId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to create a section for this exam");
 
     const [section] = await db.insert(sections).values({
@@ -21,37 +20,53 @@ const createSection = async (data: CreateSectionDto, teacherId: string) => {
     return section;
 };
 
-// ── Get All Sections of an Exam (teacher) ──────────────────────────────────────
-const getSectionsByExam = async (examId: string, teacherId: string) => {
-    // verify exam belongs to teacher
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+// ── Get All Sections of an Exam (teacher/manager) ──────────────────────────────
+const getSectionsByExam = async (examId: string, requester: Requester) => {
+    const hasAccess = await PermissionService.canManageExam(requester, examId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam's sections");
 
     const result = await db.select().from(sections).where(eq(sections.examId, examId));
     return result;
 };
 
-// ── Get Sections with Questions and Options (teacher full view) ────────────────
-const getSectionsWithDetails = async (examId: string, teacherId: string) => {
-    // verify exam belongs to teacher
-    const hasAccess = await PermissionService.teacher.canManageExam(teacherId, examId);
+// ── Get Sections with Questions and Options (teacher/manager full view) ────────
+const getSectionsWithDetails = async (examId: string, requester: Requester) => {
+    const hasAccess = await PermissionService.canManageExam(requester, examId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this exam's details");
 
     const sectionsData = await db.select().from(sections).where(eq(sections.examId, examId));
 
-    // fetch questions and options for each section
+    // fetch blocks, questions and options for each section
     const sectionsWithDetails = await Promise.all(
         sectionsData.map(async (section) => {
-            const questionsData = await db.select().from(questions).where(eq(questions.sectionId, section.id));
+            const blocksData = await db.select().from(blocks)
+                .where(eq(blocks.sectionId, section.id))
+                .orderBy(blocks.position);
 
-            const questionsWithOptions = await Promise.all(
-                questionsData.map(async (question) => {
+            const blocksWithQuestions = await Promise.all(
+                blocksData.map(async (block) => {
+                    const blockQuestions = await db.select().from(questions).where(eq(questions.blockId, block.id));
+                    const questionsWithOptions = await Promise.all(
+                        blockQuestions.map(async (question) => {
+                            const optionsData = await db.select().from(options).where(eq(options.questionId, question.id));
+                            return { ...question, options: optionsData };
+                        })
+                    );
+                    return { ...block, questions: questionsWithOptions };
+                })
+            );
+
+            // All questions for the section (flattened, for backward-compatible
+            // readers that still expect sections[].questions).
+            const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id));
+            const allQuestionsWithOptions = await Promise.all(
+                sectionQuestions.map(async (question) => {
                     const optionsData = await db.select().from(options).where(eq(options.questionId, question.id));
                     return { ...question, options: optionsData };
                 })
             );
 
-            return { ...section, questions: questionsWithOptions };
+            return { ...section, blocks: blocksWithQuestions, questions: allQuestionsWithOptions };
         })
     );
 
@@ -59,9 +74,8 @@ const getSectionsWithDetails = async (examId: string, teacherId: string) => {
 };
 
 // ── Update Section ─────────────────────────────────────────────────────────────
-const updateSection = async (sectionId: string, data: UpdateSectionDto, teacherId: string) => {
-    // verify section belongs to teacher's exam
-    const hasAccess = await PermissionService.teacher.canManageSection(teacherId, sectionId);
+const updateSection = async (sectionId: string, data: UpdateSectionDto, requester: Requester) => {
+    const hasAccess = await PermissionService.canManageSection(requester, sectionId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to update this section");
 
     const [updated] = await db.update(sections)
@@ -73,9 +87,8 @@ const updateSection = async (sectionId: string, data: UpdateSectionDto, teacherI
 };
 
 // ── Delete Section (cascades questions + options) ──────────────────────────────
-const deleteSection = async (sectionId: string, teacherId: string) => {
-    // verify section belongs to teacher's exam
-    const hasAccess = await PermissionService.teacher.canManageSection(teacherId, sectionId);
+const deleteSection = async (sectionId: string, requester: Requester) => {
+    const hasAccess = await PermissionService.canManageSection(requester, sectionId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to delete this section");
 
     await db.delete(sections).where(eq(sections.id, sectionId));

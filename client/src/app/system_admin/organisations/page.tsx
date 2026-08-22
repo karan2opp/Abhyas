@@ -81,7 +81,7 @@ export default function OrganisationsPage() {
       </div>
 
       {organisations.length === 0 ? (
-        <Card className="bg-[#111520]/50 border-white/5 py-16 text-center">
+        <Card className="bg-[#0f0f11]/50 border-white/5 py-16 text-center">
           <CardContent className="flex flex-col items-center">
             <div className="h-16 w-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
               <Building2 className="h-8 w-8 text-gray-500" />
@@ -99,7 +99,7 @@ export default function OrganisationsPage() {
             <div
               key={org.id}
               onClick={() => router.push(`/system_admin/organisations/${org.id}`)}
-              className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl hover:bg-[#1a1f2e] hover:border-white/10 transition-all gap-4 cursor-pointer"
+              className="flex items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl hover:bg-[#18181b] hover:border-white/10 transition-all gap-4 cursor-pointer"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="h-10 w-10 bg-red-600/20 text-red-400 rounded-lg flex items-center justify-center shrink-0 border border-red-500/20">
@@ -119,7 +119,7 @@ export default function OrganisationsPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="bg-[#111520] border border-white/10 text-white sm:max-w-md">
+        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white">Create Organisation</DialogTitle>
           </DialogHeader>

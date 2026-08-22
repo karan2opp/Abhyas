@@ -59,7 +59,7 @@ export function LeaderboardView({
   if (leaderboard.length === 0) {
     return (
       <div className="text-center py-20 min-h-[50vh]">
-        <div className="inline-block p-6 text-gray-400 bg-black/20 rounded-xl border border-white/5">
+        <div className="inline-block p-6 text-gray-400 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/20 rounded-xl border border-white/5">
           No results available for the leaderboard yet.
         </div>
       </div>
@@ -90,7 +90,7 @@ export function LeaderboardView({
   const orderedPodium = getPodiumOrder();
 
   return (
-    <div className="p-4 sm:p-8 h-full flex flex-col bg-[#0A0D14] overflow-y-auto custom-scrollbar min-h-screen">
+    <div className="p-4 sm:p-8 h-full flex flex-col bg-[#050505] overflow-y-auto custom-scrollbar min-h-screen">
       <div className="w-full max-w-5xl mx-auto flex flex-col">
         {/* Header */}
         <header className="flex items-center justify-between mb-10">
@@ -124,35 +124,35 @@ export function LeaderboardView({
               const isSecond = entry.rank === 2;
               const isThird = entry.rank === 3;
 
-              let cardBg = "bg-[#111520]";
+              let cardBg = "bg-[#0f0f11]";
               let borderClass = "border-white/10";
               let titleColor = "text-gray-400";
               let titleText = "";
               let icon = null;
-              let rankTextClass = "text-blue-500";
+              let rankTextClass = "text-orange-500";
               let heightClass = "h-[260px]";
 
               if (isFirst) {
-                cardBg = "bg-[#0b0f19]";
-                borderClass = "border-blue-500/50 ring-1 ring-blue-500/20 border-dashed";
-                titleColor = "text-blue-400";
+                cardBg = "bg-[#050505]";
+                borderClass = "border-orange-500/50 ring-1 ring-blue-500/20 border-dashed";
+                titleColor = "text-orange-400";
                 titleText = "CHAMPION";
                 icon = <Trophy className="h-10 w-10 text-yellow-500 mb-2" />;
-                rankTextClass = "text-blue-400";
+                rankTextClass = "text-orange-400";
                 heightClass = "h-[300px] z-10 scale-105 sm:scale-110 shadow-[0_0_30px_rgba(59,130,246,0.15)]";
               } else if (isSecond) {
                 borderClass = "border-white/5";
-                titleColor = "text-blue-500";
+                titleColor = "text-orange-500";
                 titleText = "RUNNER-UP";
                 icon = <Trophy className="h-8 w-8 text-gray-300 mb-2" />;
-                rankTextClass = "text-blue-500";
+                rankTextClass = "text-orange-500";
                 heightClass = "h-[280px]";
               } else if (isThird) {
                 borderClass = "border-white/5";
-                titleColor = "text-blue-500";
+                titleColor = "text-orange-500";
                 titleText = "THIRD PLACE";
                 icon = <Trophy className="h-8 w-8 text-amber-600 mb-2" />;
-                rankTextClass = "text-blue-500";
+                rankTextClass = "text-orange-500";
                 heightClass = "h-[260px]";
               }
 
@@ -171,7 +171,7 @@ export function LeaderboardView({
                   <div className="text-xs text-gray-500 truncate w-full text-center mb-4">
                     {entry.user.email || entry.user.id}
                   </div>
-                  <div className={`text-sm font-bold bg-blue-500/10 px-4 py-1 rounded-full ${rankTextClass}`}>
+                  <div className={`text-sm font-bold bg-orange-500/10 px-4 py-1 rounded-full ${rankTextClass}`}>
                     {entry.rank}{entry.rank === 1 ? "st" : entry.rank === 2 ? "nd" : "rd"} Rank
                   </div>
                   <div className="mt-auto text-xl font-black text-white">
@@ -190,18 +190,18 @@ export function LeaderboardView({
             <p className="text-sm text-gray-400 mb-6">See where everyone else placed.</p>
 
             <div className="relative mb-6">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
               <Input
                 placeholder="Search by student name..."
-                className="pl-10 bg-[#111520] border-white/10 text-white w-full max-w-md focus-visible:ring-blue-500"
+                className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
-            <div className="bg-[#111520] rounded-xl border border-white/5 overflow-hidden">
+            <div className="bg-[#0f0f11] rounded-xl border border-white/5 overflow-hidden">
               <table className="w-full text-left text-sm text-gray-300">
-                <thead className="bg-[#0b0f19]/50 text-gray-500 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
+                <thead className="bg-[#050505]/50 text-gray-500 text-xs uppercase tracking-wider font-semibold border-b border-white/5">
                   <tr>
                     <th className="px-6 py-4 w-24 text-center">Rank</th>
                     <th className="px-6 py-4">Student</th>
@@ -242,7 +242,7 @@ export function LeaderboardView({
                             <div className="flex items-center justify-end gap-2">
                               <div className="h-2 w-32 bg-white/5 rounded-full overflow-hidden hidden sm:block">
                                 <div 
-                                  className="h-full bg-blue-500/50" 
+                                  className="h-full bg-orange-500/50" 
                                   style={{ width: `${Math.min(100, (entry.score / Math.max(...leaderboard.map(l => l.score))) * 100)}%` }}
                                 ></div>
                               </div>

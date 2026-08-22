@@ -22,7 +22,7 @@ interface AssignmentEntry {
   locked: boolean;
   unlocksAt: string | null;
   reason: "time" | "previous_incomplete" | null;
-  submissionStatus: "in_progress" | "submitted" | "graded" | null;
+  submissionStatus: "in_progress" | "submitted" | "graded" | "evaluating" | null;
 }
 
 type View = "landing" | "weekly" | "standard";
@@ -36,7 +36,10 @@ const classifyStatus = (a: AssignmentEntry): DateStatus => {
   return "live";
 };
 
-const isSubmitted = (a: AssignmentEntry) => a.submissionStatus === "submitted" || a.submissionStatus === "graded";
+const isSubmitted = (a: AssignmentEntry) =>
+  a.submissionStatus === "submitted" ||
+  a.submissionStatus === "graded" ||
+  a.submissionStatus === "evaluating";
 
 export default function StudentClassroomAssignmentsPage() {
   const params = useParams();
@@ -111,7 +114,7 @@ export default function StudentClassroomAssignmentsPage() {
         </div>
 
         {assignments.length === 0 ? (
-          <Card className="bg-[#111520] border-white/5 py-10 text-center">
+          <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
             <CardContent>
               <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
               <p className="text-gray-400">No assignments available yet.</p>
@@ -121,10 +124,10 @@ export default function StudentClassroomAssignmentsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card
               onClick={() => openView("weekly")}
-              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
             >
               <CardContent className="p-6">
-                <div className="h-10 w-10 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/20 mb-3">
+                <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 mb-3">
                   <Layers className="h-5 w-5" />
                 </div>
                 <p className="text-white font-semibold text-base">Weekly Assignments</p>
@@ -133,10 +136,10 @@ export default function StudentClassroomAssignmentsPage() {
             </Card>
             <Card
               onClick={() => openView("standard")}
-              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
             >
               <CardContent className="p-6">
-                <div className="h-10 w-10 bg-blue-600/20 text-blue-400 rounded-lg flex items-center justify-center border border-blue-500/20 mb-3">
+                <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 mb-3">
                   <ClipboardList className="h-5 w-5" />
                 </div>
                 <p className="text-white font-semibold text-base">Standard Assignments</p>
@@ -163,13 +166,12 @@ export default function StudentClassroomAssignmentsPage() {
       </div>
 
       <div className="relative max-w-md mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
         <input
           type="text"
           placeholder="Search assignments..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+          onChange={(e) => setSearch(e.target.value)} className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
         />
       </div>
 
@@ -186,7 +188,7 @@ export default function StudentClassroomAssignmentsPage() {
             key={key}
             onClick={() => setStatus(key)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-              status === key ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-transparent border-white/10 text-gray-400 hover:bg-white/5"
+              status === key ? "bg-orange-500/20 border-orange-500/50 text-sky-200 font-medium" : "bg-transparent border-white/10 text-white/70 hover:bg-white/5"
             }`}
           >
             {label} ({count})
@@ -195,7 +197,7 @@ export default function StudentClassroomAssignmentsPage() {
       </div>
 
       {visible.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
             <ClipboardList className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No {status} assignments here.</p>
@@ -204,7 +206,7 @@ export default function StudentClassroomAssignmentsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {visible.map((a) => (
-            <Card key={a.id} className={`border-white/5 ${a.locked ? "bg-[#111520]/50" : "bg-[#111520]"}`}>
+            <Card key={a.id} className={`border-white/5 ${a.locked ? "bg-[#0f0f11]/50" : "bg-[#0f0f11]"}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <p className={`font-semibold text-base ${a.locked ? "text-gray-500" : "text-white"}`}>
@@ -216,11 +218,17 @@ export default function StudentClassroomAssignmentsPage() {
                     <span
                       className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0 ${
                         a.submissionStatus === "submitted" || a.submissionStatus === "graded"
-                          ? "bg-emerald-600/10 text-emerald-400 border-emerald-500/20"
-                          : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          ? "bg-[#18181b]merald-600/10 text-emerald-400 border-emerald-500/20"
+                          : a.submissionStatus === "evaluating"
+                          ? "bg-orange-500/10 text-orange-400 border-orange-500/30 animate-pulse"
+                          : "bg-[#18181b]mber-500/10 text-amber-400 border-amber-500/20"
                       }`}
                     >
-                      {a.submissionStatus === "submitted" || a.submissionStatus === "graded" ? "Submitted" : "Pending"}
+                      {a.submissionStatus === "submitted" || a.submissionStatus === "graded"
+                        ? "Submitted"
+                        : a.submissionStatus === "evaluating"
+                        ? "Evaluating"
+                        : "Pending"}
                     </span>
                   )}
                 </div>
@@ -234,7 +242,7 @@ export default function StudentClassroomAssignmentsPage() {
                   </p>
                   <div className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                      <span className="h-2 w-2 rounded-full bg-[#18181b]merald-400 shrink-0" />
                       <span className="w-px flex-1 bg-white/10 my-1" />
                       <span className="h-2 w-2 rounded-full bg-red-400 shrink-0" />
                     </div>
@@ -252,12 +260,12 @@ export default function StudentClassroomAssignmentsPage() {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#18181b]merald-600/10 text-emerald-400 border border-emerald-500/20">
                     {a.totalMarks} marks
                   </span>
                   <Button
                     size="lg"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-40 px-6"
+                    className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-40 px-6"
                     onClick={() => router.push(`/student/assignments/${a.id}`)}
                     disabled={a.locked}
                   >

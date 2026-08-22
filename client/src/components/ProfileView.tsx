@@ -36,7 +36,7 @@ export default function ProfileView() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="min-h-screen flex items-center justify-center bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 text-white">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
@@ -87,12 +87,12 @@ export default function ProfileView() {
   const roleColors: Record<string, string> = {
     superadmin: 'bg-red-500/10 text-red-500 border-red-500/20',
     admin: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-    teacher: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    student: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    teacher: 'bg-orange-500/10 text-orange-500 border-orange-500/30',
+    student: 'bg-[#18181b]merald-500/10 text-emerald-500 border-emerald-500/20',
   };
 
   return (
-    <div className="min-h-full bg-[#0b0f19] text-white p-6 md:p-12 overflow-y-auto">
+    <div className="min-h-full bg-[#050505] text-white p-6 md:p-12 overflow-y-auto">
       <div className="max-w-3xl mx-auto space-y-8">
         
         {/* Header */}
@@ -116,9 +116,9 @@ export default function ProfileView() {
         >
           {/* Profile Sidebar */}
           <div className="md:col-span-1 space-y-6">
-            <div className="bg-[#111520] border border-white/10 rounded-2xl p-6 flex flex-col items-center text-center space-y-4">
+            <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 flex flex-col items-center text-center space-y-4">
               <div className="relative group">
-                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#09090b] bg-gray-900 shadow-xl relative">
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-[#09090b] bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 shadow-xl relative">
                   {previewUrl ? (
                     <img src={previewUrl} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -127,7 +127,7 @@ export default function ProfileView() {
                     </div>
                   )}
                   
-                  <label htmlFor="avatar-upload" className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <label htmlFor="avatar-upload" className="absolute inset-0 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                     <Camera className="w-6 h-6 text-white mb-1" />
                     <span className="text-xs font-medium">Change</span>
                   </label>
@@ -153,7 +153,7 @@ export default function ProfileView() {
 
           {/* Settings Form */}
           <div className="md:col-span-2 space-y-6">
-            <form onSubmit={handleUpdateProfile} className="bg-[#111520] border border-white/10 rounded-2xl p-6 space-y-6">
+            <form onSubmit={handleUpdateProfile} className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 space-y-6">
               <h3 className="text-lg font-semibold border-b border-white/10 pb-4">Personal Information</h3>
               
               <div className="space-y-4">
@@ -167,7 +167,7 @@ export default function ProfileView() {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         disabled={isUpdating}
-                        className="w-full bg-[#0a0d14] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all disabled:opacity-50"
+                        className="w-full bg-[#050505] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-white focus:ring-2 focus:ring-blue-500 focus:border-orange-500 focus:outline-none transition-all disabled:opacity-50"
                       />
                     </div>
                   </div>
@@ -180,7 +180,7 @@ export default function ProfileView() {
                         type="email" 
                         value={user.email}
                         disabled
-                        className="w-full bg-[#0a0d14] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-gray-400 cursor-not-allowed focus:outline-none"
+                        className="w-full bg-[#050505] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-gray-400 cursor-not-allowed focus:outline-none"
                       />
                     </div>
                   </div>
@@ -200,7 +200,7 @@ export default function ProfileView() {
             </form>
 
             {/* Security Section */}
-            <div className="bg-[#111520] border border-white/10 rounded-2xl p-6 space-y-6">
+            <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 space-y-6">
               <h3 className="text-lg font-semibold border-b border-white/10 pb-4">Security Settings</h3>
               
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

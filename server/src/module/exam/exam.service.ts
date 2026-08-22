@@ -1,19 +1,10 @@
 import { eq, and, count, inArray, avg, desc, ilike, gte } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { exams, sections, questions, options, groups, classroomStudents, groupStudents } from "../../common/db/schema.js";
+import { exams, sections, questions, options, groups, classroomStudents, groupStudents, blocks } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
 import { PermissionService } from "../../common/permissions/index.js";
-
-import { run } from "@openai/agents";
-import { guardrailAgent } from "../Test-agent-/guardrail/agent.js";
-import { SubTopicAgent } from "../Test-agent-/subtopic/agent.js";
-import { allocateGenerationTasks } from "./ai/planner/allocation.js";
-import { executeGenerationTasks } from "./ai/question/executor.js";
-import { validateGenerationResults, validateQuestion } from "./ai/question/validator.js";
-import { repairQuestion } from "./ai/question/repair.js";
-import { formatExam } from "./ai/question/formatter.js";
 
 
 
@@ -89,8 +80,15 @@ const createExam = async (data: CreateExamDto, requester: Requester) => {
         calculatedDuration = Math.round((new Date(data.endTime).getTime() - new Date(data.startTime).getTime()) / 60000);
     }
 
+    if (data.publishTime) {
+        if (data.startTime && new Date(data.publishTime) >= new Date(data.startTime)) {
+            throw ApiError.badRequest("Publish date and time must be before the start date and time of the exam");
+        }
+    }
+
     const [exam] = await db.insert(exams).values({
         ...data,
+        totalMarks: data.totalMarks ?? 0,
         duration: calculatedDuration || 60, // fallback to 60 if somehow null
         joinCode,
         createdBy: requester.id,
@@ -103,64 +101,173 @@ const createExam = async (data: CreateExamDto, requester: Requester) => {
 };
 
 // ── Save Generated Exam ────────────────────────────────────────────────────────
-const saveGeneratedExam = async (data: any, teacherId: string) => {
-    await validateExamScope(data.classroomId, data.groupId, { id: teacherId, role: "teacher", organisationId: null });
-
-    let joinCode = generateJoinCode();
-    let existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
-    while (existing.length > 0) {
-        joinCode = generateJoinCode();
-        existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
-    }
+const saveGeneratedExam = async (data: any, requester: Requester) => {
+    await validateExamScope(data.classroomId, data.groupId, requester);
 
     return await db.transaction(async (tx) => {
-        // Create Exam
-        const [exam] = await tx.insert(exams).values({
-            title: data.title,
-            type: data.examType === "flexible" ? "ON_DEMAND" : "SCHEDULED",
-            duration: data.duration,
-            startTime: data.windowStart ? new Date(data.windowStart) : null,
-            endTime: data.windowEnd ? new Date(data.windowEnd) : null,
-            totalMarks: data.totalMarks || 100,
-            instructions: [],
-            joinCode,
-            createdBy: teacherId,
-            classroomId: data.classroomId ?? null,
-            groupId: data.groupId ?? null,
-        }).returning();
-
-        if (!exam) throw ApiError.internal("Failed to create exam");
-
-        // Create Sections and Questions
+        let calculatedTotalMarks = 0;
         for (const secData of data.sections || []) {
-            const [section] = await tx.insert(sections).values({
-                examId: exam.id,
-                title: secData.title,
-            }).returning();
-
-            if (!section) throw ApiError.internal("Failed to create section");
-
-            for (const qData of secData.questions || []) {
-                const [question] = await tx.insert(questions).values({
-                    sectionId: section.id,
-                    type: qData.type,
-                    description: qData.description,
-                    marks: qData.marks,
-                }).returning();
-
-                if (!question) throw ApiError.internal("Failed to create question");
-
-                if (qData.type === "mcq" && qData.options) {
-                    await tx.insert(options).values(
-                        qData.options.map((opt: any) => ({
-                            questionId: question.id,
-                            value: opt.value,
-                            isCorrect: opt.isCorrect,
-                        }))
-                    );
+            if (Array.isArray(secData.blocks) && secData.blocks.length > 0) {
+                for (const blockData of secData.blocks) {
+                    for (const qData of blockData.questions || []) {
+                        calculatedTotalMarks += Number(qData.marks) || 0;
+                    }
+                }
+            } else {
+                for (const qData of secData.questions || []) {
+                    calculatedTotalMarks += Number(qData.marks) || 0;
                 }
             }
         }
+
+        let examId = data.examId;
+        let exam;
+
+        if (examId) {
+            // Find existing exam and verify ownership/management permissions
+            const [existingExam] = await tx.select().from(exams).where(eq(exams.id, examId));
+            if (!existingExam) throw ApiError.notFound("Exam not found");
+
+            const hasAccess = requester.role === "manager"
+                ? await PermissionService.manager.canManageExam(requester.organisationId, examId)
+                : await PermissionService.teacher.canManageExam(requester.id, examId);
+            if (!hasAccess) throw ApiError.forbidden("You are not authorized to edit this exam");
+
+            // Update totalMarks
+            const [updatedExam] = await tx.update(exams)
+                .set({ totalMarks: calculatedTotalMarks, updatedAt: new Date() })
+                .where(eq(exams.id, examId))
+                .returning();
+            exam = updatedExam;
+        } else {
+            let joinCode = generateJoinCode();
+            let existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
+            while (existing.length > 0) {
+                joinCode = generateJoinCode();
+                existing = await db.select().from(exams).where(eq(exams.joinCode, joinCode));
+            }
+
+            // Create Exam
+            const [newExam] = await tx.insert(exams).values({
+                title: data.title,
+                type: data.examType === "flexible" ? "ON_DEMAND" : "SCHEDULED",
+                duration: data.duration,
+                startTime: data.windowStart ? new Date(data.windowStart) : null,
+                endTime: data.windowEnd ? new Date(data.windowEnd) : null,
+                totalMarks: calculatedTotalMarks,
+                instructions: [],
+                joinCode,
+                createdBy: requester.id,
+                classroomId: data.classroomId ?? null,
+                groupId: data.groupId ?? null,
+                difficulty: data.difficulty || "medium",
+                status: data.status || "DRAFT",
+            }).returning();
+            exam = newExam;
+        }
+
+        if (!exam) throw ApiError.internal("Failed to save exam");
+
+        // Create Sections, Blocks, and Questions
+        for (const secData of data.sections || []) {
+            let sectionIdToUse = secData.targetSectionId || secData.target_section_id || secData.sectionId;
+
+            if (!sectionIdToUse) {
+                const secTitle = secData.title || secData.section_name || secData.name || "Section A";
+                const [section] = await tx.insert(sections).values({
+                    examId: exam.id,
+                    title: secTitle,
+                }).returning();
+
+                if (!section) throw ApiError.internal("Failed to create section");
+                sectionIdToUse = section.id;
+            } else {
+                // Validate that the target section belongs to the exam being saved.
+                const [targetSection] = await tx.select().from(sections).where(eq(sections.id, sectionIdToUse));
+                if (!targetSection) throw ApiError.notFound("Target section not found");
+                if (targetSection.examId !== exam.id) {
+                    throw ApiError.badRequest("Target section does not belong to this exam");
+                }
+            }
+
+            const blockList = Array.isArray(secData.blocks) && secData.blocks.length > 0 ? secData.blocks : null;
+
+            if (blockList) {
+                for (const [blockIdx, blockData] of blockList.entries()) {
+                    const [block] = await tx.insert(blocks).values({
+                        sectionId: sectionIdToUse,
+                        name: blockData.name || "Block",
+                        subject: blockData.subject || "",
+                        questionType: blockData.question_type || "mcq",
+                        questionCount: blockData.question_count || (Array.isArray(blockData.questions) ? blockData.questions.length : 0),
+                        totalMarks: blockData.total_marks || 0,
+                        instructions: Array.isArray(blockData.instructions) ? blockData.instructions : [],
+                        position: blockIdx,
+                    }).returning();
+
+                    if (!block) throw ApiError.internal("Failed to create block");
+
+                    for (const qData of blockData.questions || []) {
+                        const [question] = await tx.insert(questions).values({
+                            sectionId: sectionIdToUse,
+                            blockId: block.id,
+                            type: qData.type,
+                            description: qData.description,
+                            marks: qData.marks,
+                            rubric: qData.rubric || null,
+                        }).returning();
+
+                        if (!question) throw ApiError.internal("Failed to create question");
+
+                        if (qData.type === "mcq" && qData.options) {
+                            await tx.insert(options).values(
+                                qData.options.map((opt: any) => ({
+                                    questionId: question.id,
+                                    value: opt.value,
+                                    isCorrect: opt.isCorrect,
+                                }))
+                            );
+                        }
+                    }
+                }
+            } else {
+                // Legacy shape: questions directly under the section (no blocks)
+                for (const qData of secData.questions || []) {
+                    const [question] = await tx.insert(questions).values({
+                        sectionId: sectionIdToUse,
+                        type: qData.type,
+                        description: qData.description,
+                        marks: qData.marks,
+                        rubric: qData.rubric || null,
+                    }).returning();
+
+                    if (!question) throw ApiError.internal("Failed to create question");
+
+                    if (qData.type === "mcq" && qData.options) {
+                        await tx.insert(options).values(
+                            qData.options.map((opt: any) => ({
+                                questionId: question.id,
+                                value: opt.value,
+                                isCorrect: opt.isCorrect,
+                            }))
+                        );
+                    }
+                }
+            }
+        }
+
+        // Recalculate grand total marks across all sections in this exam
+        const allExamQuestions = await tx.select({ marks: questions.marks })
+            .from(questions)
+            .innerJoin(sections, eq(questions.sectionId, sections.id))
+            .where(eq(sections.examId, exam.id));
+
+        const grandTotalMarks = allExamQuestions.reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
+
+        await tx.update(exams)
+            .set({ totalMarks: grandTotalMarks, updatedAt: new Date() })
+            .where(eq(exams.id, exam.id));
+
         return exam;
     });
 };
@@ -207,7 +314,7 @@ const getExamById = async (examId: string, requester: Requester) => {
 };
 
 // ── List Exams for a Classroom (teacher or manager) ────────────────────────────
-const listExamsForClassroom = async (classroomId: string, requester: Requester, groupId?: string) => {
+const listExamsForClassroom = async (classroomId: string, requester: Requester, groupId?: string, search?: string) => {
     const canManageClassroom = requester.role === "manager"
         ? await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId)
         : await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
@@ -215,6 +322,7 @@ const listExamsForClassroom = async (classroomId: string, requester: Requester, 
 
     const conditions = [eq(exams.classroomId, classroomId)];
     if (groupId) conditions.push(eq(exams.groupId, groupId));
+    if (search) conditions.push(ilike(exams.title, `%${search}%`));
 
     return await db.select().from(exams).where(and(...conditions)).orderBy(desc(exams.createdAt));
 };
@@ -239,6 +347,12 @@ const updateExam = async (examId: string, data: UpdateExamDto, requester: Reques
 
     if (finalType === "SCHEDULED" && finalStartTime && finalEndTime) {
         calculatedDuration = Math.round((new Date(finalEndTime).getTime() - new Date(finalStartTime).getTime()) / 60000);
+    }
+
+    if (data.publishTime !== undefined && data.publishTime !== null) {
+        if (finalStartTime && new Date(data.publishTime) >= new Date(finalStartTime)) {
+            throw ApiError.badRequest("Publish date and time must be before the start date and time of the exam");
+        }
     }
 
     const [updated] = await db.update(exams)
@@ -298,138 +412,6 @@ const getOverviewStats = async (teacherId: string) => {
     };
 };
 
-// ── Generate Exam From Form ──────────────────────────────────────────────────────
-
-const ORG_CONFIG = {
-    orgId: "default",
-    examType: "Competitive",
-};
-
-const generateExamFromForm = async (data: any, teacherId: string) => {
-    // 1. Guardrail
-    const allTopics = data.sections.map((s: any) => s.topics).join(", ");
-    const guardrailInput: any = [
-        { 
-            role: "user", 
-            content: [{ type: "input_text", text: `Create an exam with title "${data.title}" and subject "${data.subject}". Topics include: ${allTopics}. Special instructions: ${data.specialInstructions || "None"}.` }] 
-        }
-    ];
-
-    const guardrailResult = await run(guardrailAgent, guardrailInput);
-    const guardrailData = guardrailResult.finalOutput as any;
-
-    if (!guardrailData || !guardrailData.isValid) {
-        throw new ApiError(400, guardrailData?.reason || "Invalid request according to safety guardrails.");
-    }
-
-    // 2. Subtopic Planner
-    const allSubtopics = [];
-    for (const section of data.sections) {
-        const totalSectionQuestions = section.groups.reduce((acc: number, g: any) => acc + (Number(g.numberOfQuestions) || 0), 0);
-        const subTopicInput = {
-            topic: section.topics,
-            subject: data.subject,
-            difficulty: data.difficulty,
-            specialInstructions: data.specialInstructions,
-            sections: [{ name: section.name, questions: [{ count: totalSectionQuestions }] }],
-            questionCount: totalSectionQuestions,
-            orgConfig: ORG_CONFIG
-        };
-        const subTopicResult = await run(SubTopicAgent, JSON.stringify(subTopicInput));
-        
-        const subtopics = ((subTopicResult.finalOutput as any).subtopics || []).map((st: any) => ({
-            ...st,
-            section: section.name
-        }));
-        
-        allSubtopics.push({ sectionData: section, subtopics });
-    }
-
-    // 3. Allocation Engine
-    let generationTasks: any[] = [];
-    for (const { sectionData, subtopics } of allSubtopics) {
-        const groups = sectionData.groups.map((g: any) => ({
-            questionType: g.questionType,
-            numberOfQuestions: Number(g.numberOfQuestions),
-            marksPerQuestion: Number(g.marksPerQuestion),
-            specialInstructions: g.specialInstructions ? g.specialInstructions.filter((i: string) => i.trim() !== "").join("\n") : undefined,
-            topics: g.topics,
-            mergeSectionTopics: g.mergeSectionTopics
-        }));
-
-        const allocation = allocateGenerationTasks(
-            data.title,
-            data.subject,
-            subtopics,
-            groups,
-            data.specialInstructions
-        );
-        generationTasks.push(...allocation.tasks);
-    }
-
-    // 4. Executor
-    const executorConfig = { ...ORG_CONFIG, concurrency: 5 };
-    console.log("=== GENERATION TASKS ===");
-    console.log(JSON.stringify(generationTasks, null, 2));
-    const executorResult = await executeGenerationTasks(generationTasks, executorConfig);
-
-    // 5. Validator
-    let validationResult = validateGenerationResults(executorResult.results);
-
-    // 6. Repair
-    if (!validationResult.isValid) {
-        for (const issue of validationResult.issues) {
-            const task = issue.task;
-            const question = issue.question;
-            if (!task || !question) continue;
-
-            const taskId = task.id;
-            const questionId = question.id;
-
-            // Repair the question
-            const repairResult = await repairQuestion(issue, ORG_CONFIG);
-            
-            // Revalidate repaired question
-            const newIssues = validateQuestion(repairResult.repairedQuestion, task);
-            if (newIssues.length > 0) {
-                throw new ApiError(500, `Validation failed after repair: ${newIssues[0]?.message}`);
-            }
-
-            // Update the GenerationResult
-            const resultIndex = executorResult.results.findIndex((r: any) => r.task.id === taskId);
-            if (resultIndex !== -1) {
-                const result = executorResult.results[resultIndex];
-                if (result && result.output) {
-                    const output = result.output;
-                    const qIndex = output.questions.findIndex((q: any) => q.id === questionId);
-                    if (qIndex !== -1) {
-                        output.questions[qIndex] = repairResult.repairedQuestion;
-                    }
-                }
-            }
-        }
-        
-        // Re-run global validator just to be safe
-        validationResult = validateGenerationResults(executorResult.results);
-        if (!validationResult.isValid) {
-            throw new ApiError(500, "Validation failed after repair.");
-        }
-    }
-
-    // 7. Formatter
-    const examMetadata = {
-        title: data.title,
-        subject: data.subject,
-        description: `${data.subject} exam`,
-        duration: data.duration || 60,
-        examType: "flexible"
-    };
-
-    const formattedExam = formatExam(examMetadata, executorResult.results);
-
-    return formattedExam;
-};
-
 // ── Get My Exams (student, via classroom/group membership) ───────────────────
 const getMyExams = async (studentId: string, classroomId?: string) => {
     const memberships = await db.select().from(classroomStudents).where(
@@ -445,7 +427,11 @@ const getMyExams = async (studentId: string, classroomId?: string) => {
 
     const classroomExams = await db.select().from(exams).where(inArray(exams.classroomId, classroomIds));
 
-    return classroomExams.filter(e => !e.groupId || myGroupIds.has(e.groupId));
+    const now = new Date();
+    return classroomExams
+        .filter(e => (e as any).status === "PUBLISHED")
+        .filter(e => !e.groupId || myGroupIds.has(e.groupId))
+        .filter(e => !e.publishTime || now >= e.publishTime);
 };
 
 
@@ -459,4 +445,4 @@ const getMyExams = async (studentId: string, classroomId?: string) => {
 
 
 
-export { createExam, getExams, getExamById, listExamsForClassroom, updateExam, deleteExam, getOverviewStats, saveGeneratedExam, generateExamFromForm, getMyExams };
+export { createExam, getExams, getExamById, listExamsForClassroom, updateExam, deleteExam, getOverviewStats, saveGeneratedExam, getMyExams };

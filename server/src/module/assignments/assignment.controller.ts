@@ -128,3 +128,13 @@ export const gradeSubmission = async (req: Request, res: Response) => {
     const result = await assignmentService.gradeSubmission(req.params.id as string, req.body, req.user!.id);
     return ApiResponse.ok(res, "Submission graded successfully", result);
 };
+
+export const generateAssignmentFromForm = async (req: Request, res: Response) => {
+    const result = await assignmentService.generateAssignmentFromForm(req.body, req.user!.id, req.user!.organisationId);
+    return ApiResponse.ok(res, "Assignment generated successfully", result);
+};
+
+export const generateSingleQuestionFromForm = async (req: Request, res: Response) => {
+    const result = await assignmentService.generateSingleQuestionFromForm(req.body, req.user!.id, req.user!.organisationId);
+    return ApiResponse.ok(res, "Question generated successfully", result);
+};

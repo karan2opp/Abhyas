@@ -1,7 +1,7 @@
 import api from "@/utils/axios";
 
-export const listExamsForClassroomService = async (classroomId: string) => {
-  const res = await api.get(`/exams/classroom/${classroomId}`);
+export const listExamsForClassroomService = async (classroomId: string, search?: string) => {
+  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { search } });
   return res.data;
 };
 

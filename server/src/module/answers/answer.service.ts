@@ -31,8 +31,8 @@ const validateSubmitedAnswer = async (input: {
         throw ApiError.forbidden(`You are not authorized to submit answers for this submission`);
     }
 
-    // ── 2. Submission is still open ───────────────────────────────
-    if (submission.status === "submitted" || submission.status === "timeout") {
+    // ── 2. Submission is still open (only inprogress allows writes) ─
+    if (submission.status !== "inprogress") {
         throw ApiError.forbidden(
             `Submission '${submissionId}' is already ${submission.status}`
         );
@@ -116,41 +116,8 @@ const submitAnswer = async (input: CreateAnswerDto, userId: string) => {
         marksAwarded = isCorrect ? question.marks : 0;
     }
 
-    // ── Upsert ────────────────────────────────────────────────────
-    const [alreadyAnswered] = await db
-        .select()
-        .from(answers)
-        .where(
-            and(
-                eq(answers.submissionId, submissionId),
-                eq(answers.questionId, questionId)
-            )
-        )
-        .limit(1);
-
-    if (alreadyAnswered) {
-        const [updated] = await db
-            .update(answers)
-            .set({
-                options: selectedOptions,
-                textAnswer: textAnswer ?? null,
-                isCorrect,
-                marksAwarded,
-                updatedAt: new Date(),
-            })
-            .where(eq(answers.id, alreadyAnswered.id))
-            .returning();
-
-        return {
-            message: "Answer updated successfully",
-            data: updated,
-            isCorrect,
-            marksAwarded,
-        };
-    }
-
-    // ── Fresh insert ──────────────────────────────────────────────
-    const [newAnswer] = await db
+    // ── Upsert (atomic, race-safe) ───────────────────────────────
+    const [answerRow] = await db
         .insert(answers)
         .values({
             submissionId,
@@ -162,10 +129,20 @@ const submitAnswer = async (input: CreateAnswerDto, userId: string) => {
             createdAt: new Date(),
             updatedAt: new Date(),
         })
+        .onConflictDoUpdate({
+            target: [answers.submissionId, answers.questionId],
+            set: {
+                options: selectedOptions ?? [],
+                textAnswer: textAnswer ?? null,
+                isCorrect,
+                marksAwarded,
+                updatedAt: new Date(),
+            },
+        })
         .returning();
 
     return {
-        data: newAnswer,
+        data: answerRow,
         isCorrect,
         marksAwarded,
     };

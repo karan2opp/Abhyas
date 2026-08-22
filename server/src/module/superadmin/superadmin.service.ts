@@ -50,3 +50,19 @@ export const getAdmins = async () => {
         createdAt: users.createdAt,
     }).from(users).where(eq(users.role, "system_admin"));
 };
+
+export const getUserByEmail = async (email: string) => {
+    const [user] = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        createdAt: users.createdAt,
+    }).from(users).where(eq(users.email, email));
+
+    if (!user) {
+        throw ApiError.notFound("User not found with this email address");
+    }
+
+    return user;
+};

@@ -1,44 +1,47 @@
 import { eq } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { options, questions, sections, exams } from "../../common/db/schema.js";
+import { options, questions, sections } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { PermissionService, type Requester } from "../../common/permissions/index.js";
 import type { CreateOptionDto, UpdateOptionDto } from "./dto/option.dto.js";
 
-// ── Helper: verify option belongs to teacher ───────────────────────────────────
-const verifyOptionOwnership = async (optionId: string, teacherId: string) => {
+// ── Helper: verify option is manageable by the requester (creator, opted-in co-teacher, or manager) ─
+const verifyOptionAccess = async (optionId: string, requester: Requester) => {
     const [option] = await db.select({
         id: options.id,
         questionId: options.questionId,
         value: options.value,
         isCorrect: options.isCorrect,
-        examCreatedBy: exams.createdBy,
+        examId: sections.examId,
     })
         .from(options)
         .innerJoin(questions, eq(options.questionId, questions.id))
         .innerJoin(sections, eq(questions.sectionId, sections.id))
-        .innerJoin(exams, eq(sections.examId, exams.id))
         .where(eq(options.id, optionId));
 
     if (!option) throw ApiError.notFound("Option not found");
-    if (option.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized");
+
+    const hasAccess = await PermissionService.canManageExam(requester, option.examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized");
     return option;
 };
 
 // ── Create Single Option ───────────────────────────────────────────────────────
-const createOption = async (data: CreateOptionDto, teacherId: string) => {
-    // verify question exists and belongs to teacher
+const createOption = async (data: CreateOptionDto, requester: Requester) => {
+    // verify question exists and is manageable by the requester
     const [question] = await db.select({
         id: questions.id,
         type: questions.type,
-        examCreatedBy: exams.createdBy,
+        examId: sections.examId,
     })
         .from(questions)
         .innerJoin(sections, eq(questions.sectionId, sections.id))
-        .innerJoin(exams, eq(sections.examId, exams.id))
         .where(eq(questions.id, data.questionId));
 
     if (!question) throw ApiError.notFound("Question not found");
-    if (question.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized");
+
+    const hasAccess = await PermissionService.canManageExam(requester, question.examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized");
     if (question.type !== "mcq") throw ApiError.badRequest("Cannot add options to a descriptive question");
 
     // check max 5 options limit
@@ -56,8 +59,8 @@ const createOption = async (data: CreateOptionDto, teacherId: string) => {
 };
 
 // ── Update Option ──────────────────────────────────────────────────────────────
-const updateOption = async (optionId: string, data: UpdateOptionDto, teacherId: string) => {
-    await verifyOptionOwnership(optionId, teacherId);
+const updateOption = async (optionId: string, data: UpdateOptionDto, requester: Requester) => {
+    await verifyOptionAccess(optionId, requester);
 
     const [updated] = await db.update(options)
         .set({ ...data, updatedAt: new Date() })
@@ -68,8 +71,8 @@ const updateOption = async (optionId: string, data: UpdateOptionDto, teacherId: 
 };
 
 // ── Delete Option ──────────────────────────────────────────────────────────────
-const deleteOption = async (optionId: string, teacherId: string) => {
-    const option = await verifyOptionOwnership(optionId, teacherId);
+const deleteOption = async (optionId: string, requester: Requester) => {
+    const option = await verifyOptionAccess(optionId, requester);
 
     // prevent deleting if only 2 options left
     const existingOptions = await db.select().from(options).where(eq(options.questionId, option.questionId));

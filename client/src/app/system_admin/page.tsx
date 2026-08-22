@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { getAdminsService, assignAdminService, revokeAdminService } from "./systemAdmin.service";
-import { searchUserService } from "../admin/admin.service";
+import { getAdminsService, assignAdminService, revokeAdminService, searchUserService } from "./systemAdmin.service";
 
 export default function SystemAdminDashboardPage() {
   const [admins, setAdmins] = useState<any[]>([]);
@@ -86,7 +85,7 @@ export default function SystemAdminDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Admin List */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-[#111520]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
+          <Card className="bg-[#0f0f11]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
             <CardHeader className="border-b border-white/5 pb-4">
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
                 <Users className="h-5 w-5 text-red-400" />
@@ -101,7 +100,7 @@ export default function SystemAdminDashboardPage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm text-gray-300">
-                    <thead className="bg-[#0b0f19]/50 text-gray-400 font-semibold border-b border-white/5">
+                    <thead className="bg-[#050505]/50 text-gray-400 font-semibold border-b border-white/5">
                       <tr>
                         <th className="px-6 py-4">Name</th>
                         <th className="px-6 py-4">Email</th>
@@ -135,10 +134,10 @@ export default function SystemAdminDashboardPage() {
 
         {/* Right Column: Assign Admin */}
         <div className="space-y-6">
-          <Card className="bg-[#111520]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
+          <Card className="bg-[#0f0f11]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
             <CardHeader>
               <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-                <UserPlus className="h-5 w-5 text-blue-400" />
+                <UserPlus className="h-5 w-5 text-orange-400" />
                 Assign System Admin
               </CardTitle>
             </CardHeader>
@@ -151,7 +150,7 @@ export default function SystemAdminDashboardPage() {
                       value={searchEmail}
                       onChange={(e) => setSearchEmail(e.target.value)}
                       placeholder="user@example.com"
-                      className="bg-[#0b0f19] border-white/10 text-white placeholder:text-gray-600 focus-visible:ring-red-500/50 flex-1"
+                      className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 placeholder:text-gray-600 focus-visible:ring-red-500/50 flex-1"
                     />
                     <Button type="submit" variant="outline" className="border-white/10 bg-white/5 text-white hover:bg-white/10">
                       <Search className="h-4 w-4" />
@@ -161,7 +160,7 @@ export default function SystemAdminDashboardPage() {
               </form>
 
               {searchResult && (
-                <div className="p-4 rounded-lg bg-[#0b0f19] border border-white/10 space-y-3">
+                <div className="p-4 rounded-lg bg-[#050505] border border-white/10 space-y-3">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 font-bold">
                       {searchResult.name.charAt(0).toUpperCase()}

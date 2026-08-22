@@ -2,41 +2,37 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const API_KEY = process.env.OPENAI_API_KEY;
+let openaiClient: any = null;
+let mistralClient: any = null;
 
-export const apikeyChecker = () => {
+const getOpenAI = async () => {
+    if (openaiClient) return openaiClient;
+    const API_KEY = process.env.OPENAI_API_KEY;
     if (!API_KEY) {
-        console.error(
-            "Error: OPENAI_API_KEY is not set in the environment variables.",
-        );
-        process.exit(1);
+        throw new Error("OPENAI_API_KEY is not set in the environment variables.");
     }
-};
-export const checkOpenAI = async () => {
     const openai = (await import("openai")).default;
-    const client = new openai.OpenAI({
+    openaiClient = new openai.OpenAI({ apiKey: API_KEY });
+    return openaiClient;
+};
+
+const getMistral = async () => {
+    if (mistralClient) return mistralClient;
+    const API_KEY = process.env.MISTRAL_API_KEY;
+    if (!API_KEY) {
+        throw new Error("MISTRAL_API_KEY is not set in the environment variables.");
+    }
+    const openai = (await import("openai")).default;
+    mistralClient = new openai.OpenAI({
         apiKey: API_KEY,
-    });
-
-    if (!client) {
-        console.error("Error: Failed to initialize OpenAI client.");
-        process.exit(1);
-    }
-    console.log("OpenAI client initialized successfully.");
-    return client;
-};
-
-export const checkMistral = async () => {
-    const openai = (await import("openai")).default;
-    const client = new openai.OpenAI({
-        apiKey: process.env.MISTRAL_API_KEY,
         baseURL: "https://api.mistral.ai/v1",
     });
+    return mistralClient;
+};
 
-    if (!client) {
-        console.error("Error: Failed to initialize Mistral client.");
-        process.exit(1);
+export const getClientForModel = async (model: string) => {
+    if (model.toLowerCase().includes("mistral")) {
+        return getMistral();
     }
-    console.log("Mistral client initialized successfully.");
-    return client;
+    return getOpenAI();
 };

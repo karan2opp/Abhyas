@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Layers } from "lucide-react";
+import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getMyGroupsService } from "../../../classrooms/group.service";
@@ -44,9 +44,9 @@ export default function StudentClassroomGroupsPage() {
       </div>
 
       {groups.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
-            <Layers className="h-8 w-8 text-gray-500 mx-auto mb-3" />
+            <Users className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">You're not part of any group in this classroom yet.</p>
           </CardContent>
         </Card>
@@ -56,11 +56,11 @@ export default function StudentClassroomGroupsPage() {
             <Card
               key={g.id}
               onClick={() => router.push(`/student/classrooms/${classroomId}/groups/${g.id}`)}
-              className="bg-[#111520] border-white/5 hover:border-white/10 transition-all cursor-pointer"
+              className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all cursor-pointer"
             >
               <CardContent className="p-5">
-                <div className="h-9 w-9 bg-indigo-600/20 text-indigo-400 rounded-lg flex items-center justify-center border border-indigo-500/20 mb-3">
-                  <Layers className="h-4 w-4" />
+                <div className="h-9 w-9 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 mb-3">
+                  <Users className="h-4 w-4" />
                 </div>
                 <p className="text-white font-semibold text-base truncate">{g.name}</p>
               </CardContent>

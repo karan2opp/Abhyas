@@ -4,6 +4,7 @@ import db from "../../common/db/index.js";
 import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { PermissionService } from "../../common/permissions/index.js";
+import { assertStudentQuota } from "../billing/usage.service.js";
 import { sendClassroomInviteEmail } from "../../common/config/email.js";
 import type {
     CreateClassroomDto,
@@ -14,7 +15,7 @@ import type {
 } from "./dto/classroom.dto.js";
 
 const DEFAULT_JOIN_CODE_EXPIRY_DAYS = 7;
-const DEFAULT_JOIN_CODE_MAX_USES = 300;
+const DEFAULT_JOIN_CODE_MAX_USES = 1;
 const INVITE_EXPIRY_DAYS = 7;
 // Excludes 0/O/1/I to avoid ambiguity when a code is read aloud or handwritten.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -269,6 +270,9 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
             return { classroom, membership: existingMembership, alreadyJoined: true };
         }
 
+        // Enforce the organisation's student seat capacity (base + buffer).
+        await assertStudentQuota(classroom.organisationId);
+
         return await db.transaction(async (tx) => {
             // Atomically consume the invite: the status check and the update
             // happen in one conditional UPDATE, so the code can never be
@@ -307,6 +311,9 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
     );
     if (existingMembership) return { classroom, membership: existingMembership, alreadyJoined: true };
 
+    // Enforce the organisation's student seat capacity (base + buffer).
+    await assertStudentQuota(classroom.organisationId);
+
     return await db.transaction(async (tx) => {
         // Atomic, race-safe usage-cap enforcement: the increment and the cap
         // check happen in one conditional UPDATE, so concurrent joins can't
@@ -327,6 +334,18 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
         }).returning();
 
         if (!membership) throw ApiError.internal("Failed to join classroom");
+
+        // Automatically regenerate a new join code once usage limit is reached
+        if (updatedClassroom.joinCodeUseCount >= updatedClassroom.joinCodeMaxUses) {
+            const newCode = await generateUniqueCode();
+            await tx.update(classrooms)
+                .set({
+                    joinCode: newCode,
+                    joinCodeUseCount: 0,
+                    updatedAt: new Date(),
+                })
+                .where(eq(classrooms.id, classroom.id));
+        }
 
         return { classroom: updatedClassroom, membership, alreadyJoined: false };
     });

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { submissions } from "../submissions/submission.schema.js";
 import { questions } from "../questions/question.schema.js";
@@ -17,7 +17,10 @@ export const answers = pgTable("answers", {
   evaluatedBy: text("evaluated_by").$type<"ai" | "teacher">(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => [
+  // One answer per question per submission.
+  uniqueIndex("answers_submission_question_idx").on(table.submissionId, table.questionId),
+]);
 
 export type Answer = typeof answers.$inferSelect;
 export type NewAnswer = typeof answers.$inferInsert;

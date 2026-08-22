@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, pgEnum, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, pgEnum, doublePrecision, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { users } from "../auth/user.schema.js";
 import { exams } from "../exam/exam.schema.js";
@@ -20,7 +21,13 @@ export const submissions = pgTable("submissions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at")   // null = active, timestamp = deleted
-});
+}, (table) => [
+  // One active submission per exam per student. Partial index so a soft-deleted
+  // submission (deletedAt != null) does not block a future re-attempt.
+  uniqueIndex("submissions_active_exam_user_idx")
+    .on(table.examId, table.userId)
+    .where(sql`${table.deletedAt} is null`),
+]);
 
 export type Submission = typeof submissions.$inferSelect;
 export type NewSubmission = typeof submissions.$inferInsert;

@@ -11,9 +11,14 @@ import {
     groupStudents,
     groups,
     users,
+    classrooms,
+    blocks,
 } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { PermissionService } from "../../common/permissions/index.js";
+import { generateMockAssignment, generateSingleAssignmentQuestion } from "../generation/assignment_generation.service.js";
+import { assertQuota, recordUsage } from "../billing/usage.service.js";
+import { evaluateAnswer, type TextAnswer } from "../evalutaion/evalutaion.js";
 import type {
     CreateSeriesDto,
     UpdateSeriesDto,
@@ -140,16 +145,71 @@ const createAssignment = async (data: CreateAssignmentDto, teacherId: string) =>
         classroomId: data.classroomId,
         groupId: data.groupId ?? null,
         createdBy: teacherId,
-        totalMarks: data.totalMarks,
+        totalMarks: data.totalMarks ?? 0,
         startDate,
         dueDate,
         seriesId: data.seriesId ?? null,
         dayGap,
         sequenceOrder,
         unlockOffsetDays,
+        difficulty: data.difficulty || "medium",
     }).returning();
 
     if (!assignment) throw ApiError.internal("Failed to create assignment");
+
+    // Persist optional generated blocks + questions in one transaction.
+    const blocksToPersist = data.blocks;
+    if (blocksToPersist && blocksToPersist.length > 0) {
+        await db.transaction(async (tx) => {
+            let totalMarks = 0;
+            for (const [bIdx, blockData] of blocksToPersist.entries()) {
+                const [block] = await tx.insert(blocks).values({
+                    assignmentId: assignment.id,
+                    name: blockData.name,
+                    subject: blockData.subject,
+                    questionType: blockData.questionType,
+                    questionCount: blockData.questions?.length ?? 0,
+                    totalMarks: blockData.totalMarks ?? 0,
+                    instructions: blockData.instructions ?? [],
+                    position: bIdx,
+                }).returning();
+
+                if (!block) throw ApiError.internal("Failed to create block");
+
+                for (const qData of blockData.questions || []) {
+                    const [question] = await tx.insert(assignmentQuestions).values({
+                        assignmentId: assignment.id,
+                        blockId: block.id,
+                        type: qData.type,
+                        description: qData.description,
+                        marks: qData.marks,
+                        modelAnswer: qData.modelAnswer,
+                        rubric: qData.rubric ?? null,
+                    }).returning();
+
+                    if (!question) throw ApiError.internal("Failed to create question");
+                    totalMarks += Number(qData.marks) || 0;
+
+                    if (qData.type === "mcq" && qData.options && qData.options.length > 0) {
+                        await tx.insert(assignmentOptions).values(
+                            qData.options.map(opt => ({
+                                questionId: question.id,
+                                value: opt.value,
+                                isCorrect: opt.isCorrect,
+                            }))
+                        );
+                    }
+                }
+            }
+
+            if (totalMarks > 0) {
+                await tx.update(assignments)
+                    .set({ totalMarks, updatedAt: new Date() })
+                    .where(eq(assignments.id, assignment.id));
+            }
+        });
+    }
+
     return assignment;
 };
 
@@ -365,6 +425,18 @@ const verifyQuestionOwnership = async (questionId: string, teacherId: string) =>
     return question;
 };
 
+const recalculateAssignmentTotalMarks = async (assignmentId: string, tx: any = db) => {
+    const questionsList = await tx.select({ marks: assignmentQuestions.marks })
+        .from(assignmentQuestions)
+        .where(eq(assignmentQuestions.assignmentId, assignmentId));
+    
+    const totalMarks = questionsList.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
+
+    await tx.update(assignments)
+        .set({ totalMarks, updatedAt: new Date() })
+        .where(eq(assignments.id, assignmentId));
+};
+
 // ── Create Question ──────────────────────────────────────────────────────────
 const createQuestion = async (data: CreateAssignmentQuestionDto, teacherId: string) => {
     const hasAccess = await PermissionService.teacher.canManageAssignment(teacherId, data.assignmentId);
@@ -392,6 +464,8 @@ const createQuestion = async (data: CreateAssignmentQuestionDto, teacherId: stri
                 }))
             ).returning();
         }
+
+        await recalculateAssignmentTotalMarks(data.assignmentId, tx);
 
         return { ...question, options: optionsData };
     });
@@ -444,6 +518,8 @@ const updateQuestion = async (questionId: string, data: UpdateAssignmentQuestion
             }
         }
 
+        await recalculateAssignmentTotalMarks(updated.assignmentId, tx);
+
         const updatedOptions = await tx.select().from(assignmentOptions).where(eq(assignmentOptions.questionId, questionId));
         return { ...updated, options: updatedOptions };
     });
@@ -453,8 +529,11 @@ const updateQuestion = async (questionId: string, data: UpdateAssignmentQuestion
 
 // ── Delete Question (cascades options) ───────────────────────────────────────
 const deleteQuestion = async (questionId: string, teacherId: string) => {
-    await verifyQuestionOwnership(questionId, teacherId);
-    await db.delete(assignmentQuestions).where(eq(assignmentQuestions.id, questionId));
+    const question = await verifyQuestionOwnership(questionId, teacherId);
+    await db.transaction(async (tx) => {
+        await tx.delete(assignmentQuestions).where(eq(assignmentQuestions.id, questionId));
+        await recalculateAssignmentTotalMarks(question.assignmentId, tx);
+    });
 };
 
 // ── Get Questions (teacher, full view incl. correct answers) ────────────────
@@ -707,6 +786,103 @@ const saveAnswer = async (data: SaveAssignmentAnswerDto, studentId: string) => {
     return created;
 };
 
+// ── Run Assignment AI Evaluation in Background ───────────────────────────────
+const getOrganisationIdForAssignmentSubmission = async (submissionId: string): Promise<string | null> => {
+    const [submission] = await db.select().from(assignmentSubmissions).where(
+        eq(assignmentSubmissions.id, submissionId)
+    );
+    if (!submission) return null;
+    const [assignment] = await db.select().from(assignments).where(
+        eq(assignments.id, submission.assignmentId)
+    );
+    if (!assignment?.classroomId) return null;
+    const [classroom] = await db.select().from(classrooms).where(eq(classrooms.id, assignment.classroomId));
+    return classroom?.organisationId ?? null;
+};
+
+const runAssignmentAiEvaluation = async (submissionId: string) => {
+    try {
+        const submissionAnswersData = await db.select().from(assignmentAnswers).where(
+            eq(assignmentAnswers.submissionId, submissionId)
+        );
+
+        const [submission] = await db.select().from(assignmentSubmissions).where(
+            eq(assignmentSubmissions.id, submissionId)
+        );
+        if (!submission) return;
+
+        const [assignment] = await db.select().from(assignments).where(
+            eq(assignments.id, submission.assignmentId)
+        );
+        const difficulty = assignment?.difficulty || "medium";
+
+        const textAnswersToEvaluate: TextAnswer[] = [];
+
+        for (const answer of submissionAnswersData) {
+            const [question] = await db.select().from(assignmentQuestions).where(
+                eq(assignmentQuestions.id, answer.questionId)
+            );
+            if (!question) continue;
+
+            if (question.type === "descriptive") {
+                textAnswersToEvaluate.push({
+                    answerId: answer.id,
+                    questionId: question.id,
+                    question: question.description,
+                    modelAnswer: question.modelAnswer || "",
+                    studentAnswer: answer.textAnswer ?? "",
+                    maxMarks: question.marks,
+                    rubric: (question as any).rubric || null,
+                    difficulty,
+                });
+            }
+        }
+
+        if (textAnswersToEvaluate.length > 0) {
+            for (const textAns of textAnswersToEvaluate) {
+                const { marksAwarded, feedback } = await evaluateAnswer(textAns);
+
+                await db.update(assignmentAnswers)
+                    .set({
+                        marksAwarded,
+                        feedback,
+                        updatedAt: new Date()
+                    })
+                    .where(eq(assignmentAnswers.id, textAns.answerId));
+            }
+
+            const organisationId = await getOrganisationIdForAssignmentSubmission(submissionId);
+            if (organisationId) {
+                try {
+                    await recordUsage(organisationId, "question_evaluation", textAnswersToEvaluate.length);
+                } catch (meterErr) {
+                    console.error(`[Billing] Failed to record assignment evaluation usage for org ${organisationId}:`, meterErr);
+                }
+            }
+        }
+
+        // Recalculate total marks awarded
+        const allAnswers = await db.select().from(assignmentAnswers).where(
+            eq(assignmentAnswers.submissionId, submissionId)
+        );
+        const totalMarksAwarded = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+
+        await db.update(assignmentSubmissions)
+            .set({
+                status: "submitted",
+                totalMarksAwarded,
+                updatedAt: new Date()
+            })
+            .where(eq(assignmentSubmissions.id, submissionId));
+
+    } catch (e) {
+        console.error("Assignment background AI evaluation failed:", e);
+        await db.update(assignmentSubmissions)
+            .set({ status: "submitted", updatedAt: new Date() })
+            .where(eq(assignmentSubmissions.id, submissionId));
+    }
+};
+
 // ── Submit Assignment (finalize; grading of descriptive answers comes later) ─
 const submitAssignment = async (submissionId: string, studentId: string) => {
     const [submission] = await db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.id, submissionId));
@@ -727,10 +903,29 @@ const submitAssignment = async (submissionId: string, studentId: string) => {
 
     const isLate = !!(dueDate && now > dueDate);
 
+    // Check if assignment has descriptive questions
+    const questionsData = await db.select().from(assignmentQuestions).where(
+        eq(assignmentQuestions.assignmentId, submission.assignmentId)
+    );
+    const hasDescriptive = questionsData.some(q => q.type === "descriptive");
+
+    const status = hasDescriptive ? "evaluating" : "submitted";
+
     const [updated] = await db.update(assignmentSubmissions)
-        .set({ status: "submitted", submittedAt: now, isLate, updatedAt: now })
+        .set({ status, submittedAt: now, isLate, updatedAt: now })
         .where(eq(assignmentSubmissions.id, submissionId))
         .returning();
+
+    if (hasDescriptive) {
+        const descriptiveCount = questionsData.filter(q => q.type === "descriptive").length;
+        const organisationId = await getOrganisationIdForAssignmentSubmission(submissionId);
+        if (organisationId) {
+            await assertQuota(organisationId, "question_evaluation", descriptiveCount);
+        }
+        (async () => {
+            await runAssignmentAiEvaluation(submissionId);
+        })();
+    }
 
     return updated;
 };
@@ -860,6 +1055,81 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
     });
 };
 
+const generateAssignmentFromForm = async (data: any, teacherId: string, organisationId?: string | null) => {
+    const generatorInput = {
+        exam_type: data.examType || "other",
+        difficulty: data.difficulty || "medium",
+        instructions: data.specialInstructions ? [data.specialInstructions] : [],
+        blocks: Array.isArray(data.blocks) && data.blocks.length > 0
+            ? data.blocks.map((b: any) => ({
+                name: b.name || "Block 1",
+                subject: b.subject,
+                question_type: (b.questionType || "mcq").toLowerCase(),
+                question_count: Number(b.questionCount) || 5,
+                marks_per_question: Number(b.marksPerQuestion) || 5,
+                instructions: b.specialInstructions ? [b.specialInstructions] : [],
+                topics: b.topics || [],
+            }))
+            : [{
+                name: "Block 1",
+                subject: data.subject,
+                question_type: (data.questionType || "mcq").toLowerCase(),
+                question_count: Number(data.questionCount) || 5,
+                marks_per_question: Number(data.marksPerQuestion) || 5,
+                instructions: data.specialInstructions ? [data.specialInstructions] : [],
+                topics: data.topics || [],
+            }],
+    };
+
+    if (organisationId) {
+        const estimated = generatorInput.blocks.reduce((s: number, b: any) => s + b.question_count, 0);
+        await assertQuota(organisationId, "question_generation", estimated);
+    }
+
+    const generated = await generateMockAssignment(generatorInput);
+
+    if (organisationId) {
+        const generatedCount = Array.isArray(generated?.blocks)
+            ? generated.blocks.reduce((s: number, b: any) => s + (Array.isArray(b.questions) ? b.questions.length : 0), 0)
+            : 0;
+        try {
+            await recordUsage(organisationId, "question_generation", generatedCount);
+        } catch (meterErr) {
+            console.error(`[Billing] Failed to record assignment generation usage for org ${organisationId}:`, meterErr);
+        }
+    }
+
+    return generated;
+};
+
+const generateSingleQuestionFromForm = async (data: any, teacherId: string, organisationId?: string | null) => {
+    const generatorInput = {
+        subject: data.subject,
+        exam_type: data.examType || "other",
+        difficulty: data.difficulty || "medium",
+        question_type: data.questionType || "mcq",
+        topic: data.topic,
+        marks: Number(data.marks) || 5,
+        instructions: data.specialInstructions ? [data.specialInstructions] : []
+    };
+
+    if (organisationId) {
+        await assertQuota(organisationId, "question_generation", 1);
+    }
+
+    const generated = await generateSingleAssignmentQuestion(generatorInput);
+
+    if (organisationId) {
+        try {
+            await recordUsage(organisationId, "question_generation", 1);
+        } catch (meterErr) {
+            console.error(`[Billing] Failed to record single question usage for org ${organisationId}:`, meterErr);
+        }
+    }
+
+    return generated;
+};
+
 export {
     createSeries,
     listSeriesForClassroom,
@@ -885,4 +1155,6 @@ export {
     getSubmissionsForAssignment,
     getSubmissionById,
     gradeSubmission,
+    generateAssignmentFromForm,
+    generateSingleQuestionFromForm,
 };

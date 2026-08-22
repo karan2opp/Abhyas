@@ -2,26 +2,27 @@ import { eq, and, inArray } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { questions, options, sections, exams } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
-import type { CreateQuestionDto, UpdateQuestionDto, GenerateQuestionConfig } from "./dto/question.dto.js";
+import { PermissionService, type Requester } from "../../common/permissions/index.js";
+import type { CreateQuestionDto, UpdateQuestionDto } from "./dto/question.dto.js";
 import { uploadToCloudinary } from "../../common/config/cloudinary.js";
-import { checkOpenAI } from "../../common/agent/openai.client.js";
-// ── Helper: verify section belongs to teacher ──────────────────────────────────
-const verifySectionOwnership = async (sectionId: string, teacherId: string) => {
+// ── Helper: verify section is manageable by the requester (creator, opted-in co-teacher, or manager) ─
+const verifySectionAccess = async (sectionId: string, requester: Requester) => {
     const [section] = await db.select({
         id: sections.id,
-        examCreatedBy: exams.createdBy,
+        examId: sections.examId,
     })
         .from(sections)
-        .innerJoin(exams, eq(sections.examId, exams.id))
         .where(eq(sections.id, sectionId));
 
     if (!section) throw ApiError.notFound("Section not found");
-    if (section.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized");
+
+    const hasAccess = await PermissionService.canManageExam(requester, section.examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized");
     return section;
 };
 
-// ── Helper: verify question belongs to teacher ─────────────────────────────────
-const verifyQuestionOwnership = async (questionId: string, teacherId: string) => {
+// ── Helper: verify question is manageable by the requester (creator, opted-in co-teacher, or manager) ─
+const verifyQuestionAccess = async (questionId: string, requester: Requester) => {
     const [question] = await db.select({
         id: questions.id,
         sectionId: questions.sectionId,
@@ -30,27 +31,49 @@ const verifyQuestionOwnership = async (questionId: string, teacherId: string) =>
         marks: questions.marks,
         createdAt: questions.createdAt,
         updatedAt: questions.updatedAt,
-        examCreatedBy: exams.createdBy,
+        examId: sections.examId,
     })
         .from(questions)
         .innerJoin(sections, eq(questions.sectionId, sections.id))
-        .innerJoin(exams, eq(sections.examId, exams.id))
         .where(eq(questions.id, questionId));
 
     if (!question) throw ApiError.notFound("Question not found");
-    if (question.examCreatedBy !== teacherId) throw ApiError.forbidden("You are not authorized");
+
+    const hasAccess = await PermissionService.canManageExam(requester, question.examId);
+    if (!hasAccess) throw ApiError.forbidden("You are not authorized");
     return question;
+};
+
+const recalculateExamTotalMarks = async (examId: string, tx: any = db) => {
+    const sectionsList = await tx.select({ id: sections.id })
+        .from(sections)
+        .where(eq(sections.examId, examId));
+    
+    if (sectionsList.length === 0) {
+        await tx.update(exams).set({ totalMarks: 0, updatedAt: new Date() }).where(eq(exams.id, examId));
+        return;
+    }
+
+    const sectionIds = sectionsList.map((s: any) => s.id);
+    const questionsList = await tx.select({ marks: questions.marks })
+        .from(questions)
+        .where(inArray(questions.sectionId, sectionIds));
+
+    const totalMarks = questionsList.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
+
+    await tx.update(exams)
+        .set({ totalMarks, updatedAt: new Date() })
+        .where(eq(exams.id, examId));
 };
 
 // ── Create Question ────────────────────────────────────────────────────────────
 const createQuestion = async (
     data: CreateQuestionDto,
-    teacherId: string,
-    imageFiles?: Express.Multer.File[]  // ← receives files from controller
+    requester: Requester,
+    imageFiles?: Express.Multer.File[]
 ) => {
-    await verifySectionOwnership(data.sectionId, teacherId);
+    const section = await verifySectionAccess(data.sectionId, requester);
 
-    // upload images to cloudinary before transaction
     const uploadedImages: { url: string; publicId: string }[] = [];
 
     if (imageFiles && imageFiles.length > 0) {
@@ -64,6 +87,7 @@ const createQuestion = async (
     const result = await db.transaction(async (tx) => {
         const [question] = await tx.insert(questions).values({
             sectionId: data.sectionId,
+            blockId: data.blockId ?? null,
             type: data.type,
             description: data.description,
             marks: data.marks,
@@ -84,6 +108,8 @@ const createQuestion = async (
             ).returning();
         }
 
+        await recalculateExamTotalMarks(section.examId, tx);
+
         return { ...question, options: optionsData };
     });
 
@@ -91,8 +117,8 @@ const createQuestion = async (
 };
 
 // ── Get All Questions by Section ───────────────────────────────────────────────
-const getQuestionsBySection = async (sectionId: string, teacherId: string) => {
-    await verifySectionOwnership(sectionId, teacherId);
+const getQuestionsBySection = async (sectionId: string, requester: Requester) => {
+    await verifySectionAccess(sectionId, requester);
 
     const questionsData = await db.select().from(questions).where(eq(questions.sectionId, sectionId));
 
@@ -107,15 +133,15 @@ const getQuestionsBySection = async (sectionId: string, teacherId: string) => {
 };
 
 // ── Get Single Question with Options ──────────────────────────────────────────
-const getQuestionById = async (questionId: string, teacherId: string) => {
-    const question = await verifyQuestionOwnership(questionId, teacherId);
+const getQuestionById = async (questionId: string, requester: Requester) => {
+    const question = await verifyQuestionAccess(questionId, requester);
     const optionsData = await db.select().from(options).where(eq(options.questionId, questionId));
     return { ...question, options: optionsData };
 };
 
 // ── Update Question (with smart options merge) ─────────────────────────────────
-const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teacherId: string, imageFiles?: Express.Multer.File[]) => {
-    await verifyQuestionOwnership(questionId, teacherId);
+const updateQuestion = async (questionId: string, data: UpdateQuestionDto, requester: Requester, imageFiles?: Express.Multer.File[]) => {
+    const question = await verifyQuestionAccess(questionId, requester);
 
     const uploadedImages: { url: string; publicId: string }[] = [];
 
@@ -184,6 +210,8 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teach
             }
         }
 
+        await recalculateExamTotalMarks(question.examId, tx);
+
         const updatedOptions = await tx.select().from(options).where(eq(options.questionId, questionId))
         return { ...updated, options: updatedOptions };
     });
@@ -192,94 +220,11 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, teach
 };
 
 // ── Delete Question (cascades options) ────────────────────────────────────────
-const deleteQuestion = async (questionId: string, teacherId: string) => {
-    await verifyQuestionOwnership(questionId, teacherId);
-    await db.delete(questions).where(eq(questions.id, questionId));
-    // options are cascade deleted automatically by PostgreSQL
+const deleteQuestion = async (questionId: string, requester: Requester) => {
+    const question = await verifyQuestionAccess(questionId, requester);
+    await db.transaction(async (tx) => {
+        await tx.delete(questions).where(eq(questions.id, questionId));
+        await recalculateExamTotalMarks(question.examId, tx);
+    });
 };
-
-const buildUserPrompt = (config: GenerateQuestionConfig): string => {
-    let prompt = `Subject: ${config.subject}\nDifficulty: ${config.difficulty}\n\n`
-    prompt += `Generate questions for the following topics and subtopics:\n\n`
-
-    config.topics.forEach((topic) => {
-        prompt += `Topic: ${topic.name}\n`
-        topic.subtopics.forEach((sub) => {
-            prompt += `  - Subtopic: ${sub.name} | Count: ${sub.count} | Types: ${sub.questionTypes.join(", ")}\n`
-        })
-        prompt += `\n`
-    })
-
-    prompt += `MARKS CONFIGURATION:\n`
-    prompt += `- MCQ questions: 1 mark\n`
-    prompt += `- Text-based (descriptive) questions: ${config.textMarks || 5} marks\n\n`
-
-    if (config.customInstructions) {
-        prompt += `Additional Instructions: ${config.customInstructions}\n`
-    }
-
-    return prompt
-}
-const generateQuestion = async (info: GenerateQuestionConfig) => {
-    const client = await checkOpenAI();
-    const explanationRule = info.includeExplanation !== false ? `\n- Include a short explanation for the correct answer` : "";
-    const explanationFormat = info.includeExplanation !== false ? `\n      "explanation": "string",` : "";
-
-    const SYSTEM_PROMPT = `You are an expert exam question generator for our computer training institute.
-
-INSTITUTE EXAM PATTERN:
-- Question ratio: 60% theory-based, 40% practical/application-based
-- Maintain this ratio strictly across generated questions
-
-SUBJECT CATEGORIES (only generate questions from these):
-1. Programming (e.g. C, C++, Python, Java basics — logic, syntax, concepts)
-2. Tally (accounting software — vouchers, ledgers, GST, inventory)
-3. MS Office Basic:
-   - MS Word (formatting, mail merge, templates)
-   - MS Excel (formulas, functions, charts, pivot tables)
-   - MS PowerPoint (slides, animations, design, presentation tools)
-
-QUESTION RULES:
-- Theory questions → test conceptual understanding, definitions, "what is", "why", "differentiate between"
-- Practical questions → test "how to perform X", step-based, output-based, formula-based (especially for Excel/Tally)
-- Difficulty must match requested level (beginner/intermediate/advanced)
-- If requested type is "mcq": you MUST provide exactly 4 options and a correctAnswer. The correctAnswer MUST exactly match the full text of one of the options (e.g. do not just say "A", but the full text).
-- CRITICAL: For MCQs, aggressively randomize the position of the correct answer among the 4 options. Do NOT just make the first option the correct answer.
-- If requested type is "text" (descriptive): do NOT provide options or a correctAnswer. The question should be open-ended.
-- Assign "marks" to each question based on the MARKS CONFIGURATION provided by the user${explanationRule}
-
-OUTPUT FORMAT:
-Respond ONLY in valid JSON:
-{
-  "questions": [
-    {
-      "question": "string",
-      "type": "mcq" | "descriptive", // Match the requested type
-      "subject": "programming" | "tally" | "ms_word" | "ms_excel" | "ms_powerpoint",
-      "options": ["string", "string", "string", "string"], // ONLY include if type is 'mcq'
-      "correctAnswer": "string", // ONLY include if type is 'mcq'. MUST exactly match one of the options!${explanationFormat}
-      "marks": number
-    }
-  ]
-}`
-    const prompt = buildUserPrompt(info)
-    try {
-        const response = await client.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: SYSTEM_PROMPT },
-                { role: "user", content: prompt },
-            ],
-        });
-
-        return response.choices[0]?.message?.content;
-    } catch (error) {
-        throw new ApiError(500, "Failed to generate question");
-    }
-
-
-}
-
-
-
-export { createQuestion, getQuestionsBySection, getQuestionById, updateQuestion, deleteQuestion, generateQuestion };
+export { createQuestion, getQuestionsBySection, getQuestionById, updateQuestion, deleteQuestion };

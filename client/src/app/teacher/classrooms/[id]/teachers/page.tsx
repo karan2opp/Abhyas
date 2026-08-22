@@ -87,21 +87,21 @@ export default function TeachersPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           <h4 className="text-white font-semibold text-base mb-3">Co-Teachers on this Classroom</h4>
-          <div className="relative max-w-md mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <div className="relative w-full max-w-md mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
             <input
               type="text"
               placeholder="Search teachers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+              className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
             />
           </div>
 
           {loading ? (
             <div className="text-gray-400 text-center py-6 text-sm">Loading...</div>
           ) : teachers.length === 0 ? (
-            <Card className="bg-[#111520] border-white/5">
+            <Card className="bg-[#0f0f11] border-white/5">
               <CardContent className="py-14 flex flex-col items-center text-center">
                 <div className="h-14 w-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
                   <Users className="h-6 w-6 text-gray-500" />
@@ -117,7 +117,7 @@ export default function TeachersPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {teachers.map((t) => (
-                <Card key={t.id} className="bg-[#111520] border-white/5">
+                <Card key={t.id} className="bg-[#0f0f11] border-white/5">
                   <CardContent className="p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <UserAvatar name={t.name} avatarUrl={t.avatarUrl} />
@@ -132,7 +132,7 @@ export default function TeachersPage() {
                       className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 shrink-0"
                       onClick={() => handleRemoveTeacher(t.id)}
                     >
-                      <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+                      Remove
                     </Button>
                   </CardContent>
                 </Card>
@@ -150,14 +150,14 @@ export default function TeachersPage() {
               value={teacherEmail}
               onChange={(e) => setTeacherEmail(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddTeacher()}
-              className="flex-1 bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 rounded-lg px-4 py-2.5 focus:outline-none focus:border-white/20 transition-all text-sm"
+              className="flex-1 bg-[#0f0f11] border border-white/10 text-white placeholder:text-gray-500 rounded-lg px-4 py-2.5 focus:outline-none focus:border-white/20 transition-all text-sm"
             />
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white shrink-0" onClick={handleAddTeacher} disabled={addingTeacher}>
+            <Button className="bg-orange-600 hover:bg-orange-700 text-white shrink-0" onClick={handleAddTeacher} disabled={addingTeacher}>
               {addingTeacher ? "Adding..." : "Add"}
             </Button>
           </div>
 
-          <Card className="bg-[#111520] border-white/5">
+          <Card className="bg-[#0f0f11] border-white/5">
             <CardContent className="py-14 flex flex-col items-center text-center">
               <div className="h-14 w-14 rounded-full bg-white/5 flex items-center justify-center mb-4">
                 <UserPlus className="h-6 w-6 text-gray-500" />

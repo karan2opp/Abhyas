@@ -14,13 +14,8 @@ export const createExam = async (req: Request, res: Response) => {
 };
 
 export const saveGeneratedExam = async (req: Request, res: Response) => {
-    const exam = await examService.saveGeneratedExam(req.body, req.user!.id);
+    const exam = await examService.saveGeneratedExam(req.body, toRequester(req));
     return ApiResponse.created(res, "Generated exam saved successfully", exam);
-};
-
-export const generateFromForm = async (req: Request, res: Response) => {
-    const examData = await examService.generateExamFromForm(req.body, req.user!.id);
-    return ApiResponse.ok(res, "Exam generated successfully", examData);
 };
 
 export const getExams = async (req: Request, res: Response) => {
@@ -41,7 +36,12 @@ export const getExamById = async (req: Request, res: Response) => {
 };
 
 export const listExamsForClassroom = async (req: Request, res: Response) => {
-    const examsData = await examService.listExamsForClassroom(req.params.classroomId as string, toRequester(req), req.query.groupId as string | undefined);
+    const examsData = await examService.listExamsForClassroom(
+        req.params.classroomId as string,
+        toRequester(req),
+        req.query.groupId as string | undefined,
+        req.query.search as string | undefined
+    );
     return ApiResponse.ok(res, "Exams", examsData);
 };
 

@@ -83,7 +83,7 @@ export default function ManagerTeachersPage() {
         <p className="text-gray-400 mt-1">Teachers who belong to your organisation.</p>
       </div>
 
-      <Card className="bg-[#111520] border-white/5 mb-6">
+      <Card className="bg-[#0f0f11] border-white/5 mb-6">
         <CardHeader>
           <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-emerald-400" />
@@ -112,21 +112,21 @@ export default function ManagerTeachersPage() {
 
       <h3 className="text-lg font-semibold text-white mb-3">Current Teachers ({teachers.length})</h3>
 
-      <div className="relative w-full sm:w-72 mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+      <div className="relative w-full max-w-md mb-4">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
         <input
           type="text"
           placeholder="Search teachers by name or email..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-[#111520] border border-white/10 text-white placeholder:text-gray-500 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:border-white/20 transition-all text-sm"
+          className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-white/30 h-11 rounded-xl text-sm transition-all shadow-inner pl-10"
         />
       </div>
 
       {loading ? (
         <div className="text-white text-center py-10">Loading teachers...</div>
       ) : teachers.length === 0 ? (
-        <Card className="bg-[#111520]/50 border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11]/50 border-white/5 py-10 text-center">
           <CardContent>
             <Users className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">
@@ -137,19 +137,19 @@ export default function ManagerTeachersPage() {
       ) : (
         <div className="flex flex-col gap-2">
           {teachers.map((t) => (
-            <div key={t.id} className="flex items-center justify-between p-4 bg-[#111520] border border-white/5 rounded-xl">
+            <div key={t.id} className="flex items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl">
               <div>
                 <p className="text-white font-semibold text-sm">{t.name}</p>
                 <p className="text-gray-500 text-xs">{t.email}</p>
               </div>
               <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                size="sm"
+                variant="outline"
+                className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 shrink-0 h-8 px-3 text-xs font-semibold"
                 onClick={() => handleRemove(t.id, t.email)}
                 title="Remove teacher"
               >
-                <Trash2 className="h-4 w-4" />
+                Remove
               </Button>
             </div>
           ))}

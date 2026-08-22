@@ -82,15 +82,15 @@ export default function GroupExamsPage() {
           <p className="text-gray-400 text-base mt-1">Exams for {group?.name || "this group"}.</p>
         </div>
         <Button
-          className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
-          onClick={() => router.push(`/teacher/exams/new?classroomId=${classroomId}&groupId=${groupId}`)}
+          className="bg-orange-600 hover:bg-orange-700 text-white shrink-0"
+          onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/new?groupId=${groupId}`)}
         >
           <Plus className="mr-2 h-4 w-4" /> New Exam
         </Button>
       </div>
 
       {exams.length === 0 ? (
-        <Card className="bg-[#111520] border-white/5 py-10 text-center">
+        <Card className="bg-[#0f0f11] border-white/5 py-10 text-center">
           <CardContent>
             <FileText className="h-8 w-8 text-gray-500 mx-auto mb-3" />
             <p className="text-gray-400">No exams for this group yet.</p>
@@ -99,17 +99,17 @@ export default function GroupExamsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {exams.map((e) => (
-            <Card key={e.id} className="bg-[#111520] border-white/5 hover:border-white/10 transition-all">
+            <Card key={e.id} className="bg-[#0f0f11] border-white/5 hover:border-white/10 transition-all">
               <CardContent className="p-5">
                 <div
                   className="cursor-pointer"
-                  onClick={() => router.push(`/teacher/exams/${e.id}`)}
+                  onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}`)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="h-9 w-9 bg-yellow-600/20 text-yellow-400 rounded-lg flex items-center justify-center border border-yellow-500/20 shrink-0">
                       <FileText className="h-4 w-4" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                    <span className="text-[10px] font-bold uppercase px-2 py-1 rounded bg-[#18181b]mber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                       {e.totalMarks} marks
                     </span>
                   </div>
@@ -125,7 +125,7 @@ export default function GroupExamsPage() {
                     size="sm"
                     variant="outline"
                     className="bg-transparent border-white/10 text-white hover:bg-white/5"
-                    onClick={() => router.push(`/teacher/exams/${e.id}/results`)}
+                    onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}/results`)}
                   >
                     Results
                   </Button>
@@ -135,7 +135,7 @@ export default function GroupExamsPage() {
                     className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10"
                     onClick={() => handleDeleteExam(e.id, e.title)}
                   >
-                    <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Delete
+                    Delete
                   </Button>
                 </div>
               </CardContent>

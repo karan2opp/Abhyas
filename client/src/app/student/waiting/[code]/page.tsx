@@ -116,8 +116,8 @@ export default function WaitingRoomPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-10 bg-[#0b0f19]">
-        <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-4" />
+      <div className="flex flex-col h-full items-center justify-center p-10 bg-[#050505]">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin mb-4" />
         <p className="text-gray-400">Verifying Exam Code...</p>
       </div>
     );
@@ -126,37 +126,37 @@ export default function WaitingRoomPage() {
   if (!examData) return null;
 
   return (
-    <div className="flex flex-col h-full items-center justify-center p-6 md:p-10 bg-[#0b0f19]">
-      <Card className="w-full max-w-lg bg-[#111520] border-white/5 border-t-4 border-t-blue-500 shadow-2xl relative overflow-hidden">
+    <div className="flex flex-col h-full items-center justify-center p-6 md:p-10 bg-[#050505]">
+      <Card className="w-full max-w-lg bg-[#0f0f11] border-white/5 border-t-4 border-t-blue-500 shadow-2xl relative overflow-hidden">
         
         {/* Animated background pulse if waiting */}
         {!canJoinNow && (
-          <div className="absolute -top-32 -right-32 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute -top-32 -right-32 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl animate-pulse"></div>
         )}
 
         <CardHeader className="text-center pb-2 relative z-10">
-          <div className="mx-auto bg-blue-500/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-            <Hourglass className={`h-8 w-8 text-blue-400 ${!canJoinNow ? "animate-bounce" : ""}`} />
+          <div className="mx-auto bg-orange-500/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+            <Hourglass className={`h-8 w-8 text-orange-400 ${!canJoinNow ? "animate-pulse" : ""}`} />
           </div>
           <CardTitle className="text-2xl font-bold text-white tracking-tight">
             Waiting Room
           </CardTitle>
           <CardDescription className="text-gray-400 mt-2 text-base">
-            You are enrolled in <span className="text-blue-300 font-semibold">{examData.title}</span>.
+            You are enrolled in <span className="text-orange-300 font-semibold">{examData.title}</span>.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="pt-6 relative z-10 overflow-y-auto max-h-[60vh] custom-scrollbar">
           {canJoinNow ? (
             <div className="text-center space-y-6">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 text-emerald-400">
+              <div className="bg-[#18181b]merald-500/10 border border-emerald-500/20 rounded-xl p-6 text-emerald-400">
                 <p className="text-lg font-semibold mb-1">The exam is ready!</p>
                 <p className="text-sm text-emerald-400/80">You will be redirected automatically...</p>
               </div>
               <Button 
                 onClick={handleManualJoin}
                 disabled={isJoining}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 text-lg transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-6 text-lg transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40"
               >
                 {isJoining ? (
                   <>
@@ -180,16 +180,16 @@ export default function WaitingRoomPage() {
               </div>
 
               {/* Exam Metadata */}
-              <div className="bg-black/20 border border-white/5 rounded-xl p-5 space-y-4">
+              <div className="bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/20 border border-white/5 rounded-xl p-5 space-y-4">
                 <div className="flex items-center gap-3 text-gray-300">
-                  <CalendarDays className="h-5 w-5 text-blue-400/70" />
+                  <CalendarDays className="h-5 w-5 text-orange-400/70" />
                   <div>
                     <p className="text-xs text-gray-500">Scheduled Start</p>
                     <p className="font-medium">{formatDateTime(examData.startTime)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-gray-300">
-                  <Clock className="h-5 w-5 text-blue-400/70" />
+                  <Clock className="h-5 w-5 text-orange-400/70" />
                   <div>
                     <p className="text-xs text-gray-500">Duration</p>
                     <p className="font-medium">{examData.duration} Minutes</p>
@@ -199,15 +199,15 @@ export default function WaitingRoomPage() {
 
               {/* Instructions */}
               {examData.instructions && examData.instructions.length > 0 && (
-                <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-5 space-y-3">
+                <div className="bg-[#18181b] border border-white/5 rounded-xl p-5 space-y-3">
                   <div className="flex items-center gap-2 text-white font-bold">
-                    <ListChecks className="h-5 w-5 text-blue-400" />
+                    <ListChecks className="h-5 w-5 text-orange-400" />
                     Instructions
                   </div>
                   <ul className="space-y-2">
                     {examData.instructions.map((inst: string, idx: number) => (
                       <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                        <span className="text-blue-400 mt-0.5">•</span>
+                        <span className="text-orange-400 mt-0.5">•</span>
                         <span>{inst}</span>
                       </li>
                     ))}
@@ -216,11 +216,11 @@ export default function WaitingRoomPage() {
               )}
 
               {/* Color Scheme Legend */}
-              <div className="bg-[#1a1f2e] border border-white/5 rounded-xl p-5 space-y-3">
+              <div className="bg-[#18181b] border border-white/5 rounded-xl p-5 space-y-3">
                 <div className="text-white font-bold text-sm mb-2">Exam Legend</div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 rounded bg-emerald-600 flex items-center justify-center shrink-0">
+                    <div className="w-4 h-4 rounded bg-[#18181b]merald-600 flex items-center justify-center shrink-0">
                       <CheckCircle className="h-3 w-3 text-white" />
                     </div>
                     <div>

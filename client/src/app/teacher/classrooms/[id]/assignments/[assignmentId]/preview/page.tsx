@@ -68,7 +68,7 @@ export default function AssignmentPreviewPage() {
       </button>
 
       <div className="w-full bg-[#0b0e14] border border-white/10 rounded-2xl p-8">
-        <div className="pb-6 mb-8 border-b-2 border-blue-500 text-center">
+        <div className="pb-6 mb-8 border-b-2 border-orange-500 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">{assignment.title}</h2>
           {assignment.instructions && <p className="text-gray-400 text-sm mt-2">{assignment.instructions}</p>}
         </div>
@@ -83,7 +83,7 @@ export default function AssignmentPreviewPage() {
                   <p className="text-white text-base font-medium leading-relaxed">
                     <span className="font-bold">Q{idx + 1}:</span> {q.description}
                   </p>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 whitespace-nowrap">
+                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/30 shrink-0 whitespace-nowrap">
                     {q.marks} marks
                   </span>
                 </div>
@@ -98,7 +98,7 @@ export default function AssignmentPreviewPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="w-full bg-[#111520] border border-white/10 rounded-lg px-5 py-4 min-h-[260px]">
+                  <div className="w-full bg-[#0f0f11] border border-white/10 rounded-lg px-5 py-4 min-h-[260px]">
                     <p className="text-gray-500 text-base leading-relaxed font-normal not-italic">Write your answer here...</p>
                   </div>
                 )}

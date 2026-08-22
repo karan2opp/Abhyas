@@ -23,6 +23,11 @@ export const exams = pgTable("exams", {
   requireFeedback: boolean("require_feedback").default(false).notNull(),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
+  publishTime: timestamp("publish_time"),
+  difficulty: text("difficulty").$type<"easy" | "medium" | "hard">().default("medium").notNull(),
+  status: text("status").$type<"DRAFT" | "PUBLISHED">().default("DRAFT").notNull(),
+  // Creator opts in to let co-teachers of the classroom edit this exam's content.
+  allowCoTeacherEdit: boolean("allow_co_teacher_edit").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

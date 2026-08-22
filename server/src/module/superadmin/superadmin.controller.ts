@@ -28,3 +28,9 @@ export const getAdmins = async (req: Request, res: Response) => {
     const admins = await superadminService.getAdmins();
     return ApiResponse.ok(res, `Admins fetched successfully`, admins);
 };
+
+export const searchUser = async (req: Request, res: Response) => {
+    const { email } = req.body;
+    const result = await superadminService.getUserByEmail(email);
+    return ApiResponse.ok(res, `User found`, result);
+};

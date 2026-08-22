@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -44,10 +44,12 @@ interface Submission {
 
 export default function GradeSubmissionPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const classroomId = params.id as string;
   const assignmentId = params.assignmentId as string;
   const submissionId = params.submissionId as string;
+  const returnTo = searchParams.get("returnTo");
 
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -149,13 +151,21 @@ export default function GradeSubmissionPage() {
     );
   }
 
+  if (submission.status === "evaluating") {
+    return (
+      <div className="text-white text-center py-10 animate-pulse">
+        This submission is currently being evaluated by the AI grading engine. Please wait or refresh in a few moments.
+      </div>
+    );
+  }
+
   return (
     <div>
       <button
-        onClick={() => router.push(`/teacher/classrooms/${classroomId}/assignments/${assignmentId}`)}
+        onClick={() => router.push(returnTo || `/teacher/classrooms/${classroomId}/assignments/${assignmentId}`)}
         className="flex items-center gap-2 text-gray-400 hover:text-white text-sm mb-6 transition-colors"
       >
-        <ArrowLeft className="h-4 w-4" /> Back to Assignment
+        <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
       <div className="bg-[#0b0e14] border border-white/10 rounded-2xl p-8">
@@ -164,13 +174,13 @@ export default function GradeSubmissionPage() {
         </div>
 
         <div className={`grid grid-cols-1 ${submission.status === "graded" ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-3 mb-8`}>
-          <div className="bg-[#161b28] border border-white/10 border-l-2 border-l-blue-500/60 rounded-lg p-4">
-            <p className="text-[11px] text-blue-400 font-semibold uppercase tracking-wide mb-1.5">Submitted By</p>
+          <div className="bg-[#161b28] border border-white/10 rounded-lg p-4">
+            <p className="text-[11px] text-orange-300 font-semibold uppercase tracking-wide mb-1.5">Submitted By</p>
             <p className="text-sm font-semibold text-white truncate">{studentName || "Student"}</p>
             <p className="text-xs text-gray-300 mt-0.5 truncate">{studentEmail}</p>
           </div>
-          <div className="bg-[#161b28] border border-white/10 border-l-2 border-l-blue-500/60 rounded-lg p-4">
-            <p className="text-[11px] text-blue-400 font-semibold uppercase tracking-wide mb-1.5">Submitted On</p>
+          <div className="bg-[#161b28] border border-white/10 rounded-lg p-4">
+            <p className="text-[11px] text-orange-300 font-semibold uppercase tracking-wide mb-1.5">Submitted On</p>
             <p className="text-sm font-semibold text-white">{submission.submittedAt ? formatDateTime(submission.submittedAt) : "—"}</p>
             {submission.isLate && <p className="text-xs text-amber-400 mt-0.5">Late submission</p>}
           </div>
@@ -205,7 +215,7 @@ export default function GradeSubmissionPage() {
                         <div
                           key={o.id}
                           className={`text-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 ${
-                            o.isCorrect ? "bg-emerald-600/10 text-emerald-400" : selected ? "bg-red-500/10 text-red-400" : "text-gray-400"
+                            o.isCorrect ? "bg-[#18181b]merald-500/15 text-emerald-200 border border-emerald-500/30" : selected ? "bg-red-500/10 text-red-400" : "text-white/70"
                           }`}
                         >
                           {selected && <span className="font-bold">●</span>}
@@ -233,7 +243,7 @@ export default function GradeSubmissionPage() {
                       max={q.marks}
                       value={marksByAnswer[a.id] ?? ""}
                       onChange={(e) => setMarksByAnswer((prev) => ({ ...prev, [a.id]: e.target.value }))}
-                      className="w-full bg-[#1a1f2e] border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                      className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -243,7 +253,7 @@ export default function GradeSubmissionPage() {
                       value={feedbackByAnswer[a.id] ?? ""}
                       onChange={(e) => setFeedbackByAnswer((prev) => ({ ...prev, [a.id]: e.target.value }))}
                       placeholder="Feedback for this answer..."
-                      className="w-full bg-[#1a1f2e] border border-white/10 rounded-lg px-3 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
+                      className="w-full bg-[#18181b] border border-white/10 rounded-lg px-3 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
                     />
                   </div>
                 </div>
@@ -258,12 +268,12 @@ export default function GradeSubmissionPage() {
               onChange={(e) => setOverallFeedback(e.target.value)}
               rows={3}
               placeholder="Overall comments for the student..."
-              className="w-full mt-2 bg-[#1a1f2e] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
+              className="w-full mt-2 bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm resize-none"
             />
           </div>
 
           <div className="flex justify-end">
-            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmitGrade} disabled={saving}>
+            <Button size="lg" className="bg-[#18181b]merald-600 hover:bg-[#18181b]merald-700 text-white" onClick={handleSubmitGrade} disabled={saving}>
               {saving ? "Saving..." : "Submit Grade"}
             </Button>
           </div>

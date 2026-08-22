@@ -22,6 +22,29 @@ export type UpdateSeriesDto = z.infer<typeof updateSeriesSchema>;
 // Whether dayGap vs. startDate/dueDate is required for a series assignment
 // depends on the series' `type` (weekly vs custom), which requires a DB
 // lookup — that branch is validated in the service layer, not here.
+const assignmentOptionSchema = z.object({
+    value: z.string({ message: "Option value is required" }).min(1, "Option value cannot be empty"),
+    isCorrect: z.boolean({ message: "isCorrect is required" }),
+});
+
+const assignmentBlockQuestionSchema = z.object({
+    type: z.enum(["mcq", "descriptive"], { message: "Question type must be mcq or descriptive" }),
+    description: z.string({ message: "Description is required" }).min(1, "Description cannot be empty"),
+    marks: z.number({ message: "Marks are required" }).min(0.5, "Marks must be at least 0.5"),
+    modelAnswer: z.string().optional(),
+    rubric: z.any().optional(),
+    options: z.array(assignmentOptionSchema).optional(),
+});
+
+const assignmentBlockSchema = z.object({
+    name: z.string({ message: "Block name is required" }).min(1, "Block name cannot be empty"),
+    subject: z.string({ message: "Block subject is required" }).min(1, "Block subject cannot be empty"),
+    questionType: z.enum(["mcq", "descriptive"]).optional().default("mcq"),
+    instructions: z.array(z.string()).optional(),
+    totalMarks: z.number().min(0).optional().default(0),
+    questions: z.array(assignmentBlockQuestionSchema).optional(),
+});
+
 export const createAssignmentSchema = z.object({
     title: z.string({ message: "Title is required" })
         .min(3, "Title must be at least 3 characters long")
@@ -30,13 +53,15 @@ export const createAssignmentSchema = z.object({
     classroomId: z.string({ message: "Classroom ID is required" })
         .min(1, "Classroom ID cannot be empty"),
     groupId: z.string().min(1).optional(),
-    totalMarks: z.number({ message: "Total marks is required" })
-        .min(1, "Total marks must be at least 1"),
+    totalMarks: z.number({ message: "Total marks must be a number" })
+        .min(0, "Total marks must be at least 0").optional().default(0),
     startDate: z.coerce.date().optional(),
     dueDate: z.coerce.date().optional(),
     // Series-only field (weekly series):
     seriesId: z.string().min(1).optional(),
     dayGap: z.number().int().min(1).optional(),
+    difficulty: z.enum(["easy", "medium", "hard"]).optional().default("medium"),
+    blocks: z.array(assignmentBlockSchema).optional(),
 });
 
 export type CreateAssignmentDto = z.infer<typeof createAssignmentSchema>;
@@ -49,6 +74,7 @@ export const updateAssignmentSchema = z.object({
     startDate: z.coerce.date().nullable().optional(),
     dueDate: z.coerce.date().nullable().optional(),
     dayGap: z.number().int().min(1).nullable().optional(),
+    difficulty: z.enum(["easy", "medium", "hard"]).optional(),
 });
 
 export type UpdateAssignmentDto = z.infer<typeof updateAssignmentSchema>;
@@ -60,11 +86,6 @@ export const extendAssignmentSchema = z.object({
 });
 
 export type ExtendAssignmentDto = z.infer<typeof extendAssignmentSchema>;
-
-const assignmentOptionSchema = z.object({
-    value: z.string({ message: "Option value is required" }).min(1, "Option value cannot be empty"),
-    isCorrect: z.boolean({ message: "isCorrect is required" }),
-});
 
 export const createAssignmentQuestionSchema = z.object({
     assignmentId: z.string({ message: "Assignment ID is required" }).min(1),

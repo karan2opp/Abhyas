@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Check, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -48,7 +48,7 @@ interface Answer {
 
 interface Submission {
   id: string;
-  status: "in_progress" | "submitted" | "graded";
+  status: "in_progress" | "submitted" | "graded" | "evaluating";
   submittedAt: string | null;
   isLate: boolean;
   totalMarksAwarded: number | null;
@@ -69,7 +69,6 @@ export default function StudentAssignmentPage() {
 
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
-  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
   const [editingSubmission, setEditingSubmission] = useState(false);
 
   const loadAnswersIntoForm = (sub: Submission) => {
@@ -119,13 +118,10 @@ export default function StudentAssignmentPage() {
   const handleSelectOption = async (question: Question, optionId: string) => {
     if (!submission) return;
     setSelectedOptions((prev) => ({ ...prev, [question.id]: optionId }));
-    setSavingQuestionId(question.id);
     try {
       await saveAnswerService({ submissionId: submission.id, questionId: question.id, options: [optionId] });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save answer");
-    } finally {
-      setSavingQuestionId(null);
     }
   };
 
@@ -133,13 +129,10 @@ export default function StudentAssignmentPage() {
     if (!submission) return;
     const value = textAnswers[question.id];
     if (!value || !value.trim()) return;
-    setSavingQuestionId(question.id);
     try {
       await saveAnswerService({ submissionId: submission.id, questionId: question.id, textAnswer: value });
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save answer");
-    } finally {
-      setSavingQuestionId(null);
     }
   };
 
@@ -167,11 +160,11 @@ export default function StudentAssignmentPage() {
     setEditingSubmission(true);
   };
 
-  const autoResize = (el: HTMLTextAreaElement | null) => {
+  const autoResize = React.useCallback((el: HTMLTextAreaElement | null) => {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  };
+  }, []);
 
   if (loading) return <div className="p-10 text-white text-center">Loading assignment...</div>;
   if (!assignment) return <div className="p-10 text-white text-center">Assignment not found</div>;
@@ -193,7 +186,7 @@ export default function StudentAssignmentPage() {
           {assignment.instructions && <p className="text-gray-400 text-sm mt-2">{assignment.instructions}</p>}
         </div>
 
-        {(submission?.status === "submitted" || submission?.status === "graded") && !editingSubmission && (
+        {(submission?.status === "submitted" || submission?.status === "graded" || submission?.status === "evaluating") && !editingSubmission && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
             <div className="bg-[#161b28] border border-white/10 rounded-lg p-4">
               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Submitted On</p>
@@ -215,7 +208,7 @@ export default function StudentAssignmentPage() {
           )}
 
           {submission && submission.status === "submitted" && !editingSubmission && (
-            <div className="mt-4 p-4 rounded-lg bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-between gap-3 text-left">
+            <div className="mt-4 p-4 rounded-lg bg-[#18181b]merald-600/10 border border-emerald-500/20 flex items-center justify-between gap-3 text-left">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
                 <div>
@@ -226,10 +219,24 @@ export default function StudentAssignmentPage() {
                 </div>
               </div>
               {canEditSubmission && (
-                <Button variant="ghost" className="text-blue-400 hover:text-blue-300 shrink-0" onClick={handleEditSubmission}>
+                <Button variant="ghost" className="text-orange-400 hover:text-orange-300 shrink-0" onClick={handleEditSubmission}>
                   Edit Submission
                 </Button>
               )}
+            </div>
+          )}
+
+          {submission && submission.status === "evaluating" && (
+            <div className="mt-4 p-4 rounded-lg bg-orange-600/10 border border-orange-500/30 flex items-center gap-3 text-left animate-pulse">
+              <Clock className="h-5 w-5 text-orange-400 shrink-0" />
+              <div>
+                <p className="text-orange-400 font-semibold text-sm">
+                  Evaluating Submission
+                </p>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  The AI is currently evaluating your descriptive answers in the background. Refresh in a few moments.
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -243,9 +250,11 @@ export default function StudentAssignmentPage() {
                   <p className="text-white text-base font-medium leading-relaxed">
                     <span className="font-bold">Q{idx + 1}:</span> {q.description}
                   </p>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0 whitespace-nowrap">
-                    {q.marks} marks
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/30 shrink-0 whitespace-nowrap">
+                      {q.marks} marks
+                    </span>
+                  </div>
                 </div>
 
                 {q.type === "mcq" ? (
@@ -259,10 +268,10 @@ export default function StudentAssignmentPage() {
                           disabled={isReadOnly}
                           onClick={() => handleSelectOption(q, o.id)}
                           className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border text-left text-sm transition-all ${
-                            isSelected ? "bg-blue-500/20 border-blue-500/50 text-blue-300" : "bg-[#111520] border-white/10 text-gray-300 hover:bg-white/5"
+                            isSelected ? "bg-orange-500/20 border-orange-500/50 text-sky-200 font-medium" : "bg-[#0f0f11] border-white/10 text-white/80 hover:bg-white/5"
                           } ${isReadOnly ? "cursor-default" : "cursor-pointer"}`}
                         >
-                          <span className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-blue-400 bg-blue-500" : "border-gray-500"}`}>
+                          <span className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-blue-400 bg-orange-600" : "border-gray-500"}`}>
                             {isSelected && <Check className="h-3 w-3 text-white" />}
                           </span>
                           {o.value}
@@ -282,11 +291,11 @@ export default function StudentAssignmentPage() {
                     onBlur={() => handleTextBlur(q)}
                     rows={8}
                     placeholder="Write your answer here..."
-                    className="w-full bg-[#111520] border border-white/10 rounded-lg px-5 py-4 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-base leading-relaxed resize-none overflow-hidden min-h-[260px] disabled:opacity-70"
+                    className="w-full bg-[#0f0f11] border border-white/10 rounded-lg px-5 py-4 text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-base leading-relaxed resize-none overflow-hidden min-h-[260px] disabled:opacity-70"
                   />
                 )}
 
-                {savingQuestionId === q.id && <p className="text-xs text-gray-500 mt-1">Saving...</p>}
+                 
                 {isReadOnly && answer?.marksAwarded !== null && answer?.marksAwarded !== undefined && (
                   <p className="text-xs text-emerald-400 font-semibold mt-2">Marks: {answer.marksAwarded}/{q.marks}</p>
                 )}
@@ -310,7 +319,7 @@ export default function StudentAssignmentPage() {
                 Cancel
               </Button>
             )}
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSubmitAssignment} disabled={submitting}>
+            <Button className="bg-[#18181b]merald-600 hover:bg-[#18181b]merald-700 text-white" onClick={handleSubmitAssignment} disabled={submitting}>
               {submitting ? "Saving..." : editingSubmission ? "Save Changes" : "Submit Assignment"}
             </Button>
           </div>

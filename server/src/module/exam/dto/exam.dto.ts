@@ -11,11 +11,14 @@ export const createExamSchema = z.object({
     .max(180, { message: "Duration cannot exceed 180 minutes" }).optional(),
   startTime: z.coerce.date({ message: "Start time is required" }).optional(),
   endTime: z.coerce.date({ message: "End time is required" }).optional(),
-  totalMarks: z.number({ message: "Total marks is required" })
-    .min(1, { message: "Total marks must be at least 1" }),
+  totalMarks: z.number({ message: "Total marks must be a number" })
+    .min(0, { message: "Total marks must be at least 0" }).optional().default(0),
   requireFeedback: z.boolean().optional().default(false),
   classroomId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
+  publishTime: z.coerce.date().nullable().optional(),
+  status: z.enum(["DRAFT", "PUBLISHED"]).optional().default("DRAFT"),
+  allowCoTeacherEdit: z.boolean().optional().default(false),
 }).refine(data => {
   if (data.type === "SCHEDULED") {
     if (!data.startTime || !data.endTime) return false;
@@ -49,11 +52,14 @@ export const updateExamSchema = z.object({
   startTime: z.coerce.date({ message: "Invalid start time date format" }).optional(),
   endTime: z.coerce.date({ message: "Invalid end time date format" }).optional(),
   totalMarks: z.number({ message: "Total marks must be a number" })
-    .min(1, { message: "Total marks must be at least 1" })
+    .min(0, { message: "Total marks must be at least 0" })
     .optional(),
   requireFeedback: z.boolean().optional(),
   classroomId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
+  publishTime: z.coerce.date().nullable().optional(),
+  status: z.enum(["DRAFT", "PUBLISHED"]).optional(),
+  allowCoTeacherEdit: z.boolean().optional(),
 }).refine(data => {
   if (data.type === "SCHEDULED" || (!data.type && data.startTime && data.endTime)) {
     if (data.startTime && data.endTime) {

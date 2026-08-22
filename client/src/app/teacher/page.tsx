@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getTeacherOverviewStatsService } from "./exams/exam.service";
 import { formatDate } from "@/lib/date";
+import { toast } from "sonner";
 
 export default function TeacherDashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -42,41 +43,31 @@ export default function TeacherDashboard() {
           <h2 className="text-3xl font-bold text-white tracking-tight">Overview</h2>
           <p className="text-gray-400 mt-1">Welcome back to your Institutional Portal.</p>
         </div>
-        <Button 
-          onClick={() => {
-            import('@/store/useExamBuilderStore').then(m => m.useExamBuilderStore.getState().resetStore());
-            router.push('/teacher/exams/new');
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-        >
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Create New Exam
-        </Button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-[#111520] border-white/5">
+        <Card className="bg-[#0f0f11] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Exams</CardTitle>
-            <FileText className="h-4 w-4 text-blue-400" />
+            <FileText className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalExams}</div>
           </CardContent>
         </Card>
-        <Card className="bg-[#111520] border-white/5">
+        <Card className="bg-[#0f0f11] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-blue-400" />
+            <Users className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalStudents}</div>
           </CardContent>
         </Card>
-        <Card className="bg-[#111520] border-white/5">
+        <Card className="bg-[#0f0f11] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Average Score</CardTitle>
-            <BarChart className="h-4 w-4 text-blue-400" />
+            <BarChart className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{averageScore}%</div>
@@ -87,7 +78,7 @@ export default function TeacherDashboard() {
       <div className="mt-4">
         <h3 className="text-xl font-semibold text-white mb-4">Recent Exams</h3>
         {recentExams.length === 0 ? (
-          <Card className="bg-[#111520] border-white/5">
+          <Card className="bg-[#0f0f11] border-white/5">
             <CardContent className="p-0">
                <div className="p-8 text-center text-gray-500 text-sm">
                   No recent exams found. Click "Create New Exam" to get started.
@@ -97,8 +88,8 @@ export default function TeacherDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {recentExams.map((exam: any) => (
-              <Card key={exam.id || exam._id} className="bg-[#111520] border-white/5 hover:border-blue-500/30 transition-colors shadow-lg overflow-hidden group">
-                <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+              <Card key={exam.id || exam._id} className="bg-[#0f0f11] border-white/5 hover:border-orange-500/30 transition-colors shadow-lg overflow-hidden group">
+                <div className="h-2 bg-gradient-to-r from-orange-600 to-amber-600"></div>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4 gap-4">
                     <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">{exam.title}</h3>
@@ -106,15 +97,15 @@ export default function TeacherDashboard() {
                   
                   <div className="space-y-2 mt-4 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-blue-400" />
+                      <Clock className="h-4 w-4 text-orange-400" />
                       <span>Duration: {exam.duration} mins</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-blue-400" />
+                      <FileText className="h-4 w-4 text-orange-400" />
                       <span>Total Marks: {exam.totalMarks}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-blue-400" />
+                      <Calendar className="h-4 w-4 text-orange-400" />
                       <span>Created: {formatDate(exam.createdAt)}</span>
                     </div>
                   </div>
@@ -128,15 +119,27 @@ export default function TeacherDashboard() {
                         variant="outline" 
                         size="sm" 
                         className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
-                        onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}/results`)}
+                        onClick={() => {
+                          if (exam.classroomId) {
+                            router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}/results`);
+                          } else {
+                            toast.error("This exam does not belong to a classroom");
+                          }
+                        }}
                       >
                         Results
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        className="bg-transparent border-white/10 text-blue-400 border-blue-500/30 hover:text-blue-300 hover:bg-blue-500/10"
-                        onClick={() => router.push(`/teacher/exams/${exam.id || exam._id}`)}
+                        className="bg-transparent border-orange-500/30 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                        onClick={() => {
+                          if (exam.classroomId) {
+                            router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}`);
+                          } else {
+                            toast.error("This exam does not belong to a classroom");
+                          }
+                        }}
                       >
                         Manage
                       </Button>

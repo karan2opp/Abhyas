@@ -115,18 +115,38 @@ export default function ManagerBillingPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
+      // Fetch each independently so a failure in one area doesn't hide the rest.
+      // Log the real error (status + response) to the console so the actual
+      // cause is visible on production instead of being silently swallowed.
+      const capture = (label: string) => <T,>(p: Promise<T>): Promise<T | null> =>
+        p.catch((err: any) => {
+          console.error(`[billing] ${label} failed:`, err);
+          try {
+            console.error(`[billing] ${label} detail:`, {
+              url: err?.config?.url || err?.request?.responseURL || undefined,
+              status: err?.response?.status || undefined,
+              message: err?.response?.data?.message || err?.message || undefined,
+              raw: typeof err === "object" && err !== null ? Object.keys(err) : typeof err,
+            });
+          } catch {
+            console.error(`[billing] ${label} raw:`, String(err));
+          }
+          return null;
+        });
+
       const [orgRes, subRes, usageRes, plansRes] = await Promise.all([
-        getMyOrganisationService(),
-        getMySubscriptionService().catch(() => null),
-        getMyUsageService(),
-        getPlansService(),
+        capture("org")(getMyOrganisationService()),
+        capture("subscription")(getMySubscriptionService()),
+        capture("usage")(getMyUsageService()),
+        capture("plans")(getPlansService()),
       ]);
-      setOrganisation(orgRes.data || null);
+      setOrganisation(orgRes?.data || null);
       setSubscription(subRes?.data || null);
-      setUsage(usageRes.data?.usage || []);
-      setActiveStudents(usageRes.data?.activeStudents || 0);
-      setPlans(plansRes.data || []);
-    } catch {
+      setUsage(usageRes?.data?.usage || []);
+      setActiveStudents(usageRes?.data?.activeStudents || 0);
+      setPlans(plansRes?.data || []);
+    } catch (err) {
+      console.error("[billing] loadAll error:", err);
       toast.error("Failed to load billing information");
     } finally {
       setLoading(false);

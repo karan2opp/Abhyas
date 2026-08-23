@@ -22,8 +22,12 @@ import { PermissionService } from "../../common/permissions/index.js";
 type Requester = { id: string; role: string; organisationId: string | null };
 
 // ── Generate Join Code ─────────────────────────────────────────────────────────
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
 const generateJoinCode = (): string => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    let code = "";
+    for (let i = 0; i < 6; i++) code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return code;
 };
 
 // ── Validate Classroom/Group Scope ─────────────────────────────────────────────

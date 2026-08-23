@@ -24,6 +24,16 @@ export const getMyOrganisationForStudent = async (req: Request, res: Response) =
     return ApiResponse.ok(res, "Organisation details", result);
 };
 
+export const getMyOrganisationForTeacher = async (req: Request, res: Response) => {
+    const result = await organisationService.getOrganisationForTeacher(req.user!.id);
+    return ApiResponse.ok(res, "Organisation details", result);
+};
+
+export const deleteOrganisation = async (req: Request, res: Response) => {
+    const result = await organisationService.deleteOrganisation(req.params.id as string);
+    return ApiResponse.ok(res, "Organisation deleted", result);
+};
+
 export const updateMyOrganisation = async (req: Request, res: Response) => {
     const result = await organisationService.updateOrganisation(req.user!.organisationId!, req.body);
     return ApiResponse.ok(res, "Organisation updated successfully", result);

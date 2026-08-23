@@ -24,3 +24,8 @@ export const revokeManagerService = async (organisationId: string, userId: strin
   const res = await api.delete(`/organisations/${organisationId}/managers/${userId}`);
   return res.data;
 };
+
+export const deleteOrganisationService = async (organisationId: string) => {
+  const res = await api.delete(`/organisations/${organisationId}`);
+  return res.data;
+};

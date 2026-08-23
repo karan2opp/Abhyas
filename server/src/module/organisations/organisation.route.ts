@@ -19,8 +19,12 @@ router.post("/mine/logo", authenticate, authorize("manager"), upload.single("log
 // Student: read-only view of the student's organisation
 router.get("/student-mine", authenticate, authorize("student"), controller.getMyOrganisationForStudent);
 
+// Teacher: read-only view of the teacher's organisation
+router.get("/teacher-mine", authenticate, authorize("teacher"), controller.getMyOrganisationForTeacher);
+
 router.get("/:id", authenticate, authorize("system_admin"), controller.getOrganisationById);
 router.patch("/:id", authenticate, authorize("system_admin"), validate(updateOrganisationSchema), controller.updateOrganisationById);
+router.delete("/:id", authenticate, authorize("system_admin"), controller.deleteOrganisation);
 
 router.get("/:id/managers", authenticate, authorize("system_admin"), controller.getOrganisationManagers);
 router.post("/:id/managers", authenticate, authorize("system_admin"), validate(assignManagerSchema), controller.assignManager);

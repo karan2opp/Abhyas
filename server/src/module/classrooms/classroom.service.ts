@@ -23,7 +23,7 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 type Requester = { id: string; role: string; organisationId: string | null };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const generateJoinCode = (length = 8): string => {
+const generateJoinCode = (length = 6): string => {
     const bytes = crypto.randomBytes(length);
     let code = "";
     for (let i = 0; i < length; i++) code += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];

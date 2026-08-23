@@ -80,6 +80,25 @@ const getOrganisationForStudent = async (studentId: string) => {
     return getOrganisationById(orgId);
 };
 
+// ── Get Organisation for a Teacher ───────────────────────────────────────────
+// A teacher's organisation is stored directly on the user (users.organisationId),
+// assigned by their manager.
+const getOrganisationForTeacher = async (teacherId: string) => {
+    const [user] = await db.select({ organisationId: users.organisationId }).from(users).where(eq(users.id, teacherId));
+    if (!user?.organisationId) throw ApiError.notFound("No organisation found for this teacher");
+    return getOrganisationById(user.organisationId);
+};
+
+// ── Delete Organisation (system admin) ───────────────────────────────────────
+// Detaches users first (users.organisation_id has no ON DELETE cascade), then
+// deletes the org — classrooms (and their exams/submissions) cascade off.
+const deleteOrganisation = async (organisationId: string) => {
+    await db.update(users).set({ organisationId: null }).where(eq(users.organisationId, organisationId));
+    const [deleted] = await db.delete(organisations).where(eq(organisations.id, organisationId)).returning();
+    if (!deleted) throw ApiError.notFound("Organisation not found");
+    return deleted;
+};
+
 // ── List Organisations ───────────────────────────────────────────────────────
 const listOrganisations = async () => {
     return await db.select().from(organisations);
@@ -202,6 +221,8 @@ export {
     updateOrganisation,
     uploadOrganisationLogo,
     getOrganisationForStudent,
+    getOrganisationForTeacher,
+    deleteOrganisation,
     listOrganisations,
     assignUserToOrganisation,
     assignManager,

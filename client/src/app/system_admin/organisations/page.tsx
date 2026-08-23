@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Building2, ChevronRight } from "lucide-react";
+import { Plus, Building2, ChevronRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,7 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { createOrganisationService, getOrganisationsService } from "./organisation.service";
+import { createOrganisationService, getOrganisationsService, deleteOrganisationService } from "./organisation.service";
 import { formatDate } from "@/lib/date";
 
 interface Organisation {
@@ -65,6 +65,17 @@ export default function OrganisationsPage() {
     }
   };
 
+  const handleDelete = async (id: string, orgName: string) => {
+    if (!confirm(`Delete organisation "${orgName}"? This permanently removes its classrooms, exams, submissions, and all associated data. This cannot be undone.`)) return;
+    try {
+      await deleteOrganisationService(id);
+      toast.success("Organisation deleted");
+      fetchOrganisations();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to delete organisation");
+    }
+  };
+
   if (loading) return <div className="p-10 text-white text-center">Loading organisations...</div>;
 
   return (
@@ -112,7 +123,20 @@ export default function OrganisationsPage() {
                   </p>
                 </div>
               </div>
-              <ChevronRight className="h-5 w-5 text-gray-500 shrink-0" />
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(org.id, org.name);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" /> Delete
+                </Button>
+                <ChevronRight className="h-5 w-5 text-gray-500 shrink-0" />
+              </div>
             </div>
           ))}
         </div>

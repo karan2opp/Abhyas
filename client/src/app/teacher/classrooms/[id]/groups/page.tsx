@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Layers, Plus, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -30,7 +30,7 @@ export default function GroupsPage() {
     try {
       const res = await listGroupsService(classroomId);
       setGroups(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load groups");
     } finally {
       setLoading(false);

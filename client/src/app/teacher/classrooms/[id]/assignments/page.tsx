@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Layers, Plus, ClipboardList, ClipboardCheck, Trash2, Settings, Search, ChevronLeft, ChevronRight, Info, Clock } from "lucide-react";
+import { ArrowLeft, Layers, Plus, ClipboardList, ClipboardCheck, Settings, Search, ChevronLeft, ChevronRight, Info, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -89,7 +89,7 @@ export default function AssignmentsPage() {
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [newAssignmentTitle, setNewAssignmentTitle] = useState("");
   const [newAssignmentInstructions, setNewAssignmentInstructions] = useState("");
-  const [newAssignmentMarks, setNewAssignmentMarks] = useState("0");
+  const [, setNewAssignmentMarks] = useState("0");
   const [newAssignmentGroupId, setNewAssignmentGroupId] = useState("");
   const [newAssignmentSeriesId, setNewAssignmentSeriesId] = useState("");
   const [newAssignmentDayGap, setNewAssignmentDayGap] = useState("7");
@@ -116,7 +116,7 @@ export default function AssignmentsPage() {
       setGroups(gRes.data || []);
       setAllAssignments(aRes.data || []);
       setSeries(sRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load assignments");
     } finally {
       setLoading(false);
@@ -171,7 +171,7 @@ export default function AssignmentsPage() {
         live: allList.filter((a) => classifyStatus(a) === "live").length,
         closed: allList.filter((a) => classifyStatus(a) === "closed").length,
       });
-    } catch (err) {
+    } catch {
       toast.error("Failed to load standalone assignments");
     } finally {
       setStandaloneLoading(false);

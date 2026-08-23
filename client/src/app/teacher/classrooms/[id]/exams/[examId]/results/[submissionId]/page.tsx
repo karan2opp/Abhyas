@@ -4,14 +4,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot, User, MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, Check, X, Bot, User, MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
 import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from "../../../../../../exams/exam.service";
 import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
-import { formatDate } from "@/lib/date";
+
 
 export default function ResultsPage() {
   const params = useParams();
@@ -70,7 +71,7 @@ export default function ResultsPage() {
             setSelectedQuestionId(firstSection.questions[0].id);
           }
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load results.");
         router.push(`/teacher/classrooms/${classroomId}/exams/${examId}/results`);
       } finally {
@@ -112,7 +113,7 @@ export default function ResultsPage() {
       const subRes = await getSubmissionByIdService(submissionId);
       gradingInitializedRef.current = false;
       setSubmission(subRes.data || subRes);
-    } catch (err) {
+    } catch {
       toast.error("Failed to refresh submission");
     }
   };
@@ -183,11 +184,8 @@ export default function ResultsPage() {
   if (submission.status === "evaluating") {
     return (
       <div className="p-10 h-full flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-        <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Evaluating Results...</h2>
-        <p className="text-gray-400 text-center max-w-md">
-          AI is reviewing and scoring descriptive answers.
-        </p>
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 className="text-xl font-bold text-white tracking-wide">Evaluating...</h2>
       </div>
     );
   }
@@ -413,22 +411,32 @@ export default function ResultsPage() {
                         <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            code: ({node, ...props}) => {
-                              const isInline = !props.className?.includes('language-');
-                              return isInline 
-                                ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-xs text-orange-300 font-mono border border-orange-500/30" {...props} /> 
-                                : (
-                                  <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-[#09090b]">
-                                    <div className="p-4 overflow-x-auto custom-scrollbar font-normal">
-                                      <code className="block font-mono text-xs leading-relaxed text-gray-300" {...props} />
-                                    </div>
+                            pre: ({ children }) => {
+                              const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                              return (
+                                <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-[#09090b]">
+                                  <div className="bg-white/5 px-3 py-2 border-b border-white/5 flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
+                                    <span className="ml-2.5 text-[11px] font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                                   </div>
-                                )
+                                  <div className="p-4 overflow-x-auto custom-scrollbar font-normal">
+                                    {children}
+                                  </div>
+                                </div>
+                              );
                             },
-                            p: ({node, ...props}) => <p className="mb-1 last:mb-0 inline-block" {...props} />
+                            code: ({ className, children, ...props }) => {
+                              const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                              return isInline
+                                ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-xs text-orange-300 font-mono border border-orange-500/30" {...props}>{children}</code>
+                                : <code className={"block font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                            },
+                            p: ({...props}) => <p className="mb-1 last:mb-0 inline-block" {...props} />
                           }}
                         >
-                          {`**Q${questionIndex + 1}.** ${selectedQuestion.description}`}
+                          {normalizeCodeBlocks(`**Q${questionIndex + 1}.** ${selectedQuestion.description}`)}
                         </ReactMarkdown>
                       </div>
                     </div>

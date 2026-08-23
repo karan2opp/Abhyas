@@ -34,6 +34,12 @@ export const forgotPasswordSchema = z.object({
         .toLowerCase(),
 })
 
+export const resendOtpSchema = z.object({
+    email: z.string({ message: "Email is required" })
+        .email("Invalid email address")
+        .toLowerCase(),
+})
+
 export const resetPasswordSchema = z.object({
     email: z.string({ message: "Email is required" })
         .email("Invalid email address")
@@ -68,4 +74,5 @@ export type RegisterDto = z.infer<typeof registerSchema>
 export type LoginDto = z.infer<typeof loginSchema>
 export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>
+export type ResendOtpDto = z.infer<typeof resendOtpSchema>
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, KeyRound, Users, UserPlus, Layers, ClipboardList, FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Settings, KeyRound, Users, UserPlus, ClipboardList, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { getMyClassroomsService } from "../classroom.service";
 import { getOrganisationClassroomsService } from "../../../manager/classrooms/classroom.service";
@@ -43,7 +43,7 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
       const list = user?.role === "manager" ? (res.data || []) : (res.data || []).map((r: any) => r.classroom);
       const found = list.find((c: Classroom) => c.id === classroomId);
       setClassroom(found || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load classroom");
     }
   };
@@ -150,7 +150,7 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
         </aside>
 
         {/* ── Section Content ───────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-10">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-6">
           {children}
         </main>
       </div>

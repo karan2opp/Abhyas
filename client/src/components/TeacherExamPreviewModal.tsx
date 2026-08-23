@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getExamByIdService, getSectionsWithDetailsService } from "@/app/teacher/exams/exam.service";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 type FlattenedQuestion = {
@@ -188,30 +189,32 @@ export function TeacherExamPreviewModal({
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    code: ({ node, ...props }) => {
-                      const isInline = !props.className?.includes("language-");
-                      return isInline ? (
-                        <code className="bg-orange-500/10 px-2 py-1 rounded text-lg text-orange-300 font-mono border border-orange-500/30 font-normal" {...props} />
-                      ) : (
+                    pre: ({ children }) => {
+                      const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                      return (
                         <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl font-normal">
                           <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
                             <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56]" />
                             <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]" />
                             <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f]" />
-                            <span className="ml-3 text-sm font-mono text-gray-500 tracking-wider uppercase">
-                              {props.className?.replace("language-", "") || "code"}
-                            </span>
+                            <span className="ml-3 text-sm font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                           </div>
                           <div className="p-6 overflow-x-auto custom-scrollbar">
-                            <code className="block font-mono text-[16px] md:text-lg leading-relaxed text-gray-300" {...props} />
+                            {children}
                           </div>
                         </div>
                       );
                     },
-                    p: ({ node, ...props }) => <p className="mb-4 last:mb-0" {...props} />,
+                    code: ({ className, children, ...props }) => {
+                      const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                      return isInline
+                        ? <code className="bg-orange-500/10 px-2 py-1 rounded text-lg text-orange-300 font-mono border border-orange-500/30 font-normal" {...props}>{children}</code>
+                        : <code className={"block font-mono text-[16px] md:text-lg leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                    },
+                    p: ({ ...props }) => <p className="mb-4 last:mb-0" {...props} />,
                   }}
                 >
-                  {currentQuestion.description || "No question text provided."}
+                  {normalizeCodeBlocks(currentQuestion.description || "No question text provided.")}
                 </ReactMarkdown>
               </div>
               {currentQuestion.images && currentQuestion.images.length > 0 && (

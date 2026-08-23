@@ -15,6 +15,7 @@ import answersRouter from "./module/answers/answer.route.js";
 import superadminRouter from "./module/superadmin/superadmin.route.js";
 import feedbackRouter from "./module/feedback/feedback.route.js";
 import ragRouter from "./module/generation/rag/rag.route.js";
+import questionBankRouter from "./module/generation/questionBank/questionBank.route.js";
 import jobsRouter from "./module/jobs/jobs.route.js";
 import { generationRouter } from "./module/generation/generation.route.js";
 import billingRouter from "./module/billing/billing.route.js";
@@ -50,6 +51,7 @@ app.use("/api/jobs", jobsRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/student-profile", studentProfileRouter);
 app.use("/", ragRouter);
+app.use("/", questionBankRouter);
 app.use(errorHandler)
 
 export default app;

@@ -34,6 +34,11 @@ export const verifyOtp = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Email verified successfully", null);
 };
 
+export const resendOtp = async (req: Request, res: Response) => {
+    await authService.resendOtp(req.body.email);
+    return ApiResponse.ok(res, "Verification code sent to your email", null);
+};
+
 export const refreshToken = async (req: Request, res: Response) => {
     const token = req.cookies?.refreshToken;
     const { accessToken } = await authService.refresh(token);

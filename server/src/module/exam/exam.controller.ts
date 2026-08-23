@@ -40,7 +40,10 @@ export const listExamsForClassroom = async (req: Request, res: Response) => {
         req.params.classroomId as string,
         toRequester(req),
         req.query.groupId as string | undefined,
-        req.query.search as string | undefined
+        req.query.search as string | undefined,
+        req.query.status as string | undefined,
+        Number(req.query.page) || 1,
+        Number(req.query.limit) || 9
     );
     return ApiResponse.ok(res, "Exams", examsData);
 };
@@ -61,6 +64,14 @@ export const getOverviewStats = async (req: Request, res: Response) => {
 };
 
 export const getMyExams = async (req: Request, res: Response) => {
-    const exams = await examService.getMyExams(req.user!.id, req.query.classroomId as string | undefined);
+    const exams = await examService.getMyExams(
+        req.user!.id,
+        req.query.classroomId as string | undefined,
+        req.query.groupId as string | undefined,
+        req.query.search as string | undefined,
+        req.query.category as string | undefined,
+        Number(req.query.page) || 1,
+        Number(req.query.limit) || 10
+    );
     return ApiResponse.ok(res, "Your exams", exams);
 };

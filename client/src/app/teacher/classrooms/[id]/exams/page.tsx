@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { FileText, Plus, Trash2, Search, Clock, Layers, Eye, Edit2 } from "lucide-react";
+import { FileText, Plus, Search, Clock, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { listExamsForClassroomService, deleteExamService, updateExamService } from "../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
 import { TeacherExamPreviewModal } from "@/components/TeacherExamPreviewModal";
+import { Pagination } from "@/components/Pagination";
 
 interface ExamEntry {
   id: string;
@@ -36,6 +37,11 @@ export default function ExamsPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "draft">("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ all: 0, published: 0, draft: 0 });
+  const PAGE_SIZE = 9;
 
   // Preview Modal State
   const [previewExamId, setPreviewExamId] = useState<string | null>(null);
@@ -48,12 +54,16 @@ export default function ExamsPage() {
     return () => clearTimeout(handler);
   }, [search]);
 
-  const loadExams = async (query?: string) => {
+  const loadExams = async (query: string, status: string, pg: number) => {
     try {
       setLoading(true);
-      const res = await listExamsForClassroomService(classroomId, undefined, query);
-      setExams(res.data || []);
-    } catch (err) {
+      const res = await listExamsForClassroomService(classroomId, undefined, query, status, pg);
+      const result = res.data || { data: [], total: 0, counts: { all: 0, published: 0, draft: 0 } };
+      setExams(result.data || []);
+      setTotal(result.total || 0);
+      setCounts(result.counts || { all: 0, published: 0, draft: 0 });
+      setTotalPages(Math.max(1, Math.ceil((result.total || 0) / PAGE_SIZE)));
+    } catch {
       toast.error("Failed to load exams");
     } finally {
       setLoading(false);
@@ -61,17 +71,22 @@ export default function ExamsPage() {
   };
 
   useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, statusFilter]);
+
+  useEffect(() => {
     if (classroomId) {
-      loadExams(debouncedSearch);
+      loadExams(debouncedSearch, statusFilter, page);
     }
-  }, [classroomId, debouncedSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroomId, debouncedSearch, statusFilter, page]);
 
   const handleDeleteExam = async (examId: string, title: string) => {
     if (!confirm(`Delete exam "${title}"? This permanently deletes its sections, questions, and submissions. This cannot be undone.`)) return;
     try {
       await deleteExamService(examId);
       toast.success("Exam deleted");
-      loadExams(debouncedSearch);
+      loadExams(debouncedSearch, statusFilter, page);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to delete exam");
     }
@@ -82,29 +97,22 @@ export default function ExamsPage() {
     try {
       await updateExamService(examId, { status: nextStatus });
       toast.success(nextStatus === "PUBLISHED" ? "Exam published successfully!" : "Exam moved back to Draft");
-      loadExams(debouncedSearch);
+      loadExams(debouncedSearch, statusFilter, page);
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to update status");
     }
   };
 
-  const allCount = exams.length;
-  const publishedCount = exams.filter(e => (e as any).status === "PUBLISHED").length;
-  const draftCount = exams.filter(e => (e as any).status !== "PUBLISHED").length;
-
-  const filteredExams = exams.filter(e => {
-    const isPub = (e as any).status === "PUBLISHED";
-    if (statusFilter === "published") return isPub;
-    if (statusFilter === "draft") return !isPub;
-    return true;
-  });
+  const allCount = counts.all;
+  const publishedCount = counts.published;
+  const draftCount = counts.draft;
 
   return (
     <div className="space-y-6">
       {/* Header and Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-xl font-bold text-white tracking-tight">Exams ({filteredExams.length})</h3>
+          <h3 className="text-xl font-bold text-white tracking-tight">Exams ({total})</h3>
           <p className="text-gray-400 text-sm mt-1">Exams can be class-wide or restricted to a group.</p>
         </div>
         <Button
@@ -166,7 +174,7 @@ export default function ExamsPage() {
       {/* Main Grid View */}
       {loading ? (
         <div className="text-gray-400 text-center py-12">Loading exams...</div>
-      ) : filteredExams.length === 0 ? (
+      ) : exams.length === 0 ? (
         <Card className="bg-[#09090b] border-zinc-800 py-12 text-center rounded-2xl">
           <CardContent>
             <FileText className="h-10 w-10 text-gray-500 mx-auto mb-3" />
@@ -177,7 +185,7 @@ export default function ExamsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredExams.map((e) => (
+          {exams.map((e) => (
             <div
               key={e.id}
               className="bg-[#12131a] border border-white/10 hover:border-orange-500/50 rounded-2xl p-6 relative flex flex-col justify-between shadow-2xl transition-all duration-300 group"
@@ -272,6 +280,9 @@ export default function ExamsPage() {
           ))}
         </div>
       )}
+
+      {/* Pagination */}
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
 
       {/* Student View Preview Modal */}
       {previewExamId && (

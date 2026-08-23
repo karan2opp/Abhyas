@@ -21,8 +21,8 @@ export const getExamByIdService = async (id: string) => {
   return res.data;
 };
 
-export const listExamsForClassroomService = async (classroomId: string, groupId?: string, search?: string) => {
-  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { groupId, search } });
+export const listExamsForClassroomService = async (classroomId: string, groupId?: string, search?: string, status?: string, page?: number, limit?: number) => {
+  const res = await api.get(`/exams/classroom/${classroomId}`, { params: { groupId, search, status, page, limit } });
   return res.data;
 };
 

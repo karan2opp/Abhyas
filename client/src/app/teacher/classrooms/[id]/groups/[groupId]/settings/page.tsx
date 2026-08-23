@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -31,7 +31,7 @@ export default function GroupSettingsPage() {
       const found = (res.data || []).find((g: GroupEntry) => g.id === groupId);
       setGroup(found || null);
       if (found) setNameInput(found.name);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load group");
     } finally {
       setLoading(false);

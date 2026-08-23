@@ -26,7 +26,7 @@ export default function StudentClassroomGroupsPage() {
       try {
         const res = await getMyGroupsService(classroomId);
         setGroups(res.data || []);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load groups");
       } finally {
         setLoading(false);

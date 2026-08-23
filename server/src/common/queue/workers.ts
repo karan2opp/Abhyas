@@ -74,7 +74,11 @@ export const startWorkers = () => {
 
     new Worker(
         "generation",
-        async (job) => generateExamFromBlueprint(job.data.blueprint, job.data.organisationId),
+        async (job) => generateExamFromBlueprint(
+            job.data.blueprint,
+            job.data.organisationId,
+            (done, total, message) => { job.updateProgress({ done, total, message }); }
+        ),
         { connection, concurrency: 2 }
     ).on("failed", (job, err) => console.error(`Generation job ${job?.id} failed:`, err?.message));
 

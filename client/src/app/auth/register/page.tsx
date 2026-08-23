@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 
-import { registerService, verifyOtpService } from '../auth.service';
+import { registerService, verifyOtpService, resendOtpService } from '../auth.service';
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -31,6 +31,28 @@ export default function RegisterPage() {
   const [step, setStep] = useState<'REGISTER' | 'VERIFY'>('REGISTER');
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return;
+    setIsResending(true);
+    try {
+      await resendOtpService(registeredEmail);
+      setResendCooldown(30);
+      toast.success("A new verification code has been sent to your email.");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend code");
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const {
     register,
@@ -97,7 +119,7 @@ export default function RegisterPage() {
                 id="name" 
                 type="text" 
                 placeholder="John Doe" 
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all"
                 {...register('name')}
               />
               {errors.name && (
@@ -111,7 +133,7 @@ export default function RegisterPage() {
                 id="email" 
                 type="email" 
                 placeholder="name@university.edu" 
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all"
                 {...register('email')}
               />
               {errors.email && (
@@ -126,7 +148,7 @@ export default function RegisterPage() {
                   id="password" 
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••" 
-                  className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all pr-12"
+                  className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all pr-12"
                   {...register('password')}
                 />
                 <button
@@ -145,11 +167,11 @@ export default function RegisterPage() {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-white text-black hover:bg-gray-200 font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -161,7 +183,7 @@ export default function RegisterPage() {
 
           <div className="text-center text-sm text-gray-400">
             Already have an account?{' '}
-            <Link href="/auth/login" className="text-white font-semibold hover:underline transition-colors">
+            <Link href="/auth/login" className="text-orange-400 font-semibold hover:text-orange-300 hover:underline transition-colors">
               Sign In
             </Link>
           </div>
@@ -187,7 +209,7 @@ export default function RegisterPage() {
                 type="text" 
                 maxLength={6}
                 placeholder="123456" 
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-center text-2xl tracking-widest font-semibold"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all text-center text-2xl tracking-widest font-semibold"
                 {...registerVerify('otp')}
               />
               {verifyErrors.otp && (
@@ -198,11 +220,11 @@ export default function RegisterPage() {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-white text-black hover:bg-gray-200 font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
             >
               {isLoading ? (
                 <div className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -214,14 +236,16 @@ export default function RegisterPage() {
 
           <div className="text-center text-sm text-gray-400">
             Didn't receive the code?{' '}
-            <button 
-              onClick={() => {
-                toast.success("New code sent (mocked)");
-                // You can add logic to resend OTP here
-              }} 
-              className="text-white font-semibold hover:underline transition-colors"
+            <button
+              onClick={handleResend}
+              disabled={isResending || resendCooldown > 0}
+              className="text-orange-400 font-semibold hover:text-orange-300 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Resend Code
+              {isResending
+                ? "Sending..."
+                : resendCooldown > 0
+                  ? `Resend in ${resendCooldown}s`
+                  : "Resend Code"}
             </button>
           </div>
         </motion.div>

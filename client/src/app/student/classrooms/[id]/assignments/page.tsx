@@ -72,7 +72,7 @@ export default function StudentClassroomAssignmentsPage() {
         const map: Record<string, string> = {};
         (gRes.data || []).forEach((g: { id: string; name: string }) => { map[g.id] = g.name; });
         setGroupNames(map);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load assignments");
       } finally {
         setLoading(false);

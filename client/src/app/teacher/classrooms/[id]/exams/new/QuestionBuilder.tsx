@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Layers, Plus, Trash2, Edit2, Check, X, CheckCircle2, Circle, Settings2, Zap, Sparkles, ChevronDown, ChevronUp, Code, BarChart2, FileText, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, BarChart2, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,16 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
-import { BlueprintTreeViewer, BlueprintTree } from "@/components/BlueprintTreeViewer";
-import {
-  createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService,
-  createQuestionService, updateQuestionService, deleteQuestionService,
-  createOptionService, updateOptionService, deleteOptionService,
-  saveGeneratedExamService, getExamByIdService,
-  generateBlueprintService, verifyBlueprintService, enqueueGenerateFromBlueprintService, getGenerationJobService
-} from "../../../../exams/exam.service";
+import { BlueprintTreeViewer } from "@/components/BlueprintTreeViewer";
+import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService, generateBlueprintService, verifyBlueprintService, enqueueGenerateFromBlueprintService, getGenerationJobService } from "../../../../exams/exam.service";
 import { generateSingleQuestionService } from "../../../../assignments/assignment.service";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
@@ -95,7 +90,7 @@ export function QuestionBuilder({ examId }: { examId: string }) {
     try {
       const data = await getSectionsWithDetailsService(examId);
       setSections(data.data || []);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load sections");
     } finally {
       setLoading(false);
@@ -130,7 +125,6 @@ export function QuestionBuilder({ examId }: { examId: string }) {
         <AiExamGeneratorForm
           examId={examId}
           examDetail={examDetail}
-          existingSections={sections}
           existingSectionsCount={sections.length}
           initialTargetSectionId={aiTargetSectionId}
           onBack={() => {
@@ -290,7 +284,7 @@ function SectionItem({ section, index, refresh, onOpenEditor, onOpenAiForSection
       }
       await Promise.all(promises);
       refresh();
-      toast.success(`${count} empty question${count > 1 ? 's' : ''} added`);
+      toast.success(`${count} question${count > 1 ? 's' : ''} added`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to quick add questions");
     }
@@ -412,28 +406,32 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]}
             components={{
-              code: ({node, ...props}) => {
-                const isInline = !props.className?.includes('language-');
-                return isInline 
-                  ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-[13px] text-orange-300 font-mono border border-orange-500/30" {...props} /> 
-                  : (
+                pre: ({ children }) => {
+                  const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                  return (
                     <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl">
                       <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
                         <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
                         <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                        <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace('language-', '') || 'code'}</span>
+                        <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                       </div>
-                      <div className="p-5 overflow-x-auto custom-scrollbar">
-                        <code className="block font-mono text-[13px] leading-relaxed text-gray-300" {...props} />
+                      <div className="p-5 overflow-x-auto custom-scrollbar font-normal">
+                        {children}
                       </div>
                     </div>
-                  )
-              },
-              p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
-            }}
+                  );
+                },
+                code: ({ className, children, ...props }) => {
+                  const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                  return isInline
+                    ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-[13px] text-orange-300 font-mono border border-orange-500/30" {...props}>{children}</code>
+                    : <code className={"block font-mono text-[13px] leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                },
+                p: ({...props}) => <p className="mb-2 last:mb-0" {...props} />
+              }}
           >
-            {question.description || question.question || question.text || "No question text provided."}
+            {normalizeCodeBlocks(question.description || question.question || question.text || "No question text provided.")}
           </ReactMarkdown>
         </div>
         
@@ -446,7 +444,7 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
         {/* Display Read-Only Options */}
         {question.type === 'mcq' && question.options && question.options.length > 0 && (
           <div className="space-y-2.5 max-w-3xl">
-            {question.options.map((opt: any, i: number) => (
+            {question.options.map((opt: any) => (
               <div key={opt._id || opt.id} className={cn(
                 "flex items-center p-3.5 rounded-xl border text-[14px] transition-all duration-200",
                 opt.isCorrect 
@@ -737,7 +735,7 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
               {isAiLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                   <Loader2 className="h-10 w-10 text-orange-500 animate-spin" />
-                  <p className="text-sm text-gray-400 text-center">Our AI agent is generating the updated question. This may take a few seconds...</p>
+                  <p className="text-sm text-gray-400 text-center">Generating question...</p>
                 </div>
               ) : (
                 <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto custom-scrollbar">
@@ -928,7 +926,16 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
 // -------------------------------------------------------------
 // AI EXAM GENERATOR FORM
 // -------------------------------------------------------------
-function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existingSectionsCount = 0, initialTargetSectionId = null, onBack, onSuccess }: { examId: string, examDetail?: any, existingSections?: any[], existingSectionsCount?: number, initialTargetSectionId?: string | null, onBack: () => void, onSuccess: () => void }) {
+// Filters out verification warnings that only differ by case or
+// whitespace (e.g. suggesting "Variables" when the topic is already
+// "variables") — those are trivial and not worth showing/applying.
+const isTrivialWarningFix = (w: any): boolean => {
+  if (!w.suggestedTopic) return false;
+  const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return norm(w.topic) === norm(w.suggestedTopic);
+};
+
+function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, initialTargetSectionId = null, onBack, onSuccess }: { examId: string, examDetail?: any, existingSectionsCount?: number, initialTargetSectionId?: string | null, onBack: () => void, onSuccess: () => void }) {
   const [difficulty, setDifficulty] = useState(
     examDetail?.difficulty 
       ? examDetail.difficulty.charAt(0).toUpperCase() + examDetail.difficulty.slice(1).toLowerCase() 
@@ -940,7 +947,8 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
 : [""]
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatingMessage, setGeneratingMessage] = useState("");
+  const [genPhase, setGenPhase] = useState<"blueprint" | "questions" | "verify">("blueprint");
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number; message?: string } | null>(null);
 
   // 3-Stage Workflow States
   const [aiStage, setAiStage] = useState<"config" | "blueprint">("config");
@@ -1102,8 +1110,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
   };
 
   // Step 1: Generate Blueprint Tree
-  const handleGenerateBlueprint = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateBlueprint = async () => {
     const invalid = sections.some(s => {
       if (!s.name.trim()) return true;
       return !s.blocks.some((b: any) => b.subject.trim() && b.topics.filter((t: string) => t.trim() !== "").length > 0 && Number(b.numberOfQuestions) > 0);
@@ -1114,7 +1121,8 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
     }
 
     setIsGenerating(true);
-    setGeneratingMessage("Subtopics Agent is planning blueprint tree & allocating questions...");
+    setGenPhase("blueprint");
+    setGenProgress(null);
     try {
       const payload = {
         title: `${(sections[0]?.blocks?.[0]?.subject?.trim() || "Untitled")} Exam`,
@@ -1141,7 +1149,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
       const bp = res.data || res;
       setBlueprint(bp);
       setAiStage("blueprint");
-      toast.success("Blueprint tree created! Inspect and customize blocks, topics and questions below.");
+      toast.success("Subtopics created!");
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to generate blueprint");
     } finally {
@@ -1154,13 +1162,15 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
     if (!blueprint) return;
 
     setIsVerifying(true);
+    setGenPhase("verify");
+    setGenProgress(null);
     try {
       const res = await verifyBlueprintService(blueprint);
       const result = res.data || res;
       setVerificationResult(result);
 
       if (result.isValid && (!result.warnings || result.warnings.length === 0)) {
-        toast.success("Verification passed with 0 semantic issues!");
+        toast.success("Everything looks good!");
         await executeFinalGeneration(blueprint);
       } else {
         setShowVerificationModal(true);
@@ -1176,6 +1186,8 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
   const handleApplySuggestionsAndProceed = async () => {
     if (!blueprint || !verificationResult || !verificationResult.warnings) return;
 
+    const warningsToApply = (verificationResult.warnings || []).filter((w: any) => !isTrivialWarningFix(w));
+
     const updatedBp = JSON.parse(JSON.stringify(blueprint));
 
     // Capture each section's total question count BEFORE any changes so we can
@@ -1186,7 +1198,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
           sum + (top.subtopics || []).reduce((s: number, st: any) => s + (st.allocatedQuestions || 0), 0), 0), 0)
     );
 
-    verificationResult.warnings.forEach((warn: any) => {
+    warningsToApply.forEach((warn: any) => {
       if (!warn.suggestedTopic) return;
       (updatedBp.sections || []).forEach((sec: any) => {
         // Relocate the flagged subtopic, preserving its original allocated count.
@@ -1269,26 +1281,35 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
 
     setBlueprint(updatedBp);
     setShowVerificationModal(false);
-    toast.success("AI suggestions applied to blueprint tree!");
+    toast.success("Suggestions applied successfully!");
     await executeFinalGeneration(updatedBp);
   };
 
   // Final Step: Enqueue generation job, poll for result, save generated exam
   const executeFinalGeneration = async (bpToUse: any) => {
     setIsGenerating(true);
-    setGeneratingMessage("Submitting generation job...");
+    setGenPhase("questions");
+    const totalQ = (bpToUse.sections || []).reduce((s: number, sec: any) =>
+      s + (sec.blocks || []).reduce((b: number, blk: any) =>
+        b + (blk.question_count
+          || (blk.topics || []).reduce((t: number, top: any) =>
+            t + (top.subtopics || []).reduce((st: number, sb: any) => st + (sb.allocatedQuestions || 0), 0), 0)
+          || 5), 0), 0);
+    setGenProgress({ done: 0, total: totalQ });
     try {
       const enqueueRes = await enqueueGenerateFromBlueprintService(bpToUse);
       const jobId = enqueueRes.data?.jobId || enqueueRes.jobId;
       if (!jobId) throw new Error("No generation job id returned");
 
-      setGeneratingMessage("RAG search & question generation in progress...");
-
       let generatedExam: any = null;
       while (true) {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         const jobRes = await getGenerationJobService(jobId);
         const job = jobRes.data || jobRes;
+
+        if (job.progress && typeof job.progress === "object" && job.progress.total) {
+          setGenProgress(job.progress);
+        }
 
         if (job.status === "completed") {
           generatedExam = job.result;
@@ -1301,14 +1322,13 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
 
       if (!generatedExam) throw new Error("Generation job returned no result");
 
-      setGeneratingMessage("Saving generated questions into exam...");
       await saveGeneratedExamService({
         ...generatedExam,
         examId,
         status: "PUBLISHED",
       });
 
-      toast.success("Exam questions generated & saved successfully!");
+      toast.success("Questions generated successfully!");
       onSuccess();
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to generate questions");
@@ -1318,26 +1338,41 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
   };
 
   if (isGenerating || isVerifying) {
+    const hasQuestionProgress = genPhase === "questions" && !!genProgress && genProgress.total > 0;
+    const pct = hasQuestionProgress ? Math.min(100, Math.round((genProgress!.done / genProgress!.total) * 100)) : 0;
+    const loaderTitle = genPhase === "verify"
+      ? "Verifying..."
+      : genPhase === "questions"
+        ? "Generating questions..."
+        : "Planning subtopics...";
+
     return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-6">
-        <div className="relative">
-          <div className="w-20 h-20 border-4 border-purple-500/20 rounded-full flex items-center justify-center">
-            <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0" />
-            <Sparkles className="h-7 w-7 text-purple-400 animate-pulse" />
+      <div className="flex flex-col items-center justify-center py-24 space-y-5">
+        <div className="w-16 h-16 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin" />
+        <h4 className="text-lg font-bold text-white">{loaderTitle}</h4>
+        {hasQuestionProgress && (
+          <div className="w-full max-w-xs space-y-1.5">
+            <div className="w-full bg-[#14151f] border border-white/10 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-orange-500 rounded-full transition-all duration-700"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <p className="text-xs text-purple-300 font-semibold text-center">
+              {Math.min(genProgress!.done, genProgress!.total)} / {genProgress!.total}
+            </p>
+            {genProgress.message && (
+              <p className="text-[11px] text-gray-400 text-center truncate max-w-[320px] mx-auto">
+                {genProgress.message}
+              </p>
+            )}
           </div>
-        </div>
-        <div className="text-center space-y-2">
-          <h4 className="text-xl font-bold text-white">
-            {isVerifying ? "Verification Agent is checking blueprint..." : "AI Agent is generating questions..."}
-          </h4>
-          <p className="text-sm text-purple-300/80 animate-pulse">{generatingMessage}</p>
-        </div>
-        <p className="text-xs text-gray-500 max-w-sm text-center">
-          Please wait. This ensures topic relevance, question allocations, and RAG context accuracy.
-        </p>
+        )}
       </div>
     );
   }
+
+  const meaningfulWarnings = (verificationResult?.warnings || []).filter((w: any) => !isTrivialWarningFix(w));
 
   return (
     <div className="space-y-0 animate-in fade-in slide-in-from-bottom-1 duration-150 w-full max-w-full px-2 pb-6">
@@ -1368,37 +1403,42 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
         </div>
       ) : (
         /* STAGE 1: INITIAL EXAM CONFIG FORM */
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch w-full">
-          
-          {/* BOX 1 (LEFT): EXAM SETTINGS */}
-          <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 space-y-6 shadow-xl flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="border-b border-white/5 pb-4">
-                <h5 className="font-bold text-white text-base tracking-wider uppercase">EXAM SETTINGS</h5>
-                <p className="text-xs text-gray-400">Configure basic parameters to generate AI topic blueprint</p>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start w-full">
+          <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-5 space-y-5 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <div>
+                <h5 className="font-bold text-white text-base tracking-wider uppercase">EXAM SETTINGS & SECTIONS</h5>
+                <p className="text-xs text-gray-400">Configure difficulty, instructions, and organize section topics for blueprint planning</p>
+              </div>
+              <Button
+                type="button"
+                onClick={addSection}
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-orange-950/40 h-9 px-4"
+              >
+                <Plus className="h-4 w-4 mr-1.5" /> Add Section
+              </Button>
+            </div>
+
+            {/* DIFFICULTY + SPECIAL INSTRUCTIONS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">DIFFICULTY *</label>
+                <Select value={difficulty} onValueChange={val => setDifficulty(val || "Medium")}>
+                  <SelectTrigger className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-9 text-sm focus:ring-orange-500 rounded-xl px-3.5">
+                    <div className="flex items-center gap-2">
+                      <BarChart2 className="h-4 w-4 text-orange-400 shrink-0" />
+                      <SelectValue placeholder="Select Difficulty" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#14151f] border border-white/15 text-white text-sm min-w-[200px] shadow-2xl z-50">
+                    <SelectItem value="Easy">Easy</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="Hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* DIFFICULTY */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">DIFFICULTY *</label>
-                  <Select value={difficulty} onValueChange={val => setDifficulty(val || "Medium")}>
-                    <SelectTrigger className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-11 text-sm focus:ring-orange-500 rounded-xl px-3.5">
-                      <div className="flex items-center gap-2">
-                        <BarChart2 className="h-4 w-4 text-orange-400 shrink-0" />
-                        <SelectValue placeholder="Select Difficulty" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#14151f] border border-white/15 text-white text-sm min-w-[200px] shadow-2xl z-50">
-                      <SelectItem value="Easy">Easy</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="Hard">Hard</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* SPECIAL INSTRUCTIONS */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SPECIAL INSTRUCTIONS</label>
@@ -1419,7 +1459,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                         value={inst}
                         onChange={e => updateInstruction(idx, e.target.value)}
                         placeholder={`Instruction ${idx + 1}...`}
-                        className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-10 text-xs rounded-xl focus-visible:ring-orange-500"
+                        className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-9 text-xs rounded-xl focus-visible:ring-orange-500"
                       />
                       {instructions.length > 1 && (
                         <button
@@ -1435,28 +1475,13 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* BOX 2 (RIGHT): SECTIONS & TOPICS CONFIG */}
-          <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 space-y-6 shadow-xl flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                <div>
-                  <h5 className="font-bold text-white text-base tracking-wider uppercase">SECTIONS & TOPICS</h5>
-                  <p className="text-xs text-gray-400">Organize your initial section topics for blueprint planning</p>
-                </div>
-                <Button
-                  type="button"
-                  onClick={addSection}
-                  size="sm"
-                  className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-xl shadow-md shadow-orange-950/40 h-9 px-4"
-                >
-                  <Plus className="h-4 w-4 mr-1.5" /> Add Section
-                </Button>
-              </div>
+            {/* SECTIONS & TOPICS */}
+            <div className="border-t border-white/5 pt-5 space-y-4">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SECTIONS & TOPICS</label>
 
-              <div className="space-y-6">
-                {sections.map((section, idx) => (
+              <div className="space-y-4">
+{sections.map((section) => (
                   <div key={section.id} className="space-y-4 pt-2 first:pt-0">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
                       <Input
@@ -1478,7 +1503,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                     </div>
 
                     {/* BLOCKS */}
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">BLOCKS (subject-scoped)</label>
                         <Button
@@ -1492,29 +1517,34 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                       </div>
 
                       {section.blocks.map((block: any, bIdx: number) => (
-                        <div key={block.id} className="bg-[#14151f] border border-purple-500/20 rounded-xl p-3 space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="text-purple-400 text-xs font-bold">▣</span>
-                              <Input
-                                value={block.name}
-                                onChange={e => updateBlock(section.id, bIdx, 'name', e.target.value)}
-                                placeholder="Block name"
-                                className="bg-[#0b0c10] border border-white/10 text-white text-xs font-bold h-8 w-32 focus-visible:ring-purple-500"
-                              />
-                              <Input
-                                value={block.subject}
-                                onChange={e => updateBlock(section.id, bIdx, 'subject', e.target.value)}
-                                placeholder="Subject (e.g. JavaScript)"
-                                className="bg-[#0b0c10] border border-white/10 text-white text-xs font-bold h-8 flex-1 focus-visible:ring-purple-500"
-                                required
-                              />
+                        <div key={block.id} className="bg-[#09090b] border border-purple-500/20 rounded-xl p-3 space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 flex-1">
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">BLOCK</label>
+                                <Input
+                                  value={block.name}
+                                  onChange={e => updateBlock(section.id, bIdx, 'name', e.target.value)}
+                                  placeholder="Block name"
+                                  className="bg-[#14151f] border border-white/15 text-white text-xs font-bold h-8 w-full rounded-lg focus-visible:ring-orange-500"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">SUBJECT</label>
+                                <Input
+                                  value={block.subject}
+                                  onChange={e => updateBlock(section.id, bIdx, 'subject', e.target.value)}
+                                  placeholder="Subject (e.g. JavaScript)"
+                                  className="bg-[#14151f] border border-white/15 text-white text-xs font-bold h-8 w-full rounded-lg focus-visible:ring-orange-500"
+                                  required
+                                />
+                              </div>
                             </div>
                             {section.blocks.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeBlockFromSection(section.id, bIdx)}
-                                className="text-gray-400 hover:text-red-400 transition-colors p-1"
+                                className="text-gray-400 hover:text-red-400 transition-colors p-1 mt-5 shrink-0"
                               >
                                 <X className="h-4 w-4" />
                               </button>
@@ -1528,30 +1558,26 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                               <Button
                                 type="button"
                                 onClick={() => addTopicToBlock(section.id, bIdx)}
-                                variant="ghost"
-                                className="h-5 px-0 text-[11px] text-orange-400 hover:text-orange-300 bg-transparent"
+                                className="h-8 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg"
                               >
                                 <Plus className="h-3 w-3 mr-1" /> Add Topic
                               </Button>
                             </div>
-                            <div className="space-y-1.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {block.topics.map((topic: string, tIdx: number) => (
-                                <div key={tIdx} className="flex items-center justify-between gap-2 bg-[#0b0c10] border border-white/10 rounded-lg px-3 py-1.5">
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <span className="text-orange-400 text-xs font-bold">•</span>
-                                    <Input
-                                      value={topic}
-                                      onChange={e => updateTopicInBlock(section.id, bIdx, tIdx, e.target.value)}
-                                      placeholder={`Topic ${tIdx + 1}`}
-                                      className="bg-transparent border-none text-white text-xs h-8 focus-visible:ring-0 p-0 flex-1 focus:outline-none"
-                                      required
-                                    />
-                                  </div>
+                                <div key={tIdx} className="flex items-center gap-2">
+                                  <Input
+                                    value={topic}
+                                    onChange={e => updateTopicInBlock(section.id, bIdx, tIdx, e.target.value)}
+                                    placeholder={`Topic ${tIdx + 1}`}
+                                    className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-8 text-xs rounded-lg focus-visible:ring-orange-500 flex-1"
+                                    required
+                                  />
                                   {block.topics.length > 1 && (
                                     <button
                                       type="button"
                                       onClick={() => removeTopicFromBlock(section.id, bIdx, tIdx)}
-                                      className="text-gray-400 hover:text-red-400 transition-colors p-1"
+                                      className="text-gray-400 hover:text-red-400 transition-colors p-1 shrink-0"
                                     >
                                       <X className="h-3.5 w-3.5" />
                                     </button>
@@ -1566,7 +1592,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                             <div className="space-y-1">
                               <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">TYPE</label>
                               <Select value={block.questionType} onValueChange={val => updateBlock(section.id, bIdx, 'questionType', val)}>
-                                <SelectTrigger className="bg-[#0b0c10] border border-white/10 text-white h-9 text-xs font-semibold rounded-lg px-2.5">
+                                <SelectTrigger className="w-full bg-[#14151f] border border-white/15 text-white h-8 text-xs font-semibold rounded-lg px-2.5">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent className="bg-[#14151f] border border-white/15 text-white text-xs">
@@ -1583,7 +1609,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                                 max="50"
                                 value={block.numberOfQuestions}
                                 onChange={e => updateBlock(section.id, bIdx, 'numberOfQuestions', e.target.value)}
-                                className="bg-[#0b0c10] border border-white/10 text-white h-9 text-xs font-bold rounded-lg text-center"
+                                className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
                               />
                             </div>
                             <div className="space-y-1">
@@ -1593,7 +1619,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
                                 min="1"
                                 value={block.marksPerQuestion}
                                 onChange={e => updateBlock(section.id, bIdx, 'marksPerQuestion', e.target.value)}
-                                className="bg-[#0b0c10] border border-white/10 text-white h-9 text-xs font-bold rounded-lg text-center"
+                                className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
                               />
                             </div>
                           </div>
@@ -1606,17 +1632,68 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
             </div>
           </div>
 
+          {/* RIGHT COLUMN: LIVE EXAM SUMMARY SIDEBAR */}
+          <div className="space-y-4 sticky top-6">
+            <Card className="bg-[#0f0f11] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <h6 className="font-bold text-white text-xs tracking-wider uppercase">
+                  Exam Summary
+                </h6>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                  Live Stats
+                </span>
+              </div>
+
+              <div className="space-y-3">
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Sections</span>
+                    <span className="text-lg font-extrabold text-white">{sections.length}</span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Blocks</span>
+                    <span className="text-lg font-extrabold text-white">
+                      {sections.reduce((acc, s) => acc + (s.blocks?.length || 0), 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Questions</span>
+                    <span className="text-lg font-extrabold text-purple-400">
+                      {sections.reduce((acc, s) => acc + (s.blocks?.reduce((bAcc: number, b: any) => bAcc + (Number(b.numberOfQuestions) || 0), 0) || 0), 0)}
+                    </span>
+                  </div>
+                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Marks</span>
+                    <span className="text-lg font-extrabold text-emerald-400">
+                      {sections.reduce((acc, s) => acc + (s.blocks?.reduce((bAcc: number, b: any) => bAcc + ((Number(b.numberOfQuestions) || 0) * (Number(b.marksPerQuestion) || 1)), 0) || 0), 0)}
+                    </span>
+                  </div>
+                </div>
+
+                {instructions.filter(i => i.trim() !== "").length > 0 && (
+                  <div className="p-2.5 rounded-xl bg-[#14151f] border border-white/5 text-xs flex items-center justify-between">
+                    <span className="text-gray-400 font-medium">Instructions</span>
+                    <span className="text-white font-bold">{instructions.filter(i => i.trim() !== "").length} Added</span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
         </div>
       )}
 
       {/* STAGE 1 BOTTOM ACTION BAR */}
       {aiStage === "config" && (
-        <div className="sticky bottom-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-t border-white/10 p-4 rounded-t-2xl shadow-2xl flex items-center justify-between gap-4 -mx-1 mt-6">
+        <div className="sticky bottom-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-t border-white/10 p-4 rounded-t-2xl shadow-2xl flex items-center justify-between gap-4 -mx-1 mt-10">
           <Button variant="ghost" onClick={onBack} className="text-gray-400 hover:text-white h-10 px-5 text-sm font-semibold flex items-center gap-1.5">
             <ArrowLeft className="h-4 w-4" /> Cancel
           </Button>
-          <Button onClick={handleGenerateBlueprint} className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-7 font-bold text-sm shadow-xl shadow-purple-950/40 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
-            <Sparkles className="h-4 w-4 mr-2 text-purple-200" /> Generate Blueprint Tree
+          <Button onClick={handleGenerateBlueprint} className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-8 font-bold text-sm shadow-xl shadow-purple-950/40 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+            Next <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
       )}
@@ -1639,25 +1716,35 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
 
             <div className="space-y-3">
               <h6 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                Semantic Warnings & Suggested Corrections ({verificationResult?.warnings?.length || 0})
+                Semantic Warnings ({meaningfulWarnings.length})
               </h6>
 
-              {(verificationResult?.warnings || []).map((warn: any, idx: number) => (
-                <div key={idx} className="bg-[#14151f] border border-amber-500/30 rounded-xl p-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-white">
-                    <span className="text-amber-400">Topic: {warn.topic}</span>
-                    <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px]">
-                      Subtopic: {warn.subtopic}
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-300 leading-relaxed">{warn.reason}</p>
-                  {warn.suggestedTopic && (
-                    <div className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg font-medium">
-                      💡 Suggested Parent Topic: <span className="font-bold underline">{warn.suggestedTopic}</span>
+              {meaningfulWarnings.length === 0 ? (
+                <p className="text-xs text-zinc-400 bg-[#14151f] border border-white/10 p-3 rounded-xl">
+                  No significant semantic issues found. The warnings were minor formatting differences.
+                </p>
+              ) : (
+                meaningfulWarnings.map((warn: any, idx: number) => (
+                  <div key={idx} className="bg-[#14151f] border border-amber-500/30 rounded-xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0">
+                        Subtopic
+                      </span>
+                      <span className="text-xs font-bold text-white text-right">{warn.subtopic}</span>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-gray-400">Current Topic</span>
+                      <span className="text-white font-semibold text-right">{warn.topic}</span>
+                    </div>
+                    <p className="text-xs text-zinc-300 leading-relaxed border-t border-white/5 pt-2.5">{warn.reason}</p>
+                    {warn.suggestedTopic && (
+                      <div className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg font-medium">
+                        Suggested Topic: <span className="font-bold">{warn.suggestedTopic}</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -1670,7 +1757,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSections = [], existi
               Edit Blueprint
             </Button>
 
-            {verificationResult?.warnings?.some((w: any) => w.suggestedTopic) && (
+            {meaningfulWarnings.some((w: any) => w.suggestedTopic) && (
               <Button
                 onClick={handleApplySuggestionsAndProceed}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold"

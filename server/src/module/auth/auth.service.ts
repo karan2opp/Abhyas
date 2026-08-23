@@ -94,6 +94,28 @@ const verifyOtp = async (data: VerifyOtpDto) => {
     return updatedUser;
 };
 
+// ── Resend verification OTP ───────────────────────────────────────────────
+const resendOtp = async (email: string) => {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    if (!user) throw ApiError.notFound("No account with that email");
+    if (user.isVerified) throw ApiError.badRequest("This account is already verified");
+
+    const { rawToken, hashedToken } = generateOTP();
+
+    await db.update(users)
+        .set({
+            verificationToken: hashedToken,
+            verificationExpires: new Date(Date.now() + 15 * 60 * 1000),
+        })
+        .where(eq(users.id, user.id));
+
+    try {
+        await sendVerificationEmail(email, rawToken);
+    } catch (err) {
+        console.error("Failed to send verification email:", err);
+    }
+};
+
 // ── Forgot password ───────────────────────────────────────────────────────────
 const forgotPassword = async (email: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
@@ -201,4 +223,4 @@ const updateProfile = async (userId: string, data: { phone?: string, name?: stri
     return safeUser;
 };
 
-export { register, login, logout, verifyOtp, forgotPassword, resetPassword, refresh, getMe, updateProfile };
+export { register, login, logout, verifyOtp, resendOtp, forgotPassword, resetPassword, refresh, getMe, updateProfile };

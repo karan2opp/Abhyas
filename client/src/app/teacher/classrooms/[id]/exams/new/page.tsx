@@ -2,11 +2,11 @@
 
 import React, { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
-import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, Plus, X, Sparkles } from "lucide-react";
+import { Bell, Image as ImageIcon, ChevronRight, UploadCloud, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -36,13 +36,11 @@ function NewExamBuilderContent() {
   const [duration, setDuration] = useState("60");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [totalMarks, setTotalMarks] = useState("0");
   const [instructions, setInstructions] = useState<string[]>([""]);
   const [joinCode, setJoinCode] = useState("");
   const [requireFeedback, setRequireFeedback] = useState(false);
   const [allowCoTeacherEdit, setAllowCoTeacherEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPublishScheduled, setIsPublishScheduled] = useState(false);
   const [publishTime, setPublishTime] = useState("");
 
   const [classrooms, setClassrooms] = useState<{ id: string; name: string }[]>([]);
@@ -62,7 +60,7 @@ function NewExamBuilderContent() {
         if (classroomIdParam && list.some((c: any) => c.id === classroomIdParam)) {
           setSelectedClassroomId(classroomIdParam);
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load classrooms");
       }
     })();
@@ -84,7 +82,7 @@ function NewExamBuilderContent() {
         } else {
           setSelectedGroupId("");
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load groups");
       }
     })();
@@ -482,7 +480,7 @@ function NewExamBuilderContent() {
         ) : step === 2 ? (
           <QuestionBuilder examId={examId!} />
         ) : (
-          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="w-full max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <Card className="bg-[#0f0f11]/80 border border-white/5 shadow-2xl backdrop-blur-xl rounded-xl p-6">
               <CardHeader className="px-0 pt-0 pb-4">
                 <CardTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">

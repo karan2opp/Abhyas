@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { GraduationCap, LayoutDashboard, History, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User, School, Building2 } from "lucide-react";
+import { GraduationCap, LayoutDashboard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, User, School, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";

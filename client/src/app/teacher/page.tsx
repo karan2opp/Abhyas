@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { PlusCircle, FileText, Users, BarChart, Clock, Calendar } from "lucide-react";
+import { FileText, Users, BarChart, Clock, ClipboardCheck, Activity, Loader } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+
 import { useRouter } from "next/navigation";
 import { getTeacherOverviewStatsService } from "./exams/exam.service";
 import { formatDate } from "@/lib/date";
@@ -29,10 +29,13 @@ export default function TeacherDashboard() {
     fetchStats();
   }, []);
 
-  if (loading) return <div className="p-10 text-white text-center">Loading overview...</div>;
+  if (loading) return <div className="p-10 text-white text-center">Loading dashboard...</div>;
 
   const totalExams = stats?.totalExams || 0;
   const totalStudents = stats?.totalStudents || 0;
+  const totalSubmissions = stats?.totalSubmissions || 0;
+  const studentsOnline = stats?.studentsOnline || 0;
+  const pendingEvaluations = stats?.pendingEvaluations || 0;
   const averageScore = stats?.averageScore || 0;
   const recentExams = stats?.recentExams || [];
 
@@ -40,12 +43,12 @@ export default function TeacherDashboard() {
     <div className="p-10 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar">
       <header className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">Overview</h2>
+          <h2 className="text-3xl font-bold text-white tracking-tight">Dashboard</h2>
           <p className="text-gray-400 mt-1">Welcome back to your Institutional Portal.</p>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <Card className="bg-[#0f0f11] border-white/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-400">Total Exams</CardTitle>
@@ -53,6 +56,7 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalExams}</div>
+            <p className="text-xs text-gray-500 mt-1">Exams created by you</p>
           </CardContent>
         </Card>
         <Card className="bg-[#0f0f11] border-white/5">
@@ -62,6 +66,37 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{totalStudents}</div>
+            <p className="text-xs text-gray-500 mt-1">Students who attempted your exams</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f0f11] border-white/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Total Submissions</CardTitle>
+            <ClipboardCheck className="h-4 w-4 text-orange-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{totalSubmissions}</div>
+            <p className="text-xs text-gray-500 mt-1">Across all your exams</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f0f11] border-white/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Students Online</CardTitle>
+            <Activity className="h-4 w-4 text-emerald-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-emerald-400">{studentsOnline}</div>
+            <p className="text-xs text-gray-500 mt-1">Currently attempting an exam</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-[#0f0f11] border-white/5">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-gray-400">Pending Evaluations</CardTitle>
+            <Loader className="h-4 w-4 text-amber-400" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-400">{pendingEvaluations}</div>
+            <p className="text-xs text-gray-500 mt-1">Descriptive answers being graded</p>
           </CardContent>
         </Card>
         <Card className="bg-[#0f0f11] border-white/5">
@@ -71,6 +106,7 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{averageScore}%</div>
+            <p className="text-xs text-gray-500 mt-1">Across submitted exams</p>
           </CardContent>
         </Card>
       </div>
@@ -86,67 +122,59 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="flex flex-col gap-2">
             {recentExams.map((exam: any) => (
-              <Card key={exam.id || exam._id} className="bg-[#0f0f11] border-white/5 hover:border-orange-500/30 transition-colors shadow-lg overflow-hidden group">
-                <div className="h-2 bg-gradient-to-r from-orange-600 to-amber-600"></div>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-4 gap-4">
-                    <h3 className="text-lg font-bold text-white leading-tight line-clamp-2">{exam.title}</h3>
+              <div
+                key={exam.id || exam._id}
+                className="flex items-center justify-between gap-4 p-4 bg-[#0f0f11] border border-white/5 rounded-xl hover:bg-[#12131a] hover:border-white/10 transition-all"
+              >
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center border border-orange-500/30 shrink-0">
+                    <FileText className="h-5 w-5" />
                   </div>
-                  
-                  <div className="space-y-2 mt-4 text-sm text-gray-400">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-orange-400" />
-                      <span>Duration: {exam.duration} mins</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-orange-400" />
-                      <span>Total Marks: {exam.totalMarks}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-orange-400" />
-                      <span>Created: {formatDate(exam.createdAt)}</span>
-                    </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-semibold text-sm truncate">{exam.title}</p>
+                    <p className="text-gray-500 text-xs flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {exam.duration} mins · {exam.totalMarks} marks · Created {formatDate(exam.createdAt)}
+                    </p>
                   </div>
-                  
-                  <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
-                    <span className="text-[10px] font-bold px-2 py-1 rounded bg-white/5 text-gray-300 uppercase tracking-wider border border-white/5">
-                      {exam.joinCode ? `CODE: ${exam.joinCode}` : "DRAFT"}
-                    </span>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
-                        onClick={() => {
-                          if (exam.classroomId) {
-                            router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}/results`);
-                          } else {
-                            toast.error("This exam does not belong to a classroom");
-                          }
-                        }}
-                      >
-                        Results
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="bg-transparent border-orange-500/30 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
-                        onClick={() => {
-                          if (exam.classroomId) {
-                            router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}`);
-                          } else {
-                            toast.error("This exam does not belong to a classroom");
-                          }
-                        }}
-                      >
-                        Manage
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-[10px] font-bold px-2 py-1 rounded bg-white/5 text-gray-300 uppercase tracking-wider border border-white/5">
+                    {exam.joinCode ? `CODE: ${exam.joinCode}` : "DRAFT"}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-transparent border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
+                    onClick={() => {
+                      if (exam.classroomId) {
+                        router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}/results`);
+                      } else {
+                        toast.error("This exam does not belong to a classroom");
+                      }
+                    }}
+                  >
+                    Results
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-transparent border-orange-500/30 text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                    onClick={() => {
+                      if (exam.classroomId) {
+                        router.push(`/teacher/classrooms/${exam.classroomId}/exams/${exam.id || exam._id}`);
+                      } else {
+                        toast.error("This exam does not belong to a classroom");
+                      }
+                    }}
+                  >
+                    Manage
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}

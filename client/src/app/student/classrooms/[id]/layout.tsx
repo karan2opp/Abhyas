@@ -31,7 +31,7 @@ export default function StudentClassroomLayout({ children }: { children: React.R
       const res = await getMyClassroomsService();
       const found = (res.data || []).map((r: any) => r.classroom).find((c: Classroom) => c.id === classroomId);
       setClassroom(found || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load classroom");
     }
   };

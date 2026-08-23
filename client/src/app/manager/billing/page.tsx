@@ -12,7 +12,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useAuthStore } from "@/store/authStore";
 import {
   getMyOrganisationService,
   updateMyOrganisationService,
@@ -95,7 +94,6 @@ function UsageMeter({ label, icon: Icon, used, limit, accent }: {
 }
 
 export default function ManagerBillingPage() {
-  const user = useAuthStore(state => state.user);
   const [loading, setLoading] = useState(true);
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -128,7 +126,7 @@ export default function ManagerBillingPage() {
       setUsage(usageRes.data?.usage || []);
       setActiveStudents(usageRes.data?.activeStudents || 0);
       setPlans(plansRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load billing information");
     } finally {
       setLoading(false);

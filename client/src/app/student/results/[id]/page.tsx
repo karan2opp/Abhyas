@@ -4,12 +4,13 @@ import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Trophy, ArrowLeft, Clock, Calendar, Check, X, Bot, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Trophy, ArrowLeft, Check, X, Bot, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
-import { formatDate } from "@/lib/date";
+
 import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 export default function ResultsPage() {
@@ -56,7 +57,7 @@ export default function ResultsPage() {
             setSelectedQuestionId(firstSection.questions[0].id);
           }
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load results.");
         router.push("/student");
       } finally {
@@ -86,13 +87,31 @@ export default function ResultsPage() {
   const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
 
   if (submission.status === "evaluating") {
+    const descriptiveQs = (exam.sections || []).flatMap((s: any) => (s.questions || []).filter((q: any) => q.type === "descriptive"));
+    const evaluatedCount = descriptiveQs.filter((q: any) => {
+      const ans = submission.answers?.find((a: any) => a.questionId === q.id);
+      return !!ans && (ans.evaluatedBy === "ai" || ans.evaluatedBy === "teacher");
+    }).length;
+    const totalDesc = descriptiveQs.length;
+    const evalPct = totalDesc > 0 ? Math.round((evaluatedCount / totalDesc) * 100) : 0;
+
     return (
       <div className="p-10 h-full flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-        <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Evaluating Your Results...</h2>
-        <p className="text-gray-400 text-center max-w-md">
-          Our AI is currently reviewing and scoring your descriptive answers. This page will automatically update in a few moments once the evaluation is complete.
-        </p>
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 className="text-xl font-bold text-white mb-2 tracking-wide">Evaluating...</h2>
+        {totalDesc > 0 && (
+          <div className="w-full max-w-xs space-y-1.5">
+            <div className="w-full bg-[#14151f] border border-white/10 rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-700"
+                style={{ width: `${evalPct}%` }}
+              />
+            </div>
+            <p className="text-xs text-orange-300 font-semibold text-center">
+              {evaluatedCount} / {totalDesc}
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -322,22 +341,32 @@ export default function ResultsPage() {
                         <ReactMarkdown 
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            code: ({node, ...props}) => {
-                              const isInline = !props.className?.includes('language-');
-                              return isInline 
-                                ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-xs text-orange-300 font-mono border border-orange-500/30" {...props} /> 
-                                : (
-                                  <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-[#09090b]">
-                                    <div className="p-4 overflow-x-auto custom-scrollbar font-normal">
-                                      <code className="block font-mono text-xs leading-relaxed text-gray-300" {...props} />
-                                    </div>
+                            pre: ({ children }) => {
+                              const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                              return (
+                                <div className="my-3 rounded-xl overflow-hidden border border-white/10 bg-[#09090b]">
+                                  <div className="bg-white/5 px-3 py-2 border-b border-white/5 flex items-center gap-2">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
+                                    <span className="ml-2.5 text-[11px] font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                                   </div>
-                                )
+                                  <div className="p-4 overflow-x-auto custom-scrollbar font-normal">
+                                    {children}
+                                  </div>
+                                </div>
+                              );
                             },
-                            p: ({node, ...props}) => <p className="mb-1 last:mb-0 inline-block" {...props} />
+                            code: ({ className, children, ...props }) => {
+                              const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                              return isInline
+                                ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-xs text-orange-300 font-mono border border-orange-500/30" {...props}>{children}</code>
+                                : <code className={"block font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                            },
+                            p: ({...props}) => <p className="mb-1 last:mb-0 inline-block" {...props} />
                           }}
                         >
-                          {`**Q${questionIndex + 1}.** ${selectedQuestion.description}`}
+                          {normalizeCodeBlocks(`**Q${questionIndex + 1}.** ${selectedQuestion.description}`)}
                         </ReactMarkdown>
                       </div>
                     </div>

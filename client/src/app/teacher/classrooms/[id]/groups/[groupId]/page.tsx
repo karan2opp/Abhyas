@@ -67,7 +67,7 @@ export default function GroupDetailPage() {
       const res = await listGroupsService(classroomId);
       const found = (res.data || []).find((g: GroupEntry) => g.id === groupId);
       setGroup(found || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load group");
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ export default function GroupDetailPage() {
       ]);
       setAssignmentCount((aRes.data || []).length);
       setExamCount((eRes.data || []).length);
-    } catch (err) {
+    } catch {
       // non-critical — stats bar just shows 0s
     }
   };
@@ -92,7 +92,7 @@ export default function GroupDetailPage() {
     try {
       const res = await getGroupMembersService(groupId, search || undefined);
       setMembers(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load group members");
     } finally {
       setMembersLoading(false);
@@ -133,7 +133,7 @@ export default function GroupDetailPage() {
       try {
         const res = await getClassroomRosterService(classroomId, debouncedAddSearch);
         setRosterResults(res.data || []);
-      } catch (err) {
+      } catch {
         toast.error("Failed to search roster");
       } finally {
         setAddSearchLoading(false);

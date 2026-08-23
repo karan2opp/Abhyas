@@ -27,6 +27,8 @@ function makeQuestionId(fields: { subject: string; topic: string; subtopic: stri
 }
 
 // Validate + normalize the common metadata shared by all input formats.
+// `subject` is the one hard requirement (multi-subject isolation depends on it);
+// topic/subtopic are optional — retrieval relies on semantic similarity instead.
 function validateCommon(data: any, sourceFile: string) {
   const subject = (data.subject || "").trim();
   const topic = (data.topic || "").trim();
@@ -34,9 +36,9 @@ function validateCommon(data: any, sourceFile: string) {
   const type = (data.type || "").trim().toLowerCase();
   const difficulty = (data.difficulty || "medium").trim().toLowerCase();
 
-  if (!subject || !topic || !subtopic) {
+  if (!subject) {
     throw ApiError.badRequest(
-      `Curated question in "${sourceFile}" must define subject, topic, and subtopic.`
+      `Curated question in "${sourceFile}" must define a subject.`
     );
   }
   if (type !== "mcq" && type !== "descriptive") {

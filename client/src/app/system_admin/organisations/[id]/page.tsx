@@ -96,7 +96,7 @@ export default function OrganisationDetailPage() {
       const orgsRes = await getOrganisationsService();
       const found = (orgsRes.data || []).find((o: Organisation) => o.id === organisationId);
       setOrganisation(found || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load organisation");
     }
   };
@@ -105,7 +105,7 @@ export default function OrganisationDetailPage() {
     try {
       const managersRes = await getOrganisationManagersService(organisationId, search || undefined);
       setManagers(managersRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load managers");
     }
   };
@@ -121,7 +121,7 @@ export default function OrganisationDetailPage() {
       setSubscription(subRes?.data || null);
       setUsage(usageRes?.data?.usage || []);
       setActiveStudents(usageRes?.data?.activeStudents || 0);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load subscription data");
     }
   };

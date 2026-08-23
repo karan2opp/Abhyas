@@ -95,7 +95,7 @@ export default function GradeSubmissionPage() {
           setStudentName(found.studentName);
           setStudentEmail(found.studentEmail);
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load submission");
       } finally {
         setLoading(false);

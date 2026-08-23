@@ -15,8 +15,8 @@ export const startScopedExamService = async (examId: string) => {
   return res.data;
 };
 
-export const getMyExamsService = async (classroomId?: string) => {
-  const res = await api.get("/exams/me", { params: { classroomId } });
+export const getMyExamsService = async (classroomId?: string, groupId?: string, page?: number, limit?: number, search?: string, category?: string) => {
+  const res = await api.get("/exams/me", { params: { classroomId, groupId, page, limit, search, category } });
   return res.data;
 };
 
@@ -36,12 +36,12 @@ export const getExamForSubmissionService = async (id: string) => {
 };
 
 export const submitAnswerService = async (data: any) => {
-  const res = await api.post("/answers", data);
+  const res = await api.post("/answers", data, { timeout: 60000 });
   return res.data;
 };
 
 export const submitExamService = async (id: string) => {
-  const res = await api.patch(`/submissions/${id}/submit`);
+  const res = await api.patch(`/submissions/${id}/submit`, undefined, { timeout: 60000 });
   return res.data;
 };
 

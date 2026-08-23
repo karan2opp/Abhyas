@@ -1,11 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  UploadCloud, FileText, Database, Search, CheckCircle2, AlertCircle, 
-  RefreshCw, Hash, Layers, Sparkles, X, ChevronRight, FileCode, Check, BookOpen
-} from "lucide-react";
+import { UploadCloud, FileText, Database, Search, CheckCircle2, AlertCircle, RefreshCw, Layers, Sparkles, X, FileCode, BookOpen } from "lucide-react";
 import { toast } from "sonner";
+import { useAuthStore } from "@/store/authStore";
 import { 
   uploadKnowledgeDocumentService, 
   getKnowledgeCollectionsService, 
@@ -18,13 +16,14 @@ import {
 const QUICK_SUBJECTS = ["JavaScript", "Python", "Tally", "React", "Database", "Operating Systems"];
 
 export default function KnowledgeUploadView() {
-  const [activeTab, setActiveTab] = useState<"upload" | "collections" | "playground">("upload");
+  const role = useAuthStore((state) => state.user?.role);
+  const canEmbed = role === "manager" || role === "system_admin";
+  const [activeTab, setActiveTab] = useState<"upload" | "collections" | "playground">(canEmbed ? "upload" : "collections");
 
   // Upload State
   const [file, setFile] = useState<File | null>(null);
   const [subject, setSubject] = useState<string>("");
   const [topic, setTopic] = useState<string>("");
-  const [subtopic, setSubtopic] = useState<string>("");
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadResult, setUploadResult] = useState<IndexResponse["data"] | null>(null);
   const [uploadResultMsg, setUploadResultMsg] = useState<string>("");
@@ -39,7 +38,6 @@ export default function KnowledgeUploadView() {
   // Search Playground State
   const [searchSubject, setSearchSubject] = useState<string>("");
   const [searchTopic, setSearchTopic] = useState<string>("");
-  const [searchSubtopic, setSearchSubtopic] = useState<string>("");
   const [topK, setTopK] = useState<number>(5);
   const [searchResults, setSearchResults] = useState<ChunkItem[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -116,7 +114,7 @@ export default function KnowledgeUploadView() {
     setIsUploading(true);
     setUploadResult(null);
     try {
-      const res = await uploadKnowledgeDocumentService(file, subject.trim(), topic.trim(), subtopic.trim());
+      const res = await uploadKnowledgeDocumentService(file, subject.trim(), topic.trim());
       setUploadResult(res.data);
       setUploadResultMsg(res.message);
       if (res.data.indexed) {
@@ -151,7 +149,7 @@ export default function KnowledgeUploadView() {
       const results = await queryKnowledgeChunksService(
         searchSubject.trim(),
         searchTopic.trim(),
-        searchSubtopic.trim(),
+        "",
         topK
       );
       setSearchResults(results);
@@ -201,17 +199,19 @@ export default function KnowledgeUploadView() {
 
         {/* Tab Navigation Buttons */}
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-white/10 overflow-x-auto">
-          <button
-            onClick={() => setActiveTab("upload")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0 ${
-              activeTab === "upload"
-                ? "bg-orange-600 text-white shadow-lg shadow-orange-950/40 font-semibold"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
-          >
-            <UploadCloud className="h-4 w-4" />
-            Upload & Embed Document
-          </button>
+          {canEmbed && (
+            <button
+              onClick={() => setActiveTab("upload")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0 ${
+                activeTab === "upload"
+                  ? "bg-orange-600 text-white shadow-lg shadow-orange-950/40 font-semibold"
+                  : "text-gray-400 hover:text-white hover:bg-white/5"
+              }`}
+            >
+              <UploadCloud className="h-4 w-4" />
+              Upload & Embed Document
+            </button>
+          )}
 
           <button
             onClick={() => setActiveTab("collections")}
@@ -240,7 +240,7 @@ export default function KnowledgeUploadView() {
       </div>
 
       {/* ── TAB 1: UPLOAD & EMBED DOCUMENT ─────────────────────────────────────── */}
-      {activeTab === "upload" && (
+      {activeTab === "upload" && canEmbed && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Form Side */}
           <div className="lg:col-span-7 bg-[#09090b] border border-white/10 rounded-2xl p-6 shadow-xl space-y-6">
@@ -355,33 +355,18 @@ export default function KnowledgeUploadView() {
                 </div>
               </div>
 
-              {/* Topic & Subtopic Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                    Topic Name (Recommended)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Async Await, Variables"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                    Subtopic (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Promises, Lexical Scope"
-                    value={subtopic}
-                    onChange={(e) => setSubtopic(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
-                  />
-                </div>
+              {/* Topic Input */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                  Topic Name (Recommended)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Async Await, Variables"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
+                />
               </div>
 
               {/* Submit Button */}
@@ -594,7 +579,7 @@ export default function KnowledgeUploadView() {
             </h2>
 
             <form onSubmit={handlePlaygroundSearch} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
                     Filter Subject <span className="text-orange-500">*</span>
@@ -619,19 +604,6 @@ export default function KnowledgeUploadView() {
                     placeholder="e.g. Async Await"
                     value={searchTopic}
                     onChange={(e) => setSearchTopic(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 outline-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                    Subtopic Query (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Promises"
-                    value={searchSubtopic}
-                    onChange={(e) => setSearchSubtopic(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 outline-none text-sm"
                   />
                 </div>

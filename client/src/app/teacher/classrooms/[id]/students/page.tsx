@@ -36,7 +36,7 @@ export default function StudentsPage() {
     try {
       const res = await getClassroomRosterService(classroomId, search || undefined);
       setRoster(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load students");
     } finally {
       setLoading(false);

@@ -28,7 +28,7 @@ export default function AdminPlansPage() {
       try {
         const res = await getPlansService();
         setPlans(res.data || []);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load plans");
       } finally {
         setLoading(false);

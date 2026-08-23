@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Users, UserPlus, Trash2, Search } from "lucide-react";
+import { Users, UserPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -36,7 +36,7 @@ export default function ManagerTeachersPage() {
     try {
       const res = await getMyOrganisationTeachersService(search || undefined);
       setTeachers(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load teachers");
     } finally {
       setLoading(false);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, School, ChevronRight, Search, Key } from "lucide-react";
+import { Plus, School, ChevronRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -57,7 +57,7 @@ export default function ClassroomsPage() {
         const rows = res.data || [];
         setClassrooms(rows.map((r: any) => r.classroom));
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to load classrooms");
     } finally {
       setLoading(false);

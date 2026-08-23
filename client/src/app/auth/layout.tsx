@@ -22,28 +22,29 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     }
   }, [isInitialized, user, router, pathname]);
 
-  // Don't render the auth layout if we're going to redirect or haven't mounted
   if (!mounted || (isInitialized && user && pathname !== '/auth/forgot-password')) return null;
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 relative overflow-hidden font-sans">
-      
-      {/* Sleek Black Grid Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#333_1px,transparent_1px),linear-gradient(to_bottom,#333_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_20%,transparent_100%)] opacity-20 pointer-events-none"></div>
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#050505] relative overflow-hidden font-sans">
 
-      {/* Subtle Spotlight Effect */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-white/5 blur-[120px] rounded-full pointer-events-none"></div>
+      {/* Sleek Black Grid Background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#18181b_1px,transparent_1px),linear-gradient(to_bottom,#18181b_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_20%,transparent_100%)] opacity-30 pointer-events-none"></div>
+
+      {/* Orange Spotlight Effects */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-orange-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+      <div className="absolute bottom-0 -left-20 w-[400px] h-[400px] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+      <div className="absolute top-1/3 -right-20 w-[350px] h-[350px] bg-amber-500/5 blur-[120px] rounded-full pointer-events-none"></div>
 
       <div className="relative z-10 w-full max-w-md p-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="bg-[#14151f] border border-white/15 rounded-2xl p-8 shadow-2xl shadow-black/50"
+          className="bg-[#0f0f11] border border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/60 relative overflow-hidden"
         >
           {/* Logo / Header inside the card */}
           <div className="flex flex-col items-center justify-center mb-8">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-white/5 font-extrabold text-2xl text-black">
+            <div className="w-14 h-14 bg-orange-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-orange-950/60 font-extrabold text-2xl text-white">
               A
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight">Abhyas</h1>
@@ -54,7 +55,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
         </motion.div>
 
-        <motion.p 
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}

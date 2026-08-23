@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import { Document } from "@langchain/core/documents";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import {
@@ -11,16 +9,127 @@ import {
 import { cosineSimilarity } from "../dedupe.js";
 import { parseCuratedQuestions } from "./parser.js";
 import type { CuratedQuestion } from "./types.js";
+import { ApiError } from "../../../common/utils/ApiError.js";
 
 // Separate collection for manually-curated previous questions used as
 // reference examples by the generation agent (NOT the factual RAG source).
 export const QUESTION_EXAMPLES_COLLECTION = "question_examples";
 
-export const ensureQuestionExamplesCollection = async (): Promise<void> => {
-  await ensureQdrantCollection(QUESTION_EXAMPLES_COLLECTION);
+// ── Per-org collection resolution ─────────────────────────────────────────────
+// Each organisation gets its own question-bank collection
+// ("question_examples_{orgId}") so one org's curated examples are isolated from
+// every other org. When no org is given (e.g. system-admin global management),
+// fall back to the shared collection.
+export const getQuestionExamplesCollectionForOrg = (organisationId?: string | null): string => {
+  return organisationId ? `question_examples_${organisationId}` : QUESTION_EXAMPLES_COLLECTION;
 };
 
-const questionToDocument = (q: CuratedQuestion): Document => {
+export const ensureQuestionExamplesCollection = async (organisationId?: string | null): Promise<void> => {
+  await ensureQdrantCollection(getQuestionExamplesCollectionForOrg(organisationId));
+};
+
+/**
+ * Adds one or more curated questions (single object or array) directly to the
+ * question bank. Input is validated with the same parser used by the CLI
+ * indexing script; already-indexed questions (by questionId) are skipped.
+ */
+export const addCuratedQuestions = async (
+  input: any,
+  organisationId?: string | null
+): Promise<{ indexed: number; skipped: number }> => {
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
+  await ensureQuestionExamplesCollection(organisationId);
+
+  const questions = parseCuratedQuestions(JSON.stringify(input), "manual");
+  if (questions.length === 0) {
+    throw ApiError.badRequest("No questions could be parsed from the input.");
+  }
+
+  const embeddings = getEmbeddings();
+  const vectorStore = await QdrantVectorStore.fromExistingCollection(
+    embeddings,
+    getQdrantConfig(collectionName)
+  );
+
+  let indexed = 0;
+  let skipped = 0;
+  for (const question of questions) {
+    if (await questionIdExists(question.questionId, organisationId)) {
+      skipped++;
+      continue;
+    }
+    await vectorStore.addDocuments([questionToDocument(question, organisationId)]);
+    indexed++;
+  }
+
+  return { indexed, skipped };
+};
+
+/** Lists all questions currently stored in the question bank. */
+export const listCuratedQuestions = async (organisationId?: string | null): Promise<any[]> => {
+  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
+  const points: any[] = [];
+  let nextPageOffset: string | number | null = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    const body: any = {
+      limit: 100,
+      with_payload: true,
+      with_vector: false,
+    };
+    if (nextPageOffset !== null) {
+      body.offset = nextPageOffset;
+    }
+
+    const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to scroll question bank: ${res.statusText}`);
+    }
+
+    const data: any = await res.json();
+    const batch = data.result?.points || [];
+    points.push(...batch);
+
+    nextPageOffset = data.result?.next_page_offset || null;
+    if (!nextPageOffset) hasMore = false;
+  }
+
+  return points.map((point) => {
+    const payload = point.payload || {};
+    const metadata = payload.metadata || {};
+    return {
+      ...metadata,
+      question: payload.content || metadata.question || "",
+    };
+  });
+};
+
+/** Deletes a question from the bank by its questionId. */
+export const deleteCuratedQuestion = async (questionId: string, organisationId?: string | null): Promise<boolean> => {
+  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
+  const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
+    body: JSON.stringify({
+      filter: {
+        must: [{ key: "metadata.questionId", match: { value: questionId } }],
+      },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete question: ${res.statusText}`);
+  }
+  return true;
+};
+
+const questionToDocument = (q: CuratedQuestion, organisationId?: string | null): Document => {
   const metadata: Record<string, any> = {
     subject: q.subject,
     topic: q.topic,
@@ -30,6 +139,7 @@ const questionToDocument = (q: CuratedQuestion): Document => {
     marks: q.marks,
     questionId: q.questionId,
     source: q.source,
+    organisationId: organisationId || "",
   };
   if (q.options) metadata.options = q.options;
   if (q.correctOption) metadata.correct_option = q.correctOption;
@@ -41,10 +151,11 @@ const questionToDocument = (q: CuratedQuestion): Document => {
   });
 };
 
-const questionIdExists = async (questionId: string): Promise<boolean> => {
+const questionIdExists = async (questionId: string, organisationId?: string | null): Promise<boolean> => {
   const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
   try {
-    const res = await fetch(`${qdrantUrl}/collections/${QUESTION_EXAMPLES_COLLECTION}/points/scroll`, {
+    const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
       method: 'POST',
       headers: getQdrantHeaders(),
       body: JSON.stringify({
@@ -67,45 +178,41 @@ const questionIdExists = async (questionId: string): Promise<boolean> => {
   }
 };
 
-export const indexCuratedQuestionBank = async (
-  dir: string
+/**
+ * Parses and indexes question-bank content (markdown or JSON text, same formats
+ * accepted by the CLI script) directly into the org's question-bank collection.
+ * Already-indexed questions (by questionId) are skipped.
+ */
+export const indexQuestionBankContent = async (
+  content: string,
+  sourceFile: string,
+  organisationId?: string | null
 ): Promise<{ indexed: number; skipped: number; errors: number }> => {
-  await ensureQuestionExamplesCollection();
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
+  await ensureQuestionExamplesCollection(organisationId);
 
-  if (!fs.existsSync(dir)) {
-    throw new Error(`Question bank directory not found: ${dir}`);
-  }
+  const questions = parseCuratedQuestions(content, sourceFile);
 
-  const files = fs.readdirSync(dir).filter((f) => /\.(md|markdown|json)$/i.test(f));
   const embeddings = getEmbeddings();
   const vectorStore = await QdrantVectorStore.fromExistingCollection(
     embeddings,
-    getQdrantConfig(QUESTION_EXAMPLES_COLLECTION)
+    getQdrantConfig(collectionName)
   );
 
   let indexed = 0;
   let skipped = 0;
   let errors = 0;
 
-  for (const file of files) {
-    const filePath = path.join(dir, file);
+  for (const question of questions) {
     try {
-      const content = fs.readFileSync(filePath, "utf-8");
-      const questions = parseCuratedQuestions(content, file);
-
-      for (const question of questions) {
-        if (await questionIdExists(question.questionId)) {
-          console.log(`- Already indexed: ${file} (${question.subtopic})`);
-          skipped++;
-          continue;
-        }
-
-        await vectorStore.addDocuments([questionToDocument(question)]);
-        console.log(`- Indexed: ${file} (${question.type}, ${question.difficulty}, ${question.subtopic})`);
-        indexed++;
+      if (await questionIdExists(question.questionId, organisationId)) {
+        skipped++;
+        continue;
       }
+      await vectorStore.addDocuments([questionToDocument(question, organisationId)]);
+      indexed++;
     } catch (error: any) {
-      console.error(`- Failed to index ${file}:`, error?.message || error);
+      console.error(`- Failed to index question in ${sourceFile}:`, error?.message || error);
       errors++;
     }
   }
@@ -172,17 +279,22 @@ export const retrieveExampleQuestions = async (
   difficulty: string,
   topK: number = 3,
   candidatePool: number = 15,
-  lambda: number = 0.7
+  lambda: number = 0.7,
+  organisationId?: string | null
 ): Promise<RetrievedExample[]> => {
-  await ensureQuestionExamplesCollection();
+  const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
+  await ensureQuestionExamplesCollection(organisationId);
 
   const embeddings = getEmbeddings();
   const vectorStore = await QdrantVectorStore.fromExistingCollection(
     embeddings,
-    getQdrantConfig(QUESTION_EXAMPLES_COLLECTION)
+    getQdrantConfig(collectionName)
   );
 
-  const query = `${topic} - ${subtopic}`;
+  // Build a meaningful embedding query. topic/subtopic may be empty (metadata is
+  // optional now) — fall back to whatever parts are present, then subject.
+  const parts = [topic.trim(), subtopic.trim()].filter(Boolean);
+  const query = parts.length > 0 ? parts.join(" - ") : subject.trim();
 
   const filters: any[] = [
     {

@@ -44,15 +44,10 @@ interface BlueprintTreeViewerProps {
 
 export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewerProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
-  const [collapsedBlocks, setCollapsedBlocks] = useState<Record<string, boolean>>({});
+  const [collapsedBlocks] = useState<Record<string, boolean>>({});
 
   const toggleSectionCollapse = (sIdx: number) => {
     setCollapsedSections(prev => ({ ...prev, [sIdx]: !prev[sIdx] }));
-  };
-
-  const toggleBlockCollapse = (sIdx: number, bIdx: number) => {
-    const key = `${sIdx}-${bIdx}`;
-    setCollapsedBlocks(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const updateBlueprint = (updater: (draft: BlueprintTree) => void) => {

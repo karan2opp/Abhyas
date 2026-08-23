@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, Settings, Image as ImageIcon, ChevronRight, UploadCloud, Lightbulb, Plus, X, ArrowLeft, Sparkles } from "lucide-react";
+import { Bell, Image as ImageIcon, ChevronRight, UploadCloud, Plus, X, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,12 +42,12 @@ export default function EditExamBuilder() {
   const [duration, setDuration] = useState("60");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [totalMarks, setTotalMarks] = useState("0");
+  const [, setTotalMarks] = useState("0");
   const [instructions, setInstructions] = useState<string[]>([""]);
   const [joinCode, setJoinCode] = useState("");
   const [requireFeedback, setRequireFeedback] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPublishScheduled, setIsPublishScheduled] = useState(false);
+  const [, setIsPublishScheduled] = useState(false);
   const [publishTime, setPublishTime] = useState("");
 
   const calculatedDuration = React.useMemo(() => {
@@ -92,7 +92,7 @@ export default function EditExamBuilder() {
           const date = new Date(data.endTime);
           setEndTime(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16));
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load exam details");
       } finally {
         setLoadingInitial(false);
@@ -181,7 +181,7 @@ export default function EditExamBuilder() {
   return (
     <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
       {/* Dynamic Header */}
-      <header className="h-[88px] flex-shrink-0 flex items-center justify-between px-10 border-b border-white/5">
+      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-white/5">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams`)}
@@ -212,9 +212,9 @@ export default function EditExamBuilder() {
       </header>
 
       {/* Main Builder Content */}
-      <div className="flex-1 p-6 sm:p-10 max-w-[1400px] mx-auto w-full">
+      <div className="flex-1 px-6 py-4 sm:px-8 w-full">
         {/* Stepper */}
-        <div className="flex items-center gap-8 mb-10 pl-2">
+        <div className="flex items-center gap-8 mb-6 pl-2">
           <div className="flex items-center gap-4 cursor-pointer" onClick={() => setStep(1)}>
             <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
               step === 1 ? "border-orange-500 text-orange-400 bg-orange-500/10" : "border-white/20 text-white bg-white/5"
@@ -433,7 +433,7 @@ export default function EditExamBuilder() {
         ) : step === 2 ? (
           <QuestionBuilder examId={examId!} />
         ) : (
-          <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="w-full max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
             <Card className="bg-[#0f0f11]/80 border border-white/5 shadow-2xl backdrop-blur-xl rounded-xl p-6">
               <CardHeader className="px-0 pt-0 pb-4">
                 <CardTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">

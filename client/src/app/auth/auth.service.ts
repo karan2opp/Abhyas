@@ -123,6 +123,15 @@ export const verifyOtpService = async (data: { email: string; otp: string }) => 
   }
 };
 
+export const resendOtpService = async (email: string) => {
+  try {
+    const res = await api.post("/auth/resend-otp", { email });
+    return res.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.message || "Failed to resend code");
+  }
+};
+
 export const updateProfileService = async (formData: FormData) => {
   try {
     const res = await api.put("/auth/me", formData, {

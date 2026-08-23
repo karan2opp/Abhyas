@@ -23,7 +23,7 @@ export default function ManagerDashboardPage() {
         ]);
         setClassroomCount((classroomsRes.data || []).length);
         setTeacherCount((teachersRes.data || []).length);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load overview");
       }
     })();

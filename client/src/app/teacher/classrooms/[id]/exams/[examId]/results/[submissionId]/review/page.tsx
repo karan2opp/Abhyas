@@ -10,6 +10,7 @@ import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from 
 import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 export default function SubmissionReviewPage() {
@@ -78,7 +79,7 @@ export default function SubmissionReviewPage() {
           setSelectedSectionId(initialSection.id);
           if (initialQuestion) setSelectedQuestionId(initialQuestion.id);
         }
-      } catch (err) {
+      } catch {
         toast.error("Failed to load results.");
         router.push(`/teacher/classrooms/${classroomId}/exams/${examId}/results`);
       } finally {
@@ -118,7 +119,7 @@ export default function SubmissionReviewPage() {
       const subRes = await getSubmissionByIdService(submissionId);
       gradingInitializedRef.current = false;
       setSubmission(subRes.data || subRes);
-    } catch (err) {
+    } catch {
       toast.error("Failed to refresh submission");
     }
   };
@@ -223,11 +224,8 @@ export default function SubmissionReviewPage() {
   if (submission.status === "evaluating") {
     return (
       <div className="p-10 h-full flex flex-col items-center justify-center">
-        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(59,130,246,0.5)]"></div>
-        <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Evaluating Your Results...</h2>
-        <p className="text-gray-400 text-center max-w-md">
-          Our AI is currently reviewing and scoring your descriptive answers. This page will automatically update in a few moments once the evaluation is complete.
-        </p>
+        <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 className="text-xl font-bold text-white tracking-wide">Evaluating...</h2>
       </div>
     );
   }
@@ -387,28 +385,32 @@ export default function SubmissionReviewPage() {
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        code: ({ node, ...props }: any) => {
-                          const isInline = !props.className?.includes("language-");
-                          return isInline
-                            ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-[13px] text-orange-300 font-mono border border-orange-500/30" {...props} />
-                            : (
-                              <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl">
-                                <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                                  <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                                  <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                                  <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace("language-", "") || "code"}</span>
-                                </div>
-                                <div className="p-5 overflow-x-auto custom-scrollbar font-normal">
-                                  <code className="block font-mono text-[13px] leading-relaxed text-gray-300" {...props} />
-                                </div>
+                        pre: ({ children }: any) => {
+                          const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                          return (
+                            <div className="my-5 rounded-xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl">
+                              <div className="bg-white/5 px-4 py-2.5 border-b border-white/5 flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                                <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+                                <span className="ml-3 text-xs font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                               </div>
-                            );
+                              <div className="p-5 overflow-x-auto custom-scrollbar font-normal">
+                                {children}
+                              </div>
+                            </div>
+                          );
                         },
-                        p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 inline-block" {...props} />,
+                        code: ({ className, children, ...props }: any) => {
+                          const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                          return isInline
+                            ? <code className="bg-orange-500/10 px-1.5 py-0.5 rounded text-[13px] text-orange-300 font-mono border border-orange-500/30" {...props}>{children}</code>
+                            : <code className={"block font-mono text-[13px] leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                        },
+                        p: ({ ...props }: any) => <p className="mb-2 last:mb-0 inline-block" {...props} />,
                       }}
                     >
-                      {`**Q${currentIndex + 1}.** ${selectedQuestion.description}`}
+                      {normalizeCodeBlocks(`**Q${currentIndex + 1}.** ${selectedQuestion.description}`)}
                     </ReactMarkdown>
                   </CardTitle>
                 </div>

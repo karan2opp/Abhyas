@@ -28,7 +28,7 @@ export default function StudentGroupDetailPage() {
         const res = await getMyGroupsService(classroomId);
         const found = (res.data || []).find((g: GroupEntry) => g.id === groupId);
         setGroup(found || null);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load group");
       } finally {
         setLoading(false);

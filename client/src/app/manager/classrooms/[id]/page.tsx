@@ -105,7 +105,7 @@ export default function ManagerClassroomDetailPage() {
       const classroomsRes = await getOrganisationClassroomsService();
       const found = (classroomsRes.data || []).find((c: Classroom) => c.id === classroomId);
       setClassroom(found || null);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load classroom");
     }
   };
@@ -114,7 +114,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       const rosterRes = await getClassroomRosterService(classroomId, search || undefined);
       setRoster(rosterRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load roster");
     }
   };
@@ -123,7 +123,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       const teachersRes = await getClassroomTeachersService(classroomId, search || undefined);
       setTeachers(teachersRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load teachers");
     }
   };
@@ -132,7 +132,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       const res = await listGroupsService(classroomId);
       setGroups(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load groups");
     }
   };
@@ -141,7 +141,7 @@ export default function ManagerClassroomDetailPage() {
     try {
       const res = await listExamsForClassroomService(classroomId);
       setExams(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load exams");
     }
   };

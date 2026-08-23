@@ -48,7 +48,7 @@ export default function AssignmentSubmissionsPage() {
         const res = await getAssignmentByIdService(assignmentId);
         setAssignmentTitle(res.data?.title || "");
         setTotalMarks(res.data?.totalMarks || 0);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load assignment");
       }
     })();
@@ -73,7 +73,7 @@ export default function AssignmentSubmissionsPage() {
       setTotal(res.data?.total || 0);
       setHasMore(!!res.data?.hasMore);
       setPage(targetPage);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load submissions");
     } finally {
       setLoading(false);

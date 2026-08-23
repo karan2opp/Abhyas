@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { School, ChevronRight, Search, Key } from "lucide-react";
+import { School, ChevronRight, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getOrganisationClassroomsService } from "./classroom.service";
@@ -35,7 +35,7 @@ export default function ManagerClassroomsPage() {
       try {
         const res = await getOrganisationClassroomsService(debouncedSearch || undefined);
         setClassrooms(res.data || []);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load classrooms");
       } finally {
         setLoading(false);

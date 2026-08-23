@@ -19,7 +19,7 @@ export default function SystemAdminDashboardPage() {
     try {
       const data = await getAdminsService();
       setAdmins(data.data || data);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load system admins");
     } finally {
       setLoading(false);

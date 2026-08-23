@@ -1,25 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, useInView, Variants } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import {
-  BookOpen,
-  CheckCircle,
-  Brain,
-  LineChart,
-  LayoutDashboard,
-  FileText,
-  ChevronDown,
-  Menu,
-  X,
-  ArrowRight,
-  User,
-  Star,
-  Code
-} from "lucide-react";
+import { ChevronDown, Menu, X, ArrowRight } from "lucide-react";
 
 
 

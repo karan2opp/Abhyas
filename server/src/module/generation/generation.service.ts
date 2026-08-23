@@ -13,11 +13,54 @@ import type { IInputExam } from "./Types/inputExam.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 
 /**
+ * Attaches per-topic "reference_examples" (previous questions tagged with the
+ * requested difficulty) from the question bank to a deep clone of the exam
+ * input, so the Subtopics Agent can gauge difficulty from real questions.
+ * Each block gets a "reference_examples" array of { topic, examples }. Fetches
+ * are cached per (subject, topic, difficulty, question_type) within a single
+ * planning call; empty/error results leave the field absent so the agent
+ * falls back to the subject/topics/instructions.
+ */
+const attachPlanningExamples = async (data: IInputExam, organisationId?: string | null): Promise<IInputExam> => {
+    const clone = structuredClone(data);
+    const cache = new Map<string, any[]>();
+    const difficulty = data.difficulty || "medium";
+
+    for (const section of clone.sections) {
+        for (const block of section.blocks) {
+            const type = block.question_type || "mcq";
+            const blockExamples: { topic: string; examples: any[] }[] = [];
+            for (const topic of block.topics || []) {
+                const key = `${block.subject}|${topic}|${difficulty}|${type}`;
+                if (!cache.has(key)) {
+                    let examples: any[] = [];
+                    try {
+                        examples = await retrieveExampleQuestions(block.subject, topic, "", type, difficulty, 3, 15, 0.7, organisationId);
+                    } catch (err) {
+                        console.error(`Failed to fetch planning examples for topic "${topic}":`, err);
+                    }
+                    cache.set(key, examples);
+                }
+                const examples = cache.get(key) || [];
+                if (examples.length > 0) {
+                    blockExamples.push({ topic, examples });
+                }
+            }
+            if (blockExamples.length > 0) {
+                (block as any).reference_examples = blockExamples;
+            }
+        }
+    }
+
+    return clone;
+};
+
+/**
  * Step 1 of Interactive AI Exam Workflow:
  * Generates topic/subtopic allocation blueprint tree without generating question texts.
  * Each section contains subject-scoped BLOCKS.
  */
-export const generateExamBlueprint = async (input: IInputExam): Promise<any> => {
+export const generateExamBlueprint = async (input: IInputExam, organisationId?: string | null): Promise<any> => {
     const parseResult = IInputExamZodSchema.safeParse(input);
     if (!parseResult.success) {
         console.error("Zod Validation Failed for generateExamBlueprint:", JSON.stringify(parseResult.error.format(), null, 2));
@@ -34,10 +77,11 @@ export const generateExamBlueprint = async (input: IInputExam): Promise<any> => 
         `Create an exam blueprint with title "${data.title || "Untitled"}" and subjects "${subjects}". Topics: ${allTopics}. Special instructions: ${specialInstructions}.`
     );
 
-    // Subtopics Agent Planner
+    // Subtopics Agent Planner (with per-topic difficulty examples from the bank)
     let agentOutput;
     try {
-        agentOutput = await Subtopics_Agent(data);
+        const planningInput = await attachPlanningExamples(data, organisationId);
+        agentOutput = await Subtopics_Agent(planningInput);
     } catch (agentErr: any) {
         console.error("Subtopics Agent planning failed:", agentErr);
         throw ApiError.internal(`Planning failed: ${agentErr.message}`);
@@ -78,12 +122,25 @@ export const verifyExamBlueprint = async (blueprint: any): Promise<any> => {
  * Takes the verified blueprint tree, queries RAG context per block subject, and runs
  * question generation with Repair Agent.
  */
-export const generateExamFromBlueprint = async (blueprint: any, organisationId?: string | null): Promise<any> => {
+export const generateExamFromBlueprint = async (
+    blueprint: any,
+    organisationId?: string | null,
+    onProgress?: (done: number, total: number, message?: string) => void
+): Promise<any> => {
     if (!blueprint || !Array.isArray(blueprint.sections)) {
         throw ApiError.badRequest("Invalid blueprint structure.");
     }
 
     const finalSections: any[] = [];
+
+    // Total questions to generate (matches per-block qCount resolution below)
+    const totalQuestions = (blueprint.sections || []).reduce((sum: number, sec: any) =>
+        sum + (sec.blocks || []).reduce((blockSum: number, blk: any) =>
+            blockSum + (blk.question_count
+                || (blk.topics || []).reduce((topicSum: number, top: any) =>
+                    topicSum + (top.subtopics || []).reduce((subSum: number, sb: any) => subSum + (sb.allocatedQuestions || 0), 0), 0)
+                || 5), 0), 0);
+    let generatedSoFar = 0;
 
     for (const section of blueprint.sections) {
         const finalBlocks: any[] = [];
@@ -135,6 +192,8 @@ export const generateExamFromBlueprint = async (blueprint: any, organisationId?:
             }
 
             for (const batch of batchByQuestionCount(units, 10)) {
+                const batchLabel = batch.map((u) => u.subtopic || u.topic).filter(Boolean).join(", ");
+                onProgress?.(generatedSoFar, totalQuestions, batchLabel ? `Generating: ${batchLabel}` : "Generating questions...");
                 try {
                     const repairedQuestions = await runGenerationBatch({
                         units: batch,
@@ -156,7 +215,10 @@ export const generateExamFromBlueprint = async (blueprint: any, organisationId?:
                                     unit.subtopic ?? "",
                                     unit.questionType,
                                     blueprint.difficulty || "medium",
-                                    3
+                                    3,
+                                    15,
+                                    0.7,
+                                    organisationId
                                 );
                             } catch (ragError) {
                                 console.error(`Failed to fetch example questions for "${unit.subtopic}":`, ragError);
@@ -195,6 +257,7 @@ export const generateExamFromBlueprint = async (blueprint: any, organisationId?:
                     });
 
                     blockQuestions.push(...repairedQuestions);
+                    onProgress?.(generatedSoFar + blockQuestions.length, totalQuestions);
                 } catch (genError: any) {
                     if (genError instanceof ApiError) throw genError;
                     console.error(`Generation failed for block "${block.name}" of section "${section.name || section.section_name}":`, genError);
@@ -204,6 +267,8 @@ export const generateExamFromBlueprint = async (blueprint: any, organisationId?:
             if (block.question_count && blockQuestions.length > block.question_count) {
                 blockQuestions.length = block.question_count;
             }
+
+            generatedSoFar += blockQuestions.length;
 
             const formattedQuestions = blockQuestions.map((q: any) => {
                 const qType = (q.type || q.question_type || block.question_type || "mcq").toLowerCase();

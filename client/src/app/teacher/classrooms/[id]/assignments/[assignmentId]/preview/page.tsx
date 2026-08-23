@@ -47,7 +47,7 @@ export default function AssignmentPreviewPage() {
         ]);
         setAssignment(aRes.data);
         setQuestions(qRes.data || []);
-      } catch (err) {
+      } catch {
         toast.error("Failed to load assignment");
       } finally {
         setLoading(false);

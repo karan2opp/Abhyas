@@ -8,7 +8,8 @@ import { assertQuota } from "../billing/usage.service.js";
 
 export const generateBlueprintHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-        const result = await generateExamBlueprint(req.body);
+        const organisationId = req.user?.organisationId ?? null;
+        const result = await generateExamBlueprint(req.body, organisationId);
         res.status(200).json({
             success: true,
             data: result

@@ -1,4 +1,4 @@
-import { eq, and, count, inArray, avg, desc, ilike, gte } from "drizzle-orm";
+import { eq, and, count, inArray, avg, desc, ilike, gte, or, isNull, lte } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { exams, sections, questions, options, groups, classroomStudents, groupStudents, blocks } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
@@ -133,9 +133,13 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                 : await PermissionService.teacher.canManageExam(requester.id, examId);
             if (!hasAccess) throw ApiError.forbidden("You are not authorized to edit this exam");
 
-            // Update totalMarks
+            // Update totalMarks (and honor status so AI-generated exams can publish)
             const [updatedExam] = await tx.update(exams)
-                .set({ totalMarks: calculatedTotalMarks, updatedAt: new Date() })
+                .set({
+                    totalMarks: calculatedTotalMarks,
+                    status: data.status || existingExam.status,
+                    updatedAt: new Date()
+                })
                 .where(eq(exams.id, examId))
                 .returning();
             exam = updatedExam;
@@ -314,17 +318,47 @@ const getExamById = async (examId: string, requester: Requester) => {
 };
 
 // ── List Exams for a Classroom (teacher or manager) ────────────────────────────
-const listExamsForClassroom = async (classroomId: string, requester: Requester, groupId?: string, search?: string) => {
+const listExamsForClassroom = async (classroomId: string, requester: Requester, groupId?: string, search?: string, status?: string, page: number = 1, limit: number = 9) => {
     const canManageClassroom = requester.role === "manager"
         ? await PermissionService.manager.canManageClassroom(requester.organisationId, classroomId)
         : await PermissionService.teacher.canManageClassroom(requester.id, classroomId);
     if (!canManageClassroom) throw ApiError.forbidden("You are not authorized to view this classroom's exams");
 
-    const conditions = [eq(exams.classroomId, classroomId)];
-    if (groupId) conditions.push(eq(exams.groupId, groupId));
-    if (search) conditions.push(ilike(exams.title, `%${search}%`));
+    const baseConditions = [eq(exams.classroomId, classroomId)];
+    if (groupId) baseConditions.push(eq(exams.groupId, groupId));
+    if (search) baseConditions.push(ilike(exams.title, `%${search}%`));
 
-    return await db.select().from(exams).where(and(...conditions)).orderBy(desc(exams.createdAt));
+    // Counts for the status filter pills (independent of the current page)
+    const [allRow] = await db.select({ value: count() }).from(exams).where(and(...baseConditions));
+    const [pubRow] = await db.select({ value: count() }).from(exams).where(and(...baseConditions, eq(exams.status, "PUBLISHED")));
+    const [draftRow] = await db.select({ value: count() }).from(exams).where(and(...baseConditions, eq(exams.status, "DRAFT")));
+
+    const conditions = [...baseConditions];
+    if (status === "published") conditions.push(eq(exams.status, "PUBLISHED"));
+    if (status === "draft") conditions.push(eq(exams.status, "DRAFT"));
+
+    const [totalRow] = await db.select({ value: count() }).from(exams).where(and(...conditions));
+    const total = Number(totalRow?.value) || 0;
+    const offset = (page - 1) * limit;
+
+    const data = await db.select().from(exams)
+        .where(and(...conditions))
+        .orderBy(desc(exams.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+    return {
+        data,
+        total,
+        page,
+        limit,
+        hasMore: offset + data.length < total,
+        counts: {
+            all: Number(allRow?.value) || 0,
+            published: Number(pubRow?.value) || 0,
+            draft: Number(draftRow?.value) || 0,
+        }
+    };
 };
 
 // ── Update Exam ────────────────────────────────────────────────────────────────
@@ -386,9 +420,15 @@ const getOverviewStats = async (teacherId: string) => {
     const examIds = teacherExams.map(e => e.id);
 
     let totalStudents = 0;
+    let totalSubmissions = 0;
+    let studentsOnline = 0;
+    let pendingEvaluations = 0;
     let averageScore = 0;
 
     if (examIds.length > 0) {
+        const [submissionsCount] = await db.select({ value: count() }).from(submissions).where(inArray(submissions.examId, examIds));
+        totalSubmissions = Number(submissionsCount?.value) || 0;
+
         const uniqueStudents = await db.selectDistinct({ userId: submissions.userId })
             .from(submissions)
             .where(and(
@@ -396,6 +436,22 @@ const getOverviewStats = async (teacherId: string) => {
                 eq(submissions.status, "submitted")
             ));
         totalStudents = uniqueStudents.length;
+
+        // Students currently attempting an exam (in-progress submission)
+        const onlineStudents = await db.selectDistinct({ userId: submissions.userId })
+            .from(submissions)
+            .where(and(
+                inArray(submissions.examId, examIds),
+                eq(submissions.status, "inprogress")
+            ));
+        studentsOnline = onlineStudents.length;
+
+        const [evaluatingCount] = await db.select({ value: count() }).from(submissions)
+            .where(and(
+                inArray(submissions.examId, examIds),
+                eq(submissions.status, "evaluating")
+            ));
+        pendingEvaluations = Number(evaluatingCount?.value) || 0;
 
         const [avgResult] = await db.select({ value: avg(submissions.score) })
             .from(submissions)
@@ -407,31 +463,90 @@ const getOverviewStats = async (teacherId: string) => {
     return {
         totalExams: Number(examsCount?.value) || 0,
         totalStudents,
+        totalSubmissions,
+        studentsOnline,
+        pendingEvaluations,
         averageScore,
         recentExams
     };
 };
 
 // ── Get My Exams (student, via classroom/group membership) ───────────────────
-const getMyExams = async (studentId: string, classroomId?: string) => {
+const getMyExams = async (studentId: string, classroomId?: string, groupId?: string, search?: string, category?: string, page: number = 1, limit: number = 10) => {
     const memberships = await db.select().from(classroomStudents).where(
         and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active"))
     );
     const memberClassroomIds = memberships.map(m => m.classroomId);
-    if (memberClassroomIds.length === 0) return [];
-    if (classroomId && !memberClassroomIds.includes(classroomId)) return [];
+    if (memberClassroomIds.length === 0) return { data: [], total: 0, page, limit, hasMore: false, counts: { upcoming: 0, inprogress: 0, closed: 0 } };
+    if (classroomId && !memberClassroomIds.includes(classroomId)) return { data: [], total: 0, page, limit, hasMore: false, counts: { upcoming: 0, inprogress: 0, closed: 0 } };
 
     const classroomIds = classroomId ? [classroomId] : memberClassroomIds;
     const myGroups = await db.select().from(groupStudents).where(eq(groupStudents.studentId, studentId));
     const myGroupIds = new Set(myGroups.map(g => g.groupId));
 
-    const classroomExams = await db.select().from(exams).where(inArray(exams.classroomId, classroomIds));
+    const conditions = [
+        inArray(exams.classroomId, classroomIds),
+        eq(exams.status, "PUBLISHED"),
+        or(isNull(exams.publishTime), lte(exams.publishTime, new Date()))
+    ];
+    if (search) conditions.push(ilike(exams.title, `%${search}%`));
+
+    if (groupId) {
+        conditions.push(eq(exams.groupId, groupId));
+    } else if (myGroupIds.size > 0) {
+        conditions.push(or(isNull(exams.groupId), inArray(exams.groupId, Array.from(myGroupIds))));
+    } else {
+        conditions.push(isNull(exams.groupId));
+    }
+
+    const allExams = await db.select().from(exams).where(and(...conditions)).orderBy(desc(exams.createdAt));
+
+    // Attach the student's submission to each exam so the UI can show status
+    const examIds = allExams.map(e => e.id);
+    const subMap: Record<string, any> = {};
+    if (examIds.length > 0) {
+        const subs = await db.select().from(submissions).where(
+            and(inArray(submissions.examId, examIds), eq(submissions.userId, studentId))
+        );
+        subs.forEach(s => { subMap[s.examId] = s; });
+    }
 
     const now = new Date();
-    return classroomExams
-        .filter(e => (e as any).status === "PUBLISHED")
-        .filter(e => !e.groupId || myGroupIds.has(e.groupId))
-        .filter(e => !e.publishTime || now >= e.publishTime);
+    const withMeta = allExams.map(e => {
+        const sub = subMap[e.id] || null;
+        const subStatus = sub?.status;
+        let cat: "upcoming" | "inprogress" | "closed";
+        if (subStatus === "inprogress") cat = "inprogress";
+        else if (subStatus === "submitted" || subStatus === "evaluating") cat = "closed";
+        else if (e.type === "SCHEDULED") {
+            if (e.startTime && now < new Date(e.startTime)) cat = "upcoming";
+            else if (e.endTime && now > new Date(e.endTime)) cat = "closed";
+            else cat = "inprogress";
+        } else {
+            cat = "inprogress"; // ON_DEMAND is available now
+        }
+        return { ...e, mySubmission: sub, category: cat };
+    });
+
+    const counts = {
+        upcoming: withMeta.filter(x => x.category === "upcoming").length,
+        inprogress: withMeta.filter(x => x.category === "inprogress").length,
+        closed: withMeta.filter(x => x.category === "closed").length,
+    };
+
+    const filtered = category && category !== "all" ? withMeta.filter(x => x.category === category) : withMeta;
+    const total = filtered.length;
+    const offset = (page - 1) * limit;
+    const data = filtered.slice(offset, offset + limit);
+
+    return {
+        data,
+        total,
+        page,
+        limit,
+        hasMore: offset + data.length < total,
+        counts
+    };
 };
 
 

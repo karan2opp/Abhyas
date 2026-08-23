@@ -37,7 +37,7 @@ export default function GroupAssignmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [totalMarks, setTotalMarks] = useState("0");
+  const [, setTotalMarks] = useState("0");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [creating, setCreating] = useState(false);
@@ -51,7 +51,7 @@ export default function GroupAssignmentsPage() {
       const found = (gRes.data || []).find((g: GroupEntry) => g.id === groupId);
       setGroup(found || null);
       setAssignments(aRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load group assignments");
     } finally {
       setLoading(false);

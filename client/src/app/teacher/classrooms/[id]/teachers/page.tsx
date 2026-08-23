@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Search, Users, UserPlus, Trash2 } from "lucide-react";
+import { Search, Users, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -36,7 +36,7 @@ export default function TeachersPage() {
     try {
       const res = await getClassroomTeachersService(classroomId, search || undefined);
       setTeachers(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load teachers");
     } finally {
       setLoading(false);

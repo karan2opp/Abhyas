@@ -105,7 +105,7 @@ export default function ForgotPasswordPage() {
                 id="email" 
                 type="email" 
                 placeholder="name@university.edu" 
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all"
                 {...registerEmail('email')}
               />
               {emailErrors.email && (
@@ -116,7 +116,7 @@ export default function ForgotPasswordPage() {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-white text-black hover:bg-gray-200 font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
             >
               {isLoading ? "Sending OTP..." : "Send OTP"}
             </button>
@@ -137,7 +137,7 @@ export default function ForgotPasswordPage() {
                 type="text" 
                 placeholder="123456" 
                 maxLength={6}
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-center tracking-[0.5em] text-lg font-semibold"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all text-center tracking-[0.5em] text-lg font-semibold"
                 {...registerReset('otp')}
               />
               {resetErrors.otp && (
@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
                 id="password" 
                 type="password" 
                 placeholder="••••••••" 
-                className="w-full bg-[#09090b] border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:ring-1 focus:ring-white/30 transition-all"
+                className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-3 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-orange-500/40 transition-all"
                 {...registerReset('password')}
               />
               {resetErrors.password && (
@@ -162,7 +162,7 @@ export default function ForgotPasswordPage() {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-white text-black hover:bg-gray-200 font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-xl px-4 py-3 transition-all active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100 mt-2"
             >
               {isLoading ? "Resetting Password..." : "Reset Password"}
             </button>
@@ -170,7 +170,7 @@ export default function ForgotPasswordPage() {
               type="button" 
               onClick={() => setStep(1)}
               disabled={isLoading}
-              className="w-full bg-transparent text-gray-400 hover:text-white font-semibold rounded-xl px-4 py-3 transition-all text-sm mt-2"
+              className="w-full bg-transparent text-gray-400 hover:text-orange-400 font-semibold rounded-xl px-4 py-3 transition-all text-sm mt-2"
             >
               Back to Email
             </button>
@@ -180,7 +180,7 @@ export default function ForgotPasswordPage() {
 
       <div className="text-center text-sm text-gray-400">
         Remember your password?{' '}
-        <Link href="/auth/login" className="text-white font-semibold hover:underline transition-colors">
+        <Link href="/auth/login" className="text-orange-400 font-semibold hover:text-orange-300 hover:underline transition-colors">
           Sign In
         </Link>
       </div>

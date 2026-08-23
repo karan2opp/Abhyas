@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Clock, Send, Flag, ChevronLeft, ChevronRight, Check } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
 import { FeedbackModal } from "@/components/FeedbackModal";
 import ReactMarkdown from "react-markdown";
+import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 // Define a type for our flattened question structure
@@ -23,6 +24,29 @@ type FlattenedQuestion = {
   images: any[];
 };
 
+const STORAGE_PREFIX = "abhyas-exam-pending:";
+
+const loadLocalSnapshot = (submissionId: string) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_PREFIX + submissionId);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveLocalSnapshot = (submissionId: string, answers: Record<string, string[]>, textAnswers: Record<string, string>) => {
+  try {
+    localStorage.setItem(STORAGE_PREFIX + submissionId, JSON.stringify({ answers, textAnswers }));
+  } catch {}
+};
+
+const clearLocalSnapshot = (submissionId: string) => {
+  try {
+    localStorage.removeItem(STORAGE_PREFIX + submissionId);
+  } catch {}
+};
+
 export default function ExamAttemptPage() {
   const params = useParams();
   const submissionId = params.id as string;
@@ -33,7 +57,12 @@ export default function ExamAttemptPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingAnswer, setIsSavingAnswer] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [, setTimeLeft] = useState<number | null>(null);
+
+  // Offline / sync state
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [dirtyVersion, setDirtyVersion] = useState(0);
 
   // Map of questionId -> selectedOptionIds[]
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
@@ -51,6 +80,16 @@ export default function ExamAttemptPage() {
   const [hasAcceptedInstructions, setHasAcceptedInstructions] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Refs for offline persistence & sync (avoid stale closures)
+  const answersRef = useRef<Record<string, string[]>>({});
+  const textAnswersRef = useRef<Record<string, string>>({});
+  const dirtyRef = useRef<Set<string>>(new Set());
+  const pendingSubmitRef = useRef(false);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncPromiseRef = useRef<Promise<boolean> | null>(null);
+  const runSyncRef = useRef<() => Promise<boolean>>(async () => true);
+  const submitRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => {
     if (!submissionId) return;
     
@@ -65,6 +104,7 @@ export default function ExamAttemptPage() {
         const sub = subRes.data || subRes;
         
         if (sub.status !== "inprogress") {
+          clearLocalSnapshot(submissionId);
           toast.info("This exam is already submitted or timeout.");
           router.replace(`/student/results/${submissionId}`);
           return;
@@ -73,7 +113,7 @@ export default function ExamAttemptPage() {
         setExamData(exam);
         setSubmissionData(sub);
 
-        // Populate initial answers
+        // Populate initial answers (server) then overlay any local offline snapshot
         const initialAnswers: Record<string, string[]> = {};
         const initialTextAnswers: Record<string, string> = {};
         if (sub.answers && Array.isArray(sub.answers)) {
@@ -82,10 +122,30 @@ export default function ExamAttemptPage() {
             if (ans.textAnswer) initialTextAnswers[ans.questionId] = ans.textAnswer;
           });
         }
-        setAnswers(initialAnswers);
-        setSavedAnswers(initialAnswers);
-        setTextAnswers(initialTextAnswers);
-        setSavedTextAnswers(initialTextAnswers);
+
+        const local = loadLocalSnapshot(submissionId);
+        const mergedAnswers = { ...initialAnswers };
+        const mergedTextAnswers = { ...initialTextAnswers };
+        const dirty = new Set<string>();
+        if (local) {
+          for (const [qid, opts] of Object.entries(local.answers || {})) {
+            mergedAnswers[qid] = opts as string[];
+            dirty.add(qid);
+          }
+          for (const [qid, txt] of Object.entries(local.textAnswers || {})) {
+            mergedTextAnswers[qid] = txt as string;
+            dirty.add(qid);
+          }
+        }
+
+        setAnswers(mergedAnswers);
+        setSavedAnswers(mergedAnswers);
+        setTextAnswers(mergedTextAnswers);
+        setSavedTextAnswers(mergedTextAnswers);
+        answersRef.current = mergedAnswers;
+        textAnswersRef.current = mergedTextAnswers;
+        dirtyRef.current = dirty;
+        if (dirty.size > 0) setDirtyVersion(v => v + 1);
 
         // Setup timer based on submission createdAt
         if (sub.createdAt && exam.duration) {
@@ -96,7 +156,7 @@ export default function ExamAttemptPage() {
           setTimeLeft(remaining);
         }
 
-      } catch (err) {
+      } catch {
         toast.error("Failed to load the exam.");
         router.push("/student");
       } finally {
@@ -106,6 +166,40 @@ export default function ExamAttemptPage() {
     
     fetchData();
   }, [submissionId, router]);
+
+  // ── Online / offline detection ──────────────────────────────────────────
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Internet connection restored. Syncing your answers...");
+      runSyncRef.current().then((ok) => {
+        if (ok && pendingSubmitRef.current) {
+          pendingSubmitRef.current = false;
+          submitRef.current();
+        }
+      });
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning("Connection lost. Your answers are saved on this device.");
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // ── Auto-save: debounced sync of any unsaved (dirty) answers when online ─
+  useEffect(() => {
+    if (!isOnline) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => { runSyncRef.current(); }, 3000);
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    };
+  }, [dirtyVersion, isOnline]);
 
   // Flatten sections into a linear array of questions
   const flattenedQuestions = useMemo<FlattenedQuestion[]>(() => {
@@ -136,23 +230,78 @@ export default function ExamAttemptPage() {
   }, [examData]);
 
   const handleTimeUp = async () => {
-    toast.error("Time is up! Submitting your exam automatically.");
+    if (!navigator.onLine) {
+      pendingSubmitRef.current = true;
+      toast.error("Time is up! You need internet to submit. It will be submitted automatically when the connection returns.");
+      return;
+    }
+    toast.info("Time is up! Submitting your exam automatically.");
     await submitExamFinal();
   };
 
   const handleOptionChange = (questionId: string, optionId: string) => {
-    const newSelected = [optionId]; 
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: newSelected
-    }));
+    const newSelected = [optionId];
+    const nextAnswers = { ...answersRef.current, [questionId]: newSelected };
+    setAnswers(nextAnswers);
+    answersRef.current = nextAnswers;
+    saveLocalSnapshot(submissionId, nextAnswers, textAnswersRef.current);
+    dirtyRef.current.add(questionId);
+    setDirtyVersion(v => v + 1);
   };
 
   const handleTextAnswerChange = (questionId: string, text: string) => {
-    setTextAnswers(prev => ({
-      ...prev,
-      [questionId]: text
-    }));
+    const nextTextAnswers = { ...textAnswersRef.current, [questionId]: text };
+    setTextAnswers(nextTextAnswers);
+    textAnswersRef.current = nextTextAnswers;
+    saveLocalSnapshot(submissionId, answersRef.current, nextTextAnswers);
+    dirtyRef.current.add(questionId);
+    setDirtyVersion(v => v + 1);
+  };
+
+  // ── Sync helpers ────────────────────────────────────────────────────────
+  // Sends every locally-dirty answer to the server. Returns true only if all
+  // dirty answers were saved successfully (or there were none to save).
+  const syncDirtyAnswers = async (): Promise<boolean> => {
+    const dirtyIds = Array.from(dirtyRef.current);
+    if (dirtyIds.length === 0) return true;
+    if (!navigator.onLine) return false;
+
+    setIsSyncing(true);
+    let allOk = true;
+    try {
+      for (const qid of dirtyIds) {
+        const q = flattenedQuestions.find((fq) => fq.id === qid);
+        if (!q) continue;
+        try {
+          await submitAnswerService({
+            submissionId,
+            questionId: qid,
+            options: q.type === "mcq" ? answersRef.current[qid] : undefined,
+            textAnswer: q.type !== "mcq" ? textAnswersRef.current[qid] : undefined,
+          });
+          if (q.type === "mcq") {
+            setSavedAnswers(prev => ({ ...prev, [qid]: answersRef.current[qid] ?? [] }));
+          } else {
+            setSavedTextAnswers(prev => ({ ...prev, [qid]: textAnswersRef.current[qid] ?? "" }));
+          }
+          dirtyRef.current.delete(qid);
+        } catch {
+          allOk = false;
+          break;
+        }
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+    return allOk;
+  };
+
+  // Runs a single sync at a time; concurrent callers share the same attempt.
+  const runSync = (): Promise<boolean> => {
+    if (syncPromiseRef.current) return syncPromiseRef.current;
+    const p = syncDirtyAnswers().finally(() => { syncPromiseRef.current = null; });
+    syncPromiseRef.current = p;
+    return p;
   };
 
 
@@ -183,6 +332,28 @@ export default function ExamAttemptPage() {
     }
 
     setIsSavingAnswer(true);
+
+    // If offline, store locally and let auto-sync push it when connection returns
+    if (!isOnline) {
+      dirtyRef.current.add(currentQ.id);
+      setDirtyVersion(v => v + 1);
+      if (currentQ.type === "mcq") {
+        setSavedAnswers(prev => ({ ...prev, [currentQ.id]: selectedOptions }));
+      } else {
+        setSavedTextAnswers(prev => ({ ...prev, [currentQ.id]: textAns }));
+      }
+      setIsSavingAnswer(false);
+      toast.info("You're offline. Your answer is saved on this device and will sync automatically.");
+      if (moveToNext) {
+        if (currentIndex < flattenedQuestions.length - 1) {
+          setCurrentIndex(currentIndex + 1);
+        } else {
+          toast.success("All questions answered! You can now submit the exam.");
+        }
+      }
+      return;
+    }
+
     try {
       await submitAnswerService({
         submissionId,
@@ -197,6 +368,7 @@ export default function ExamAttemptPage() {
       } else {
         setSavedTextAnswers(prev => ({ ...prev, [currentQ.id]: textAns }));
       }
+      dirtyRef.current.delete(currentQ.id);
       
       if (moveToNext) {
         if (currentIndex < flattenedQuestions.length - 1) {
@@ -215,31 +387,23 @@ export default function ExamAttemptPage() {
   };
 
   const submitExamFinal = async () => {
+    if (!navigator.onLine) {
+      toast.error("You need internet to submit your exam. Please wait for the connection to come back and try again.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const currentQ = flattenedQuestions[currentIndex];
-      if (currentQ) {
-        const selectedOptions = answers[currentQ.id];
-        const textAns = textAnswers[currentQ.id];
-        
-        const hasMcqAns = currentQ.type === "mcq" && selectedOptions && selectedOptions.length > 0;
-        const hasTextAns = currentQ.type !== "mcq" && textAns && textAns.trim() !== "";
-        
-        if (hasMcqAns || hasTextAns) {
-          try {
-             await submitAnswerService({
-              submissionId,
-              questionId: currentQ.id,
-              options: currentQ.type === "mcq" ? selectedOptions : undefined,
-              textAnswer: currentQ.type !== "mcq" ? textAns : undefined
-            });
-          } catch(e) {
-            console.error("Failed to save final answer before submission", e);
-          }
-        }
+      const synced = await runSync();
+      if (!synced) {
+        toast.error("Could not save your latest answers. Check your connection and try again.");
+        setIsSubmitting(false);
+        return;
       }
 
       await submitExamService(submissionId);
+      clearLocalSnapshot(submissionId);
+      dirtyRef.current.clear();
       toast.success("Exam submitted successfully!");
       if (examData?.requireFeedback) {
         setShowFeedback(true);
@@ -247,12 +411,29 @@ export default function ExamAttemptPage() {
         router.push(`/student/results/${submissionId}`);
       }
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to submit exam");
+      const message = err.response?.data?.message || "Failed to submit exam";
+      if (/already submitted/i.test(message)) {
+        clearLocalSnapshot(submissionId);
+        toast.info("This exam was already submitted. Redirecting to your results.");
+        router.replace(`/student/results/${submissionId}`);
+        return;
+      }
+      toast.error(message);
       setIsSubmitting(false);
     }
   };
 
+  // Keep the latest sync/submit functions available to the online/offline handlers
+  useEffect(() => {
+    runSyncRef.current = runSync;
+    submitRef.current = submitExamFinal;
+  });
+
   const handleSubmitClick = () => {
+    if (!isOnline) {
+      toast.error("You need internet to submit your exam. Please wait for the connection to come back and try again.");
+      return;
+    }
     if (!confirm("Are you sure you want to submit your exam? You cannot change your answers after submitting.")) return;
     submitExamFinal();
   };
@@ -487,6 +668,11 @@ export default function ExamAttemptPage() {
           ) : (
             <div className="font-mono text-2xl font-bold tracking-wider text-gray-200">--:--</div>
           )}
+          {(isSyncing || !isOnline) && (
+            <span className={`mt-1 text-[10px] font-bold uppercase tracking-widest ${!isOnline ? "text-red-400" : "text-amber-400"}`}>
+              {!isOnline ? "● Offline" : "Syncing..."}
+            </span>
+          )}
         </div>
 
         <Button 
@@ -497,6 +683,15 @@ export default function ExamAttemptPage() {
           {isSubmitting ? "Submitting..." : "Submit Exam"}
         </Button>
       </header>
+
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="shrink-0 bg-red-500/10 border-b border-red-500/30 px-6 py-2.5 flex items-center justify-center gap-2">
+          <span className="text-xs font-semibold text-red-300">
+            Connection lost — your answers are saved on this device. You can keep answering, but submitting requires internet.
+          </span>
+        </div>
+      )}
 
       {/* Main Split Content */}
       <div className="flex flex-1 min-h-0">
@@ -526,28 +721,32 @@ export default function ExamAttemptPage() {
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    code: ({node, ...props}) => {
-                      const isInline = !props.className?.includes('language-');
-                      return isInline 
-                        ? <code className="bg-orange-500/10 px-2 py-1 rounded text-lg text-orange-300 font-mono border border-orange-500/30 font-normal" {...props} /> 
-                        : (
-                          <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl font-normal">
-                            <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
-                              <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56]" />
-                              <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]" />
-                              <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f]" />
-                              <span className="ml-3 text-sm font-mono text-gray-500 tracking-wider uppercase">{props.className?.replace('language-', '') || 'code'}</span>
-                            </div>
-                            <div className="p-6 overflow-x-auto custom-scrollbar">
-                              <code className="block font-mono text-[16px] md:text-lg leading-relaxed text-gray-300" {...props} />
-                            </div>
+                    pre: ({ children }) => {
+                      const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
+                      return (
+                        <div className="my-6 rounded-2xl overflow-hidden border border-white/10 bg-[#09090b] shadow-2xl font-normal">
+                          <div className="bg-white/5 px-4 py-3 border-b border-white/5 flex items-center gap-2">
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#ff5f56]" />
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]" />
+                            <div className="w-3.5 h-3.5 rounded-full bg-[#27c93f]" />
+                            <span className="ml-3 text-sm font-mono text-gray-500 tracking-wider uppercase">{lang}</span>
                           </div>
-                        )
+                          <div className="p-6 overflow-x-auto custom-scrollbar">
+                            {children}
+                          </div>
+                        </div>
+                      );
                     },
-                    p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />
+                    code: ({ className, children, ...props }) => {
+                      const isInline = !(className?.includes("language-") || String(children ?? "").includes("\n"));
+                      return isInline
+                        ? <code className="bg-orange-500/10 px-2 py-1 rounded text-lg text-orange-300 font-mono border border-orange-500/30 font-normal" {...props}>{children}</code>
+                        : <code className={"block font-mono text-[16px] md:text-lg leading-relaxed text-gray-300 whitespace-pre-wrap" + (className ? " " + className : "")} {...props}>{children}</code>;
+                    },
+                    p: ({...props}) => <p className="mb-4 last:mb-0" {...props} />
                   }}
                 >
-                  {currentQuestion.description || "No question text provided."}
+                  {normalizeCodeBlocks(currentQuestion.description || "No question text provided.")}
                 </ReactMarkdown>
               </div>
               {currentQuestion.images && currentQuestion.images.length > 0 && (

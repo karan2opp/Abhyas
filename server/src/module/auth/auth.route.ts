@@ -6,6 +6,7 @@ import {
   registerSchema,
   loginSchema,
   verifyOtpSchema,
+  resendOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   updateProfileSchema,
@@ -26,6 +27,12 @@ const router = Router();
 router.post("/register", validate(registerSchema), controller.register);
 router.post("/login", validate(loginSchema), controller.login);
 router.post("/verify-otp", validate(verifyOtpSchema), controller.verifyOtp);
+router.post(
+  "/resend-otp",
+  resetPasswordLimiter,
+  validate(resendOtpSchema),
+  controller.resendOtp
+);
 router.post("/refreshToken", controller.refreshToken);
 router.post("/logout", authenticate, controller.logout);
 router.post(

@@ -36,7 +36,7 @@ export default function StudentClassroomsPage() {
       const res = await getMyClassroomsService();
       const rows = res.data || [];
       setClassrooms(rows.map((r: any) => r.classroom));
-    } catch (err) {
+    } catch {
       toast.error("Failed to load your classrooms");
     } finally {
       setLoading(false);

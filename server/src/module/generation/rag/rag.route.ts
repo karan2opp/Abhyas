@@ -44,8 +44,8 @@ const docUpload = multer({
   }
 });
 
-// Route for uploading documents: POST /api/rag/upload (system admin only)
-router.post("/api/rag/upload", authenticate, authorize("system_admin"), docUpload.single("file"), uploadDocument);
+// Route for uploading documents: POST /api/rag/upload (manager + system admin only)
+router.post("/api/rag/upload", authenticate, authorize("manager", "system_admin"), docUpload.single("file"), uploadDocument);
 
 // Routes for getting distinct collections: staff only (teacher, manager, system_admin)
 router.get("/api/rag/collections", authenticate, authorize("teacher", "manager", "system_admin"), getCollections);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Pencil, ListChecks, X, Check, Eye, Sparkles, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, ListChecks, X, Check, Eye, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -78,7 +78,7 @@ export default function AssignmentDetailPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editStartDate, setEditStartDate] = useState("");
   const [editDueDate, setEditDueDate] = useState("");
-  const [editTotalMarks, setEditTotalMarks] = useState("0");
+  const [, setEditTotalMarks] = useState("0");
   const [savingAssignment, setSavingAssignment] = useState(false);
 
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
@@ -227,7 +227,7 @@ export default function AssignmentDetailPage() {
       ]);
       setAssignment(aRes.data);
       setQuestions(qRes.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load assignment");
     } finally {
       if (showLoading) setLoading(false);
@@ -773,7 +773,7 @@ export default function AssignmentDetailPage() {
           {generatingWithAi ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-4">
               <Loader2 className="h-10 w-10 text-orange-500 animate-spin" />
-              <p className="text-sm text-gray-400 text-center">Our AI agent is reviewing the RAG context and generating assignment question(s). This may take up to a minute...</p>
+              <p className="text-sm text-gray-400 text-center">Generating...</p>
             </div>
           ) : (
             <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto custom-scrollbar">

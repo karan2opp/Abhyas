@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Users, CheckCircle, Clock, AlertCircle, Trophy } from "lucide-react";
+import { ChevronLeft, Users, CheckCircle, AlertCircle, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExamByIdService, getExamSubmissionsService } from "../../../../../exams/exam.service";

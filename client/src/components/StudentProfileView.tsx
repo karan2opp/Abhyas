@@ -6,7 +6,7 @@ import { useParams, usePathname } from "next/navigation";
 import {
   GraduationCap, ClipboardCheck, FileText, Mail, Phone, ArrowRight, Loader2, TrendingUp,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import api from "@/utils/axios";
 import { formatDate } from "@/lib/date";

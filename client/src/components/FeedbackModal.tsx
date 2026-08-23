@@ -44,7 +44,7 @@ export function FeedbackModal({ examId, submissionId, hasTextQuestions, onClose,
       });
       toast.success("Thank you for your feedback!");
       onSuccess();
-    } catch (error) {
+    } catch {
       toast.error("Failed to submit feedback. Please try again.");
     } finally {
       setIsSubmitting(false);

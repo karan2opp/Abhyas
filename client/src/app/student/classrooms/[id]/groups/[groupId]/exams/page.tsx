@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Clock } from "lucide-react";
+import { ArrowLeft, FileText, Clock, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { getMyExamsService, startScopedExamService } from "../../../../../student.service";
 import { formatDateTime } from "@/lib/date";
+import { Pagination } from "@/components/Pagination";
 
 interface ExamEntry {
   id: string;
@@ -28,20 +29,39 @@ export default function StudentGroupExamsPage() {
   const [exams, setExams] = useState<ExamEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [startingExamId, setStartingExamId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const res = await getMyExamsService(classroomId);
-        setExams((res.data || []).filter((e: ExamEntry) => e.groupId === groupId));
-      } catch (err) {
+        const res = await getMyExamsService(classroomId, groupId, page, PAGE_SIZE, debouncedSearch || undefined);
+        const result = res.data || { data: [], total: 0 };
+        setExams(result.data || []);
+        setTotal(result.total || 0);
+        setTotalPages(Math.max(1, Math.ceil((result.total || 0) / PAGE_SIZE)));
+      } catch {
         toast.error("Failed to load exams");
       } finally {
         setLoading(false);
       }
     })();
-  }, [classroomId, groupId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroomId, groupId, page, debouncedSearch]);
 
   const handleStartExam = async (examId: string) => {
     setStartingExamId(examId);
@@ -65,8 +85,20 @@ export default function StudentGroupExamsPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Back to Group
       </button>
 
-      <div className="mb-6">
-        <h3 className="text-2xl font-bold text-white">Group Exams ({exams.length})</h3>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-2xl font-bold text-white">Group Exams ({total})</h3>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
+          <input
+            type="text"
+            placeholder="Search exams..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus:border-orange-500/50 h-11 rounded-xl text-sm pl-10"
+          />
+        </div>
       </div>
 
       {exams.length === 0 ? (
@@ -106,6 +138,8 @@ export default function StudentGroupExamsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 }

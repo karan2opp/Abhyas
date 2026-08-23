@@ -35,7 +35,7 @@ export default function OrganisationsPage() {
     try {
       const res = await getOrganisationsService();
       setOrganisations(res.data || []);
-    } catch (err) {
+    } catch {
       toast.error("Failed to load organisations");
     } finally {
       setLoading(false);

@@ -2,13 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { listGroupsService } from "../../../../group.service";
 import { listExamsForClassroomService, deleteExamService } from "../../../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
+import { Pagination } from "@/components/Pagination";
 
 interface GroupEntry {
   id: string;
@@ -33,33 +34,50 @@ export default function GroupExamsPage() {
   const [group, setGroup] = useState<GroupEntry | null>(null);
   const [exams, setExams] = useState<ExamEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 9;
 
-  const loadAll = async () => {
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const fetchAll = async (pg: number) => {
     try {
       const [gRes, eRes] = await Promise.all([
         listGroupsService(classroomId),
-        listExamsForClassroomService(classroomId, groupId),
+        listExamsForClassroomService(classroomId, groupId, debouncedSearch || undefined, undefined, pg),
       ]);
       const found = (gRes.data || []).find((g: GroupEntry) => g.id === groupId);
       setGroup(found || null);
-      setExams(eRes.data || []);
-    } catch (err) {
+      const result = eRes.data || { data: [], total: 0 };
+      setExams(result.data || []);
+      setTotalPages(Math.max(1, Math.ceil((result.total || 0) / PAGE_SIZE)));
+    } catch {
       toast.error("Failed to load group exams");
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (groupId) loadAll();
-  }, [groupId]);
+    if (!groupId) return;
+    setLoading(true);
+    fetchAll(page).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, page, debouncedSearch]);
 
   const handleDeleteExam = async (examId: string, title: string) => {
     if (!confirm(`Delete exam "${title}"? This permanently deletes its sections, questions, and submissions. This cannot be undone.`)) return;
     try {
       await deleteExamService(examId);
       toast.success("Exam deleted");
-      loadAll();
+      fetchAll(page);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to delete exam");
     }
@@ -76,17 +94,29 @@ export default function GroupExamsPage() {
         <ArrowLeft className="h-3.5 w-3.5" /> Back to Group
       </button>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-2xl font-bold text-white">Group Exams</h3>
           <p className="text-gray-400 text-base mt-1">Exams for {group?.name || "this group"}.</p>
         </div>
-        <Button
-          className="bg-orange-600 hover:bg-orange-700 text-white shrink-0"
-          onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/new?groupId=${groupId}`)}
-        >
-          <Plus className="mr-2 h-4 w-4" /> New Exam
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
+            <input
+              type="text"
+              placeholder="Search exams..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 focus:outline-none focus:ring-0 focus:border-orange-500/50 h-11 rounded-xl text-sm pl-10"
+            />
+          </div>
+          <Button
+            className="bg-orange-600 hover:bg-orange-700 text-white shrink-0"
+            onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/new?groupId=${groupId}`)}
+          >
+            <Plus className="mr-2 h-4 w-4" /> New Exam
+          </Button>
+        </div>
       </div>
 
       {exams.length === 0 ? (
@@ -143,6 +173,8 @@ export default function GroupExamsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
     </div>
   );
 }

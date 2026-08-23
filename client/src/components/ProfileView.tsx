@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Camera, Mail, Phone, User, Shield, KeyRound, Loader2, ArrowLeft } from 'lucide-react';
+import { Camera, Mail, User, Shield, KeyRound, Loader2, ArrowLeft } from 'lucide-react';
 
 import { useAuthStore } from '@/store/authStore';
 import { updateProfileService, forgotPasswordService, getMe } from '@/app/auth/auth.service';

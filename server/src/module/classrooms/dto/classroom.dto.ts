@@ -24,7 +24,7 @@ export const regenerateJoinCodeSchema = z.object({
 
 export const joinClassroomSchema = z.object({
     joinCode: z.string({ message: "Join code is required" })
-        .length(8, "Join code must be exactly 8 characters")
+        .length(6, "Join code must be exactly 6 characters")
         .transform((val) => val.toUpperCase()),
 });
 

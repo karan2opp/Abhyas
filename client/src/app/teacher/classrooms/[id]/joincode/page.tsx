@@ -6,19 +6,24 @@ import { Copy, RefreshCw, Ban, Mail, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import { regenerateJoinCodeService, revokeJoinCodeService, inviteStudentService } from "../../classroom.service";
+import { regenerateJoinCodeService, revokeJoinCodeService, updateJoinCodeService, inviteStudentService } from "../../classroom.service";
 import { useClassroom } from "../ClassroomContext";
+import { useAuthStore } from "@/store/authStore";
 import { formatDateTime } from "@/lib/date";
 
 export default function JoinCodePage() {
   const params = useParams();
   const classroomId = params.id as string;
   const { classroom, reloadClassroom } = useClassroom();
+  const user = useAuthStore(state => state.user);
+  const isManager = user?.role === "manager";
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [maxUsesInput, setMaxUsesInput] = useState(String(classroom.joinCodeMaxUses ?? ""));
+  const [savingMaxUses, setSavingMaxUses] = useState(false);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(classroom.joinCode);
@@ -28,13 +33,36 @@ export default function JoinCodePage() {
   const handleRegenerate = async () => {
     setRegenerating(true);
     try {
-      await regenerateJoinCodeService(classroomId);
+      const parsedMaxUses = parseInt(maxUsesInput, 10);
+      const payload =
+        isManager && Number.isInteger(parsedMaxUses) && parsedMaxUses >= 1 && parsedMaxUses <= 1000
+          ? { joinCodeMaxUses: parsedMaxUses }
+          : {};
+      await regenerateJoinCodeService(classroomId, payload);
       toast.success("Join code regenerated");
       await reloadClassroom();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to regenerate join code");
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleSaveMaxUses = async () => {
+    const parsedMaxUses = parseInt(maxUsesInput, 10);
+    if (!Number.isInteger(parsedMaxUses) || parsedMaxUses < 1 || parsedMaxUses > 1000) {
+      toast.error("Max students per code must be between 1 and 1000");
+      return;
+    }
+    setSavingMaxUses(true);
+    try {
+      await updateJoinCodeService(classroomId, { joinCodeMaxUses: parsedMaxUses });
+      toast.success("Max students per code updated");
+      await reloadClassroom();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update join code limit");
+    } finally {
+      setSavingMaxUses(false);
     }
   };
 
@@ -102,6 +130,38 @@ export default function JoinCodePage() {
               <p>Expires: {formatDateTime(classroom.joinCodeExpiresAt)}</p>
               <p>Uses: {classroom.joinCodeUseCount} / {classroom.joinCodeMaxUses}</p>
             </div>
+
+            {isManager && (
+              <>
+                <div className="flex items-center gap-2 pt-1">
+                  <label htmlFor="join-code-max-uses" className="text-xs text-gray-400 flex-1">
+                    Max students per code
+                  </label>
+                  <input
+                    id="join-code-max-uses"
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={maxUsesInput}
+                    onChange={(e) => setMaxUsesInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSaveMaxUses()}
+                    className="w-20 bg-[#18181b] border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm text-center focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="bg-transparent border-white/10 text-white hover:bg-white/5 shrink-0"
+                    onClick={handleSaveMaxUses}
+                    disabled={savingMaxUses || classroom.joinCodeRevoked}
+                  >
+                    {savingMaxUses ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-gray-600">
+                  Sets how many students can join with this code. It applies to the current code immediately.
+                </p>
+              </>
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button

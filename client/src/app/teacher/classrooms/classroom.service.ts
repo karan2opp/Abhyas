@@ -53,6 +53,11 @@ export const revokeJoinCodeService = async (id: string) => {
   return res.data;
 };
 
+export const updateJoinCodeService = async (id: string, data: { joinCodeMaxUses: number }) => {
+  const res = await api.patch(`/classrooms/${id}/join-code`, data);
+  return res.data;
+};
+
 // ------------- STUDENT INVITE -------------
 export const inviteStudentService = async (id: string, email: string) => {
   const res = await api.post(`/classrooms/${id}/invite`, { email });

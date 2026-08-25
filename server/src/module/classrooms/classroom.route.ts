@@ -6,6 +6,7 @@ import {
     createClassroomSchema,
     updateClassroomSchema,
     regenerateJoinCodeSchema,
+    updateJoinCodeSchema,
     joinClassroomSchema,
     addTeacherSchema,
     inviteStudentSchema,
@@ -29,6 +30,7 @@ router.post("/:id/invite", authenticate, authorize("teacher", "manager"), valida
 
 router.post("/:id/join-code/regenerate", authenticate, authorize("teacher", "manager"), validate(regenerateJoinCodeSchema), controller.regenerateJoinCode);
 router.post("/:id/join-code/revoke", authenticate, authorize("teacher", "manager"), controller.revokeJoinCode);
+router.patch("/:id/join-code", authenticate, authorize("teacher", "manager"), validate(updateJoinCodeSchema), controller.updateJoinCode);
 
 router.post("/join", authenticate, authorize("student"), validate(joinClassroomSchema), controller.joinClassroom);
 router.get("/me", authenticate, authorize("student"), controller.getMyClassroomsAsStudent);

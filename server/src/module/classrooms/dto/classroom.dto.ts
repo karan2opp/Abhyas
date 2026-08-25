@@ -22,6 +22,10 @@ export const regenerateJoinCodeSchema = z.object({
     joinCodeMaxUses: z.number().int().min(1).max(1000).optional(),
 });
 
+export const updateJoinCodeSchema = z.object({
+    joinCodeMaxUses: z.number({ message: "Max uses is required" }).int().min(1, "Must be at least 1").max(1000, "Must be at most 1000"),
+});
+
 export const joinClassroomSchema = z.object({
     joinCode: z.string({ message: "Join code is required" })
         .length(6, "Join code must be exactly 6 characters")
@@ -43,6 +47,7 @@ export const inviteStudentSchema = z.object({
 export type CreateClassroomDto = z.infer<typeof createClassroomSchema>;
 export type UpdateClassroomDto = z.infer<typeof updateClassroomSchema>;
 export type RegenerateJoinCodeDto = z.infer<typeof regenerateJoinCodeSchema>;
+export type UpdateJoinCodeDto = z.infer<typeof updateJoinCodeSchema>;
 export type JoinClassroomDto = z.infer<typeof joinClassroomSchema>;
 export type AddTeacherDto = z.infer<typeof addTeacherSchema>;
 export type InviteStudentDto = z.infer<typeof inviteStudentSchema>;

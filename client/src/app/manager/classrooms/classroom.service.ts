@@ -40,6 +40,11 @@ export const regenerateJoinCodeService = async (id: string, data?: { joinCodeExp
   return res.data;
 };
 
+export const updateJoinCodeService = async (id: string, data: { joinCodeMaxUses: number }) => {
+  const res = await api.patch(`/classrooms/${id}/join-code`, data);
+  return res.data;
+};
+
 export const revokeJoinCodeService = async (id: string) => {
   const res = await api.post(`/classrooms/${id}/join-code/revoke`);
   return res.data;

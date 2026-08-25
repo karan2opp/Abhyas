@@ -10,6 +10,7 @@ import type {
     CreateClassroomDto,
     UpdateClassroomDto,
     RegenerateJoinCodeDto,
+    UpdateJoinCodeDto,
     AddTeacherDto,
     InviteStudentDto,
 } from "./dto/classroom.dto.js";
@@ -213,6 +214,19 @@ const revokeJoinCode = async (classroomId: string, requester: Requester) => {
     return updated;
 };
 
+// ── Update Join Code Settings (max uses, without regenerating the code) ───────
+const updateJoinCode = async (classroomId: string, requester: Requester, data: UpdateJoinCodeDto) => {
+    await assertCanManageClassroom(requester, classroomId);
+
+    const [updated] = await db.update(classrooms)
+        .set({ joinCodeMaxUses: data.joinCodeMaxUses, updatedAt: new Date() })
+        .where(eq(classrooms.id, classroomId))
+        .returning();
+
+    if (!updated) throw ApiError.notFound("Classroom not found");
+    return updated;
+};
+
 // ── Invite Student (single-use, emailed) ─────────────────────────────────────
 const inviteStudent = async (classroomId: string, data: InviteStudentDto, requester: Requester) => {
     await assertCanManageClassroom(requester, classroomId);
@@ -408,6 +422,7 @@ export {
     listTeachers,
     inviteStudent,
     regenerateJoinCode,
+    updateJoinCode,
     revokeJoinCode,
     joinClassroom,
     getMyClassrooms,

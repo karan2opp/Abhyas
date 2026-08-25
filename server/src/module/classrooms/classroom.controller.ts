@@ -57,6 +57,11 @@ export const revokeJoinCode = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Join code revoked", result);
 };
 
+export const updateJoinCode = async (req: Request, res: Response) => {
+    const result = await classroomService.updateJoinCode(req.params.id as string, toRequester(req), req.body);
+    return ApiResponse.ok(res, "Join code settings updated", result);
+};
+
 export const joinClassroom = async (req: Request, res: Response) => {
     const result = await classroomService.joinClassroom(req.body.joinCode, req.user!.id, req.user!.email);
     const message = result.alreadyJoined ? "You have already joined this classroom" : "Joined classroom successfully";

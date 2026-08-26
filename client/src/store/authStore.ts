@@ -7,6 +7,7 @@ interface User {
   email: string;
   role: 'student' | 'teacher' | 'manager' | 'system_admin';
   avatarUrl?: string;
+  organisationId?: string | null;
 }
 
 interface AuthState {

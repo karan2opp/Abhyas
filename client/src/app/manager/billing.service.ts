@@ -26,6 +26,17 @@ export const uploadMyOrganisationLogoService = async (file: File) => {
   return res.data;
 };
 
+// ------------- ORGANISATION JOIN CODE -------------
+export const getMyOrganisationJoinCodeService = async () => {
+  const res = await api.get("/organisations/mine/join-code");
+  return res.data;
+};
+
+export const regenerateMyOrganisationJoinCodeService = async () => {
+  const res = await api.post("/organisations/mine/join-code/regenerate");
+  return res.data;
+};
+
 // ------------- SUBSCRIPTION -------------
 export const getMySubscriptionService = async () => {
   const res = await api.get("/billing/subscriptions/mine");

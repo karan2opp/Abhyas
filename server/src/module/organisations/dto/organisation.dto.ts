@@ -29,8 +29,14 @@ export const assignTeacherSchema = z.object({
     email: z.string({ message: "Email is required" }).email("Invalid email address").toLowerCase(),
 });
 
+export const joinOrganisationSchema = z.object({
+    code: z.string({ message: "Join code is required" }).min(1, "Join code is required")
+        .transform((code) => code.trim().toUpperCase()),
+});
+
 export type CreateOrganisationDto = z.infer<typeof createOrganisationSchema>;
 export type UpdateOrganisationDto = z.infer<typeof updateOrganisationSchema>;
 export type AssignUserDto = z.infer<typeof assignUserSchema>;
 export type AssignManagerDto = z.infer<typeof assignManagerSchema>;
 export type AssignTeacherDto = z.infer<typeof assignTeacherSchema>;
+export type JoinOrganisationDto = z.infer<typeof joinOrganisationSchema>;

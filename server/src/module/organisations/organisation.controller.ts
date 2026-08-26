@@ -98,3 +98,18 @@ export const demoteTeacherFromMyOrganisation = async (req: Request, res: Respons
     const result = await organisationService.demoteTeacher(req.user!.organisationId!, req.params.userId as string);
     return ApiResponse.ok(res, "Teacher demoted to student", result);
 };
+
+export const getMyOrganisationJoinCode = async (req: Request, res: Response) => {
+    const result = await organisationService.getOrCreateOrganisationJoinCode(req.user!.organisationId!);
+    return ApiResponse.ok(res, "Organisation join code", result);
+};
+
+export const regenerateMyOrganisationJoinCode = async (req: Request, res: Response) => {
+    const result = await organisationService.regenerateOrganisationJoinCode(req.user!.organisationId!);
+    return ApiResponse.ok(res, "Organisation join code regenerated", result);
+};
+
+export const joinOrganisationByCode = async (req: Request, res: Response) => {
+    const result = await organisationService.joinOrganisationByCode(req.user!.id, req.body.code);
+    return ApiResponse.ok(res, "Joined organisation successfully", result);
+};

@@ -9,6 +9,9 @@ export const organisations = pgTable("organisations", {
   address: text("address"),
   logoUrl: text("logo_url"),
   logoPublicId: text("logo_public_id"),
+  // Invitation code a teacher or student enters to join this organisation.
+  // Generated on demand by the manager and regenerable.
+  joinCode: text("join_code").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

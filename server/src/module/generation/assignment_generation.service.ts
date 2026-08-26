@@ -1,5 +1,6 @@
 import { assertSafeGenerationRequest } from "./agents/guardrail_agent.js";
-import { queryRelevantChunks } from "./rag/rag.service.js";
+import { queryRelevantChunks, resolveIndexedSubject } from "./rag/rag.service.js";
+import { tryGenerateContext, contextToText } from "./agents/context_agent.js";
 import { assingmentAgent } from "./agents/assignment_agent.js";
 import { repairQuestionGeneration } from "./agents/repair_agent.js";
 import { runGenerationBatch, type GenerationUnit } from "./runner.js";
@@ -38,7 +39,7 @@ export type AssignmentBlockInput = z.infer<typeof AssignmentBlockInputSchema>;
 export type AssignmentGenerationInput = z.infer<typeof AssignmentGenerationInputSchema>;
 export type SingleQuestionGenerationInput = z.infer<typeof SingleQuestionGenerationInputSchema>;
 
-export const generateMockAssignment = async (input: AssignmentGenerationInput): Promise<any> => {
+export const generateMockAssignment = async (input: AssignmentGenerationInput, organisationId?: string | null): Promise<any> => {
     // 1. Validate Input
     const parseResult = AssignmentGenerationInputSchema.safeParse(input);
     if (!parseResult.success) {
@@ -48,10 +49,10 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput): 
 
     // 2. Safety Guardrail on Blocks and Instructions
     const allTopics = data.blocks.flatMap((b) => b.topics).join(", ");
-    const blockSubjects = data.blocks.map((b) => b.subject).join(", ");
+    const blockSummaries = data.blocks.map((b) => `subject "${b.subject}" (${b.question_count} ${b.question_type} questions) topics [${b.topics.join(", ")}]`).join("; ");
     const specialInstructions = data.instructions ? data.instructions.join(", ") : "None";
     await assertSafeGenerationRequest(
-        `Create an assignment for subjects "${blockSubjects}". Topics include: ${allTopics}. Special instructions: ${specialInstructions}.`
+        `Generate assignment exam questions for: ${blockSummaries}. Topics covered: ${allTopics}. Special instructions: ${specialInstructions}.`
     );
 
     const finalBlocks: any[] = [];
@@ -87,13 +88,37 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput): 
                 const repairedQuestions = await runGenerationBatch({
                     units: batch,
                     fetchContext: async (unit) => {
-                        let chunks: any[] = [];
+                        const generated = await tryGenerateContext({
+                            subject: unit.subject,
+                            topic: unit.topic,
+                            subtopic: unit.topic,
+                            difficulty: data.difficulty,
+                            question_type: unit.questionType,
+                            instructions: [...(data.instructions || []), ...(block.instructions || [])],
+                        });
+                        const generatedText = generated ? contextToText(generated) : null;
+
+                        let ragChunks: any[] = [];
                         try {
-                            chunks = await queryRelevantChunks(unit.subject, unit.topic, unit.topic, 4);
+                            const { matched } = await resolveIndexedSubject(unit.subject, organisationId);
+                            if (matched) {
+                                ragChunks = await queryRelevantChunks(
+                                    matched,
+                                    unit.topic,
+                                    unit.topic,
+                                    4,
+                                    organisationId,
+                                    generatedText ?? undefined
+                                );
+                            }
                         } catch (ragError) {
                             console.error(`Failed to fetch RAG chunks for topic "${unit.topic}":`, ragError);
                         }
-                        return chunks.map((c) => ({ source: c.sourceFile, text: c.text }));
+
+                        const entries: { source: string; text: string }[] = [];
+                        if (generatedText) entries.push({ source: "agent-generated context", text: generatedText });
+                        entries.push(...ragChunks.map((c) => ({ source: c.sourceFile, text: c.text })));
+                        return entries;
                     },
                     buildPayload: (batchUnits, contexts) => ({
                         subject: block.subject,
@@ -137,7 +162,7 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput): 
     };
 };
 
-export const generateSingleAssignmentQuestion = async (input: SingleQuestionGenerationInput): Promise<any> => {
+export const generateSingleAssignmentQuestion = async (input: SingleQuestionGenerationInput, organisationId?: string | null): Promise<any> => {
     // 1. Validate Input
     const parseResult = SingleQuestionGenerationInputSchema.safeParse(input);
     if (!parseResult.success) {
@@ -148,27 +173,47 @@ export const generateSingleAssignmentQuestion = async (input: SingleQuestionGene
     // 2. Safety Guardrail
     const specialInstructions = data.instructions ? data.instructions.join(", ") : "None";
     await assertSafeGenerationRequest(
-        `Create a single question for subject "${data.subject}" on topic "${data.topic}". Special instructions: ${specialInstructions}.`
+        `Generate a single exam question (${data.question_type}) for subject "${data.subject}" on topic "${data.topic}". Special instructions: ${specialInstructions}.`
     );
 
-    // 3. Query RAG context for this topic
+    // 3. Always generate a study-note context for the topic, then run a single
+    // subject-only semantic search using it as the query.
+    const generated = await tryGenerateContext({
+        subject: data.subject,
+        topic: data.topic,
+        subtopic: data.topic,
+        difficulty: data.difficulty,
+        question_type: data.question_type,
+        instructions: data.instructions || [],
+    });
+    const generatedText = generated ? contextToText(generated) : null;
+
     let chunks: any[] = [];
     try {
-        chunks = await queryRelevantChunks(
-            data.subject,
-            data.topic,
-            data.topic,
-            4
-        );
+        const { matched } = await resolveIndexedSubject(data.subject, organisationId);
+        if (matched) {
+            chunks = await queryRelevantChunks(
+                matched,
+                data.topic,
+                data.topic,
+                4,
+                organisationId,
+                generatedText ?? undefined
+            );
+        }
     } catch (ragError) {
         console.error(`Failed to fetch RAG chunks for topic "${data.topic}":`, ragError);
     }
 
-    const ragContextForAgent = chunks.map(c => ({
+    const ragContextForAgent = [];
+    if (generatedText) {
+        ragContextForAgent.push({ topic: data.topic, source: "agent-generated context", text: generatedText });
+    }
+    ragContextForAgent.push(...chunks.map(c => ({
         topic: data.topic,
         source: c.sourceFile,
         text: c.text
-    }));
+    })));
 
     const generationPayload = {
         subject: data.subject,

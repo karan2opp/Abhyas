@@ -1,8 +1,9 @@
 import { assertSafeGenerationRequest } from "./agents/guardrail_agent.js";
 import { Subtopics_Agent } from "./agents/subtopics_agent.js";
+import { tryGenerateContext, contextToText } from "./agents/context_agent.js";
 import { mapMcqOptions } from "./mcq.js";
 import { allocateSectionQuestions } from "./allocation.js";
-import { queryRelevantChunks } from "./rag/rag.service.js";
+import { queryRelevantChunks, resolveIndexedSubject } from "./rag/rag.service.js";
 import { retrieveExampleQuestions } from "./questionBank/questionBank.service.js";
 import { recordUsage } from "../billing/usage.service.js";
 import { generationAgent } from "./agents/generation_agent.js";
@@ -71,10 +72,14 @@ export const generateExamBlueprint = async (input: IInputExam, organisationId?: 
 
     // Safety Guardrail (per-block subjects)
     const allTopics = data.sections.flatMap((s) => s.blocks.flatMap((b) => b.topics)).join(", ");
-    const subjects = data.sections.flatMap((s) => s.blocks.map((b) => b.subject)).join(", ");
+    const blockSummaries = data.sections.flatMap((s) => s.blocks.map((b) => {
+        const qType = b.question_type || "mcq";
+        const count = b.question_count || 5;
+        return `subject "${b.subject}" (${count} ${qType} questions) topics [${b.topics.join(", ")}]`;
+    })).join("; ");
     const specialInstructions = data.instructions ? data.instructions.join(", ") : "None";
     await assertSafeGenerationRequest(
-        `Create an exam blueprint with title "${data.title || "Untitled"}" and subjects "${subjects}". Topics: ${allTopics}. Special instructions: ${specialInstructions}.`
+        `Generate an exam blueprint and exam questions for: ${blockSummaries}. Topics covered: ${allTopics}. Special instructions: ${specialInstructions}.`
     );
 
     // Subtopics Agent Planner (with per-topic difficulty examples from the bank)
@@ -198,13 +203,43 @@ export const generateExamFromBlueprint = async (
                     const repairedQuestions = await runGenerationBatch({
                         units: batch,
                         fetchContext: async (unit) => {
-                            let chunks: any[] = [];
+                            // 1. Always generate a study-note context for the unit. This
+                            // guarantees the generation agent has factual material even when
+                            // the knowledge base has nothing for this topic.
+                            const generated = await tryGenerateContext({
+                                subject: unit.subject,
+                                topic: unit.topic,
+                                subtopic: unit.subtopic ?? "",
+                                difficulty: blueprint.difficulty || "medium",
+                                question_type: unit.questionType,
+                                instructions: [...(blueprint.instructions || []), ...(block.instructions || [])],
+                            });
+                            const generatedText = generated ? contextToText(generated) : null;
+
+                            // 2. Fuzzy-match the subject; if it matches an indexed subject,
+                            // run a single subject-only semantic search using the generated
+                            // context as the query (skips the strict topic-metadata match).
+                            let ragChunks: any[] = [];
                             try {
-                                chunks = await queryRelevantChunks(unit.subject, unit.topic, unit.subtopic ?? "", 4);
+                                const { matched } = await resolveIndexedSubject(unit.subject, organisationId);
+                                if (matched) {
+                                    ragChunks = await queryRelevantChunks(
+                                        matched,
+                                        unit.topic,
+                                        unit.subtopic ?? "",
+                                        4,
+                                        organisationId,
+                                        generatedText ?? undefined
+                                    );
+                                }
                             } catch (ragError) {
                                 console.error(`Failed to fetch RAG chunks for "${unit.subtopic}":`, ragError);
                             }
-                            return chunks.map((c) => ({ source: c.sourceFile, text: c.text }));
+
+                            const entries: { source: string; text: string }[] = [];
+                            if (generatedText) entries.push({ source: "agent-generated context", text: generatedText });
+                            entries.push(...ragChunks.map((c) => ({ source: c.sourceFile, text: c.text })));
+                            return entries;
                         },
                         fetchExamples: async (unit) => {
                             let examples: any[] = [];

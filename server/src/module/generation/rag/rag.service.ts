@@ -5,6 +5,7 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { ApiError } from "../../../common/utils/ApiError.js";
 import { loadMarkdownChunks } from "./markdown.js";
+import { subjectMatchAgent } from "../agents/subject_match_agent.js";
 const COLLECTION_NAME = "exams";
 
 // ── Per-org collection resolution ─────────────────────────────────────────────
@@ -395,12 +396,66 @@ export const getDistinctCollections = async (organisationId?: string | null): Pr
   return result;
 };
 
+// ── Subject fuzzy matching ────────────────────────────────────────────────────
+// When the user's subject doesn't exactly match any indexed subject, we ask a
+// small matching agent whether the user's subject is related to any indexed
+// subject. The search is then rewritten to use that indexed subject, so the user
+// doesn't have to know the exact stored subject name. If nothing is related
+// (e.g. "Cooking" vs an org that only has "JavaScript"), we return no match and
+// rely on agent-generated context instead.
+const SUBJECT_MATCH_CACHE_TTL_MS = 5 * 60 * 1000;
+let subjectMatchCache: { key: string; matched: string | null; expiresAt: number } | null = null;
+
+export const resolveIndexedSubject = async (
+  userSubject: string,
+  organisationId?: string | null
+): Promise<{ matched: string | null; score: number }> => {
+  let collections: { subject: string; topic: string; count: number }[] = [];
+  try {
+    collections = await getDistinctCollections(organisationId);
+  } catch (err) {
+    console.error(`Failed to load indexed subjects for matching:`, err);
+    return { matched: null, score: 0 };
+  }
+
+  const subjects = [...new Set(collections.map((c) => c.subject))];
+  if (subjects.length === 0) return { matched: null, score: 0 };
+
+  const cacheKey = `${organisationId || "global"}::${userSubject.trim().toLowerCase()}`;
+  if (subjectMatchCache && subjectMatchCache.key === cacheKey && Date.now() < subjectMatchCache.expiresAt) {
+    return { matched: subjectMatchCache.matched, score: subjectMatchCache.matched ? 1 : 0 };
+  }
+
+  // Fast path: exact (case-insensitive) match — no agent call needed.
+  const exact = subjects.find((s) => s.trim().toLowerCase() === userSubject.trim().toLowerCase());
+  if (exact) {
+    subjectMatchCache = { key: cacheKey, matched: exact, expiresAt: Date.now() + SUBJECT_MATCH_CACHE_TTL_MS };
+    return { matched: exact, score: 1 };
+  }
+
+  // Agent-based judgment: is the user's subject related to any indexed subject?
+  let matched: string | null = null;
+  try {
+    const result = await subjectMatchAgent(userSubject.trim(), subjects);
+    matched = result.matchedSubject;
+    // The agent must return one of the available subjects; ignore any drift.
+    if (matched && !subjects.includes(matched)) matched = null;
+  } catch (err) {
+    console.error(`Subject match agent failed for "${userSubject}":`, err);
+    matched = null;
+  }
+
+  subjectMatchCache = { key: cacheKey, matched, expiresAt: Date.now() + SUBJECT_MATCH_CACHE_TTL_MS };
+  return { matched, score: matched ? 1 : 0 };
+};
+
 export const queryRelevantChunks = async (
   subject: string,
   topic: string,
   subtopic: string,
   topK: number = 5,
-  organisationId?: string | null
+  organisationId?: string | null,
+  query?: string
 ): Promise<{ text: string; score: number; sourceFile: string }[]> => {
   try {
     const collectionName = getCollectionForOrg(organisationId);
@@ -409,7 +464,7 @@ export const queryRelevantChunks = async (
     const matchedObj = collections.find((c) => c.subject.toLowerCase() === trimmedSub);
     const canonicalSubject = matchedObj ? matchedObj.subject : subject.trim();
 
-    const query = `${topic} - ${subtopic}`;
+    const searchText = (query && query.trim()) ? query.trim() : `${topic} - ${subtopic}`;
 
     const embeddings = getEmbeddings();
 
@@ -421,7 +476,12 @@ export const queryRelevantChunks = async (
     // Fetch a larger candidate pool so re-ranking has something to work with.
     const poolK = Math.max(topK * 4, 20);
 
-    // 1. Try exact topic match under canonical subject
+    // When a generated-context query is provided, run a single subject-scoped
+    // semantic search with NO topic filter. The vector search does the topical
+    // ranking, so the topic metadata no longer has to match exactly — chunks
+    // about the topic surface on their own because the query text is about it.
+    const subjectOnly = !!query && query.trim().length > 0;
+
     let filter: any = {
       must: [
         {
@@ -429,48 +489,49 @@ export const queryRelevantChunks = async (
           match: {
             value: canonicalSubject
           }
-        },
-        {
-          key: "metadata.topic",
-          match: {
-            value: topic.trim()
-          }
         }
       ]
     };
-
-    let results = await vectorStore.similaritySearchWithScore(query, poolK, filter);
-
-    // 2. If no results, try case-insensitive topic match from indexed collections
-    if (!results || results.length === 0) {
-      const trimmedTop = topic.trim().toLowerCase();
-      const matchedTopic = collections.find(
-        (c) => c.subject.toLowerCase() === canonicalSubject.toLowerCase() && c.topic.toLowerCase() === trimmedTop
-      );
-      if (matchedTopic) {
-        filter = {
-          must: [
-            { key: "metadata.subject", match: { value: canonicalSubject } },
-            { key: "metadata.topic", match: { value: matchedTopic.topic } }
-          ]
-        };
-        results = await vectorStore.similaritySearchWithScore(query, poolK, filter);
-      }
+    if (!subjectOnly) {
+      filter.must.push({ key: "metadata.topic", match: { value: topic.trim() } });
     }
 
-    // 3. If still no results, fallback to subject-only filter for semantic vector search across the entire subject
-    if (!results || results.length === 0) {
-      filter = {
-        must: [
-          {
-            key: "metadata.subject",
-            match: {
-              value: canonicalSubject
+    let results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
+
+    // Backward-compatible fallback chain (used when no generated query is given):
+    // exact topic, then case-insensitive topic, then subject-only.
+    if (!subjectOnly) {
+      // 2. If no results, try case-insensitive topic match from indexed collections
+      if (!results || results.length === 0) {
+        const trimmedTop = topic.trim().toLowerCase();
+        const matchedTopic = collections.find(
+          (c) => c.subject.toLowerCase() === canonicalSubject.toLowerCase() && c.topic.toLowerCase() === trimmedTop
+        );
+        if (matchedTopic) {
+          filter = {
+            must: [
+              { key: "metadata.subject", match: { value: canonicalSubject } },
+              { key: "metadata.topic", match: { value: matchedTopic.topic } }
+            ]
+          };
+          results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
+        }
+      }
+
+      // 3. If still no results, fallback to subject-only filter for semantic vector search across the entire subject
+      if (!results || results.length === 0) {
+        filter = {
+          must: [
+            {
+              key: "metadata.subject",
+              match: {
+                value: canonicalSubject
+              }
             }
-          }
-        ]
-      };
-      results = await vectorStore.similaritySearchWithScore(query, poolK, filter);
+          ]
+        };
+        results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
+      }
     }
 
     if (!results || results.length === 0) {

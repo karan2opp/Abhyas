@@ -3,7 +3,7 @@ import * as controller from "./organisation.controller.js";
 import validate from "../../common/middleware/validate.middleware.js";
 import { authenticate, authorize } from "../../common/middleware/auth.middleware.js";
 import { upload } from "../../common/middleware/multer.middleware.js";
-import { createOrganisationSchema, assignUserSchema, assignManagerSchema, assignTeacherSchema, updateOrganisationSchema } from "./dto/organisation.dto.js";
+import { createOrganisationSchema, assignUserSchema, assignManagerSchema, assignTeacherSchema, joinOrganisationSchema, updateOrganisationSchema } from "./dto/organisation.dto.js";
 
 const router = Router();
 
@@ -35,5 +35,12 @@ router.get("/mine/teachers", authenticate, authorize("manager"), controller.getM
 router.post("/mine/teachers", authenticate, authorize("manager"), validate(assignTeacherSchema), controller.assignTeacherToMyOrganisation);
 router.delete("/mine/teachers/:userId", authenticate, authorize("manager"), controller.removeTeacherFromMyOrganisation);
 router.delete("/mine/teachers/:userId/demote", authenticate, authorize("manager"), controller.demoteTeacherFromMyOrganisation);
+
+// Manager-scoped: organisation join code
+router.get("/mine/join-code", authenticate, authorize("manager"), controller.getMyOrganisationJoinCode);
+router.post("/mine/join-code/regenerate", authenticate, authorize("manager"), controller.regenerateMyOrganisationJoinCode);
+
+// Student/teacher: join an organisation by code
+router.post("/join", authenticate, authorize("student", "teacher"), validate(joinOrganisationSchema), controller.joinOrganisationByCode);
 
 export default router;

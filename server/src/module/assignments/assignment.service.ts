@@ -1086,7 +1086,7 @@ const generateAssignmentFromForm = async (data: any, teacherId: string, organisa
         await assertQuota(organisationId, "question_generation", estimated);
     }
 
-    const generated = await generateMockAssignment(generatorInput);
+    const generated = await generateMockAssignment(generatorInput, organisationId);
 
     if (organisationId) {
         const generatedCount = Array.isArray(generated?.blocks)
@@ -1117,7 +1117,7 @@ const generateSingleQuestionFromForm = async (data: any, teacherId: string, orga
         await assertQuota(organisationId, "question_generation", 1);
     }
 
-    const generated = await generateSingleAssignmentQuestion(generatorInput);
+    const generated = await generateSingleAssignmentQuestion(generatorInput, organisationId);
 
     if (organisationId) {
         try {

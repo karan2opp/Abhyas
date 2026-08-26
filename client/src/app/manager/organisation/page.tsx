@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Building2, Save, Loader2, Mail, Phone, MapPin, ImagePlus, UploadCloud, X } from "lucide-react";
+import { Building2, Save, Loader2, Mail, Phone, MapPin, ImagePlus, UploadCloud, X, KeyRound, Copy, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { getMyOrganisationService, updateMyOrganisationService, uploadMyOrganisationLogoService } from "../billing.service";
+import { getMyOrganisationService, updateMyOrganisationService, uploadMyOrganisationLogoService, getMyOrganisationJoinCodeService, regenerateMyOrganisationJoinCodeService } from "../billing.service";
 
 export default function ManagerOrganisationPage() {
   const [loading, setLoading] = useState(true);
@@ -20,6 +20,45 @@ export default function ManagerOrganisationPage() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [loadingJoinCode, setLoadingJoinCode] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  const loadJoinCode = async () => {
+    setLoadingJoinCode(true);
+    try {
+      const res = await getMyOrganisationJoinCodeService();
+      setJoinCode(res.data?.joinCode || null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to load join code");
+    } finally {
+      setLoadingJoinCode(false);
+    }
+  };
+
+  const handleCopyJoinCode = async () => {
+    if (!joinCode) return;
+    try {
+      await navigator.clipboard.writeText(joinCode);
+      toast.success("Join code copied");
+    } catch {
+      toast.error("Could not copy join code");
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!confirm("Regenerate the join code? The previous code will stop working.")) return;
+    setRegenerating(true);
+    try {
+      const res = await regenerateMyOrganisationJoinCodeService();
+      setJoinCode(res.data?.joinCode || null);
+      toast.success("Join code regenerated");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to regenerate join code");
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -43,6 +82,7 @@ export default function ManagerOrganisationPage() {
 
   useEffect(() => {
     load();
+    loadJoinCode();
   }, []);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,6 +255,48 @@ export default function ManagerOrganisationPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Join Code */}
+      <Card className="bg-[#0f0f11] border-white/5 mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-white">
+            <KeyRound className="h-5 w-5 text-orange-400" /> Organisation Join Code
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-gray-500">
+            Share this code with students and teachers so they can join your organisation. Each code is unique to your organisation.
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex-1 bg-[#09090b] border border-white/10 rounded-xl px-4 py-3">
+              {loadingJoinCode ? (
+                <span className="text-gray-500 text-sm">Loading...</span>
+              ) : (
+                <span className="text-white font-mono text-xl font-bold tracking-[0.35em]">{joinCode || "No code yet"}</span>
+              )}
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                variant="outline"
+                className="border-white/10 text-white"
+                onClick={handleCopyJoinCode}
+                disabled={!joinCode || loadingJoinCode}
+              >
+                <Copy className="h-4 w-4 mr-2 text-orange-400" /> Copy
+              </Button>
+              <Button
+                variant="outline"
+                className="border-white/10 text-white"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+              >
+                {regenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2 text-orange-400" />}
+                Regenerate
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

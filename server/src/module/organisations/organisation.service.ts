@@ -1,8 +1,14 @@
 import { eq, and, count, ilike, or } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import db from "../../common/db/index.js";
 import { organisations, users, classrooms, classroomStudents } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateOrganisationDto, UpdateOrganisationDto } from "./dto/organisation.dto.js";
+
+// 6-letter org invitation code (A-Z), easy to type and share.
+const JOIN_CODE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const generateJoinCode = () =>
+    Array.from({ length: 6 }, () => JOIN_CODE_LETTERS[(randomBytes(1)[0] ?? 0) % 26]).join("");
 
 // ── Create Organisation ──────────────────────────────────────────────────────
 const createOrganisation = async (data: CreateOrganisationDto) => {
@@ -65,7 +71,9 @@ const uploadOrganisationLogo = async (organisationId: string, file: Express.Mult
 // ── Get Organisation for a Student ───────────────────────────────────────────
 // A student's organisation is derived via their active classroom memberships
 // (classroom_students -> classrooms.organisation_id). We assume a student
-// belongs to a single organisation and return the first active one.
+// belongs to a single organisation and return the first active one. If the
+// student has no classroom yet, fall back to the direct users.organisation_id
+// set when they joined the organisation by code.
 const getOrganisationForStudent = async (studentId: string) => {
     const rows = await db.select({ organisationId: classrooms.organisationId })
         .from(classroomStudents)
@@ -76,8 +84,11 @@ const getOrganisationForStudent = async (studentId: string) => {
         ));
 
     const orgId = rows[0]?.organisationId;
-    if (!orgId) throw ApiError.notFound("No organisation found for this student");
-    return getOrganisationById(orgId);
+    if (orgId) return getOrganisationById(orgId);
+
+    const [user] = await db.select({ organisationId: users.organisationId }).from(users).where(eq(users.id, studentId));
+    if (!user?.organisationId) throw ApiError.notFound("No organisation found for this student");
+    return getOrganisationById(user.organisationId);
 };
 
 // ── Get Organisation for a Teacher ───────────────────────────────────────────
@@ -275,6 +286,66 @@ const getOrganisationTeachers = async (organisationId: string, search?: string) 
     }).from(users).where(and(...conditions));
 };
 
+// ── Get / create organisation join code ──────────────────────────────────────
+// Returns the org's invite code, generating one on first request.
+const getOrCreateOrganisationJoinCode = async (organisationId: string) => {
+    const [organisation] = await db.select().from(organisations).where(eq(organisations.id, organisationId));
+    if (!organisation) throw ApiError.notFound("Organisation not found");
+
+    if (organisation.joinCode) return organisation;
+
+    const [updated] = await db.update(organisations)
+        .set({ joinCode: generateJoinCode(), updatedAt: new Date() })
+        .where(eq(organisations.id, organisationId))
+        .returning();
+
+    if (!updated) throw ApiError.internal("Failed to generate join code");
+    return updated;
+};
+
+// ── Regenerate organisation join code ────────────────────────────────────────
+// Issues a fresh code, invalidating the previous one.
+const regenerateOrganisationJoinCode = async (organisationId: string) => {
+    const [updated] = await db.update(organisations)
+        .set({ joinCode: generateJoinCode(), updatedAt: new Date() })
+        .where(eq(organisations.id, organisationId))
+        .returning();
+
+    if (!updated) throw ApiError.notFound("Organisation not found");
+    return updated;
+};
+
+// ── Join organisation by code (student or teacher) ───────────────────────────
+// Links the caller to the organisation matching the code. Managers and system
+// admins can't join by code (their org is assigned by a system admin).
+const joinOrganisationByCode = async (userId: string, code: string) => {
+    const [organisation] = await db.select().from(organisations).where(eq(organisations.joinCode, code));
+    if (!organisation) throw ApiError.badRequest("Invalid organisation join code");
+
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) throw ApiError.notFound("User not found");
+    if (user.role === "manager" || user.role === "system_admin") {
+        throw ApiError.badRequest("Only students and teachers can join an organisation by code");
+    }
+
+    if (user.organisationId) {
+        if (user.organisationId === organisation.id) {
+            const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
+            return safeUser;
+        }
+        throw ApiError.badRequest("You already belong to another organisation");
+    }
+
+    const [updatedUser] = await db.update(users)
+        .set({ organisationId: organisation.id, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+
+    if (!updatedUser) throw ApiError.internal("Failed to join organisation");
+    const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = updatedUser;
+    return safeUser;
+};
+
 export {
     createOrganisation,
     getOrganisationById,
@@ -292,4 +363,7 @@ export {
     demoteTeacher,
     removeTeacherFromOrganisation,
     getOrganisationTeachers,
+    getOrCreateOrganisationJoinCode,
+    regenerateOrganisationJoinCode,
+    joinOrganisationByCode,
 };

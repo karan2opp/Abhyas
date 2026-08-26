@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import {
   getMyOrganisationTeachersService,
   assignTeacherToMyOrganisationService,
-  removeTeacherFromMyOrganisationService,
+  demoteTeacherFromMyOrganisationService,
 } from "../manager.service";
 
 interface Teacher {
@@ -65,14 +65,14 @@ export default function ManagerTeachersPage() {
     }
   };
 
-  const handleRemove = async (userId: string, teacherEmail: string) => {
-    if (!confirm(`Remove ${teacherEmail} from your organisation?`)) return;
+  const handleDemote = async (userId: string, teacherEmail: string) => {
+    if (!confirm(`Demote ${teacherEmail} back to a student role?`)) return;
     try {
-      await removeTeacherFromMyOrganisationService(userId);
-      toast.success("Teacher removed");
+      await demoteTeacherFromMyOrganisationService(userId);
+      toast.success("Teacher demoted to student");
       fetchTeachers(debouncedSearch);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to remove teacher");
+      toast.error(err.response?.data?.message || "Failed to demote teacher");
     }
   };
 
@@ -92,7 +92,7 @@ export default function ManagerTeachersPage() {
         </CardHeader>
         <CardContent>
           <p className="text-xs text-gray-500 mb-3">
-            The user must already have a teacher account (registered with the teacher role). This links them to your organisation.
+            Enter the email of a user in your organisation. Students are promoted to the teacher role and linked to your organisation; existing teachers are linked directly.
           </p>
           <div className="flex gap-2">
             <input
@@ -146,10 +146,10 @@ export default function ManagerTeachersPage() {
                 size="sm"
                 variant="outline"
                 className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 shrink-0 h-8 px-3 text-xs font-semibold"
-                onClick={() => handleRemove(t.id, t.email)}
-                title="Remove teacher"
+                onClick={() => handleDemote(t.id, t.email)}
+                title="Demote teacher back to student"
               >
-                Remove
+                Demote
               </Button>
             </div>
           ))}

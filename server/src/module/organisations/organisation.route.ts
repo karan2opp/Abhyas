@@ -34,5 +34,6 @@ router.delete("/:id/managers/:userId", authenticate, authorize("system_admin"), 
 router.get("/mine/teachers", authenticate, authorize("manager"), controller.getMyOrganisationTeachers);
 router.post("/mine/teachers", authenticate, authorize("manager"), validate(assignTeacherSchema), controller.assignTeacherToMyOrganisation);
 router.delete("/mine/teachers/:userId", authenticate, authorize("manager"), controller.removeTeacherFromMyOrganisation);
+router.delete("/mine/teachers/:userId/demote", authenticate, authorize("manager"), controller.demoteTeacherFromMyOrganisation);
 
 export default router;

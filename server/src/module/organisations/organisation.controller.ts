@@ -93,3 +93,8 @@ export const removeTeacherFromMyOrganisation = async (req: Request, res: Respons
     const result = await organisationService.removeTeacherFromOrganisation(req.user!.organisationId!, req.params.userId as string);
     return ApiResponse.ok(res, "Teacher removed from organisation", result);
 };
+
+export const demoteTeacherFromMyOrganisation = async (req: Request, res: Response) => {
+    const result = await organisationService.demoteTeacher(req.user!.organisationId!, req.params.userId as string);
+    return ApiResponse.ok(res, "Teacher demoted to student", result);
+};

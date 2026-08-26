@@ -169,18 +169,78 @@ const getOrganisationManagers = async (organisationId: string, search?: string) 
 };
 
 // ── Assign Teacher to Organisation (manager, scoped to their own org) ────────
+// A manager can add a teacher to their organisation by email. If the user is a
+// student who belongs to this organisation (via an active classroom membership),
+// they are promoted to the teacher role and linked. An unlinked teacher is simply
+// linked. Managers/admins, teachers of other orgs, and students of other orgs are
+// rejected.
 const assignTeacherToOrganisation = async (organisationId: string, email: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     if (!user) throw ApiError.notFound("User not found with this email address");
-    if (user.role !== "teacher") throw ApiError.badRequest("User must already have the teacher role");
+
+    if (user.role === "manager" || user.role === "system_admin") {
+        throw ApiError.badRequest("Cannot assign a manager or system admin as a teacher");
+    }
+
+    // Existing teacher: only allowed to link them when they are not already
+    // claimed by another organisation.
+    if (user.role === "teacher") {
+        if (user.organisationId && user.organisationId !== organisationId) {
+            throw ApiError.badRequest("This teacher already belongs to another organisation");
+        }
+
+        const [updatedUser] = await db.update(users)
+            .set({ organisationId, updatedAt: new Date() })
+            .where(eq(users.id, user.id))
+            .returning();
+
+        if (!updatedUser) throw ApiError.internal("Failed to assign teacher");
+        const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = updatedUser;
+        return safeUser;
+    }
+
+    // Student path: they must belong to this organisation via an active
+    // classroom membership before we promote them.
+    const [membership] = await db.select({ id: classroomStudents.id })
+        .from(classroomStudents)
+        .innerJoin(classrooms, eq(classrooms.id, classroomStudents.classroomId))
+        .where(and(
+            eq(classroomStudents.studentId, user.id),
+            eq(classroomStudents.status, "active"),
+            eq(classrooms.organisationId, organisationId),
+        ));
+
+    if (!membership) {
+        throw ApiError.badRequest("This user is not a student in your organisation");
+    }
 
     const [updatedUser] = await db.update(users)
-        .set({ organisationId, updatedAt: new Date() })
-        .where(eq(users.email, email))
+        .set({ role: "teacher", organisationId, updatedAt: new Date() })
+        .where(eq(users.id, user.id))
         .returning();
 
     if (!updatedUser) throw ApiError.internal("Failed to assign teacher");
+    const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = updatedUser;
+    return safeUser;
+};
 
+// ── Demote Teacher to Student (manager, scoped to their own org) ──────────────
+// Reverts a teacher of the manager's own organisation back to the student role
+// and detaches them from the organisation (a student's org is derived from their
+// classroom memberships, not the direct users.organisation_id field).
+const demoteTeacher = async (organisationId: string, userId: string) => {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) throw ApiError.notFound("User not found");
+    if (user.role !== "teacher" || user.organisationId !== organisationId) {
+        throw ApiError.badRequest("User is not a teacher in your organisation");
+    }
+
+    const [updatedUser] = await db.update(users)
+        .set({ role: "student", organisationId: null, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+
+    if (!updatedUser) throw ApiError.internal("Failed to demote teacher");
     const { password, verificationToken, refreshToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = updatedUser;
     return safeUser;
 };
@@ -229,6 +289,7 @@ export {
     revokeManager,
     getOrganisationManagers,
     assignTeacherToOrganisation,
+    demoteTeacher,
     removeTeacherFromOrganisation,
     getOrganisationTeachers,
 };

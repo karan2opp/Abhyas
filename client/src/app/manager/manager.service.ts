@@ -15,3 +15,8 @@ export const removeTeacherFromMyOrganisationService = async (userId: string) => 
   const res = await api.delete(`/organisations/mine/teachers/${userId}`);
   return res.data;
 };
+
+export const demoteTeacherFromMyOrganisationService = async (userId: string) => {
+  const res = await api.delete(`/organisations/mine/teachers/${userId}/demote`);
+  return res.data;
+};

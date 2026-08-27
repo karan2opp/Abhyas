@@ -7,6 +7,7 @@ import { Search, Users, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { toast } from "sonner";
+import { useAuthStore } from "@/store/authStore";
 import { getClassroomRosterService } from "../../classroom.service";
 
 interface RosterEntry {
@@ -21,6 +22,7 @@ interface RosterEntry {
 export default function StudentsPage() {
   const params = useParams();
   const classroomId = params.id as string;
+  const userRole = useAuthStore(state => state.user?.role);
 
   const [roster, setRoster] = useState<RosterEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export default function StudentsPage() {
                     </span>
                   </div>
                   <Link
-                    href={`/teacher/student-profile/${s.studentId}`}
+                    href={userRole === "manager" ? `/manager/student-profile/${s.studentId}` : `/teacher/student-profile/${s.studentId}`}
                     className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#0a0a0c] text-gray-300 hover:text-white hover:border-orange-500/40 text-xs font-semibold py-2 transition-all"
                   >
                     <Eye className="h-3.5 w-3.5" /> View Profile

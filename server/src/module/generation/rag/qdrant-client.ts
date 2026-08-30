@@ -238,7 +238,9 @@ export const getDistinctCollections = async (
   const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
 
   try {
-    const checkRes = await fetch(`${qdrantUrl}/collections/${collectionName}`);
+    const checkRes = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
+      headers: getQdrantHeaders(),
+    });
     if (!checkRes.ok) {
       return [];
     }
@@ -263,7 +265,7 @@ export const getDistinctCollections = async (
 
     const scrollRes = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
       body: JSON.stringify(body),
     });
 

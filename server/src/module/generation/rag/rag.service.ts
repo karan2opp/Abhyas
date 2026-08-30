@@ -75,7 +75,7 @@ export const checkIfHashIndexed = async (fileHash: string, organisationId?: stri
 
     const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
       body: JSON.stringify({
         filter: {
           must: [

@@ -7,8 +7,12 @@ dotenv.config();
 // Question-bank collections (question_examples*) are intentionally left intact.
 const run = async () => {
   const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (process.env.QDRANT_API_KEY) {
+    headers["api-key"] = process.env.QDRANT_API_KEY;
+  }
 
-  const listRes = await fetch(`${qdrantUrl}/collections`);
+  const listRes = await fetch(`${qdrantUrl}/collections`, { headers });
   if (!listRes.ok) {
     console.error(`Failed to list collections: ${listRes.status} ${await listRes.text()}`);
     process.exit(1);
@@ -24,11 +28,11 @@ const run = async () => {
   }
 
   for (const name of targets) {
-    const del = await fetch(`${qdrantUrl}/collections/${name}`, { method: "DELETE" });
+    const del = await fetch(`${qdrantUrl}/collections/${name}`, { method: "DELETE", headers });
     console.log(
       del.ok
         ? `Deleted ${name}`
-        : `Failed to delete ${name}: ${del.status} ${del.statusText}`
+        : `Failed to delete ${name}: ${del.status} ${await del.text()}`
     );
   }
 

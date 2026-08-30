@@ -8,10 +8,13 @@ import { retrieveExampleQuestions } from "./questionBank/questionBank.service.js
 import { recordUsage } from "../billing/usage.service.js";
 import { generationAgent } from "./agents/generation_agent.js";
 import { verificationAgent } from "./agents/verification_agent.js";
-import { runGenerationBatch, batchByQuestionCount, type GenerationUnit } from "./runner.js";
+import { runGenerationBatch, batchUnitsByTopic, type GenerationUnit } from "./runner.js";
 import { IInputExamZodSchema } from "./Types/inputExam.js";
 import type { IInputExam } from "./Types/inputExam.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+
+// A block topic may be a plain string or a { topic, subtopics } object.
+const topicName = (t: any): string => (typeof t === "string" ? t : t?.topic || "");
 
 /**
  * Attaches per-topic "reference_examples" (previous questions) from the question
@@ -29,7 +32,9 @@ const attachPlanningExamples = async (data: IInputExam, organisationId?: string 
         for (const block of section.blocks) {
             const type = block.question_type || "mcq";
             const blockExamples: { topic: string; examples: any[] }[] = [];
-            for (const topic of block.topics || []) {
+            for (const rawTopic of block.topics || []) {
+                const topic = topicName(rawTopic);
+                if (!topic) continue;
                 const key = `${block.subject}|${topic}|${type}`;
                 if (!cache.has(key)) {
                     let examples: any[] = [];
@@ -69,11 +74,11 @@ export const generateExamBlueprint = async (input: IInputExam, organisationId?: 
     const data = parseResult.data;
 
     // Safety Guardrail (per-block subjects)
-    const allTopics = data.sections.flatMap((s) => s.blocks.flatMap((b) => b.topics)).join(", ");
+    const allTopics = data.sections.flatMap((s) => s.blocks.flatMap((b) => b.topics.map(topicName))).join(", ");
     const blockSummaries = data.sections.flatMap((s) => s.blocks.map((b) => {
         const qType = b.question_type || "mcq";
         const count = b.question_count || 5;
-        return `subject "${b.subject}" (${count} ${qType} questions) topics [${b.topics.join(", ")}]`;
+        return `subject "${b.subject}" (${count} ${qType} questions) topics [${b.topics.map(topicName).join(", ")}]`;
     })).join("; ");
     const specialInstructions = data.instructions ? data.instructions.join(", ") : "None";
     await assertSafeGenerationRequest(
@@ -193,7 +198,7 @@ export const generateExamFromBlueprint = async (
                 }
             }
 
-            for (const batch of batchByQuestionCount(units, 10)) {
+            for (const batch of batchUnitsByTopic(units, 8)) {
                 const batchLabel = batch.map((u) => u.subtopic || u.topic).filter(Boolean).join(", ");
                 onProgress?.(generatedSoFar, totalQuestions, batchLabel ? `Generating: ${batchLabel}` : "Generating questions...");
                 try {
@@ -233,8 +238,12 @@ export const generateExamFromBlueprint = async (
                             }
 
                             const entries: { source: string; text: string }[] = [];
-                            if (generatedText) entries.push({ source: "agent-generated context", text: generatedText });
+                            // Real retrieved chunks first; the agent-generated study note
+                            // is ONLY a fallback when the knowledge base has nothing.
                             entries.push(...ragChunks.map((c) => ({ source: c.sourceFile, text: c.text })));
+                            if (entries.length === 0 && generatedText) {
+                                entries.push({ source: "agent-generated context", text: generatedText });
+                            }
                             return entries;
                         },
                         fetchExamples: async (unit) => {

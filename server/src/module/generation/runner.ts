@@ -55,6 +55,7 @@ export async function runGenerationBatch({
         payload,
         initialQuestions,
         expectedCount,
+        allowedUnits: units.map((u) => ({ topic: u.topic, subtopic: u.subtopic || "" })),
         generateDeltaFn: async (deltaPayload, missingCount, existing) => {
             const existingTexts = existing.map((q) => q.question_text || q.description).filter(Boolean);
             const rebuiltPayload = {
@@ -74,16 +75,19 @@ export async function runGenerationBatch({
 }
 
 /**
- * Group units into batches, capping the total question count per batch without
- * ever splitting a single unit across batches.
+ * Group units into batches by TOPIC (never mixing unrelated topics), capping the
+ * total question count per batch without ever splitting a single unit across
+ * batches. Keeps each generation call focused on one topic's subtopics.
  */
-export function batchByQuestionCount(units: GenerationUnit[], maxPerBatch: number): GenerationUnit[][] {
+export function batchUnitsByTopic(units: GenerationUnit[], maxPerBatch: number = 8): GenerationUnit[][] {
     const batches: GenerationUnit[][] = [];
     let current: GenerationUnit[] = [];
     let currentCount = 0;
 
     for (const unit of units) {
-        if (current.length > 0 && currentCount + unit.count > maxPerBatch) {
+        const topic = (unit.topic || "").toLowerCase();
+        const sameTopic = current.length > 0 && (current[0]!.topic || "").toLowerCase() === topic;
+        if (current.length > 0 && (!sameTopic || currentCount + unit.count > maxPerBatch)) {
             batches.push(current);
             current = [];
             currentCount = 0;

@@ -88,7 +88,10 @@ export const ensureRagCollection = async (collectionName: string): Promise<void>
   const res = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
     headers: getQdrantHeaders(),
   });
-  if (res.ok) return;
+  if (res.ok) {
+    await ensurePayloadIndexes(collectionName);
+    return;
+  }
 
   console.log(`Creating RAG Qdrant collection (named vectors): ${collectionName}`);
   const createRes = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
@@ -106,6 +109,52 @@ export const ensureRagCollection = async (collectionName: string): Promise<void>
   if (!createRes.ok) {
     const errorText = await createRes.text();
     throw new Error(`Failed to create RAG Qdrant collection: ${errorText}`);
+  }
+
+  await ensurePayloadIndexes(collectionName);
+};
+
+// ── Payload keyword indexes ───────────────────────────────────────────────────
+// Qdrant only supports filtering by a payload field once a keyword index exists
+// on it. Without these, "metadata.topic"/"metadata.subject" filters fail with
+// "Index required but not found" and every scoped retrieval silently returns [].
+// Indexes are non-destructive and apply to existing points — no re-upload needed.
+const INDEX_FIELDS = [
+  "metadata.subject",
+  "metadata.topic",
+  "metadata.topicKey",
+  "metadata.subtopic",
+  "metadata.subtopicKey",
+  "metadata.type",
+  "metadata.fileHash",
+  "metadata.sourceFile",
+  "metadata.questionId",
+];
+
+const indexedCollections = new Set<string>();
+
+/**
+ * Creates keyword payload indexes for a collection. Runs once per collection per
+ * process; creating an index that already exists returns 400, which is ignored.
+ */
+export const ensurePayloadIndexes = async (collectionName: string): Promise<void> => {
+  if (indexedCollections.has(collectionName)) return;
+  indexedCollections.add(collectionName);
+
+  const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
+  for (const field of INDEX_FIELDS) {
+    try {
+      const res = await fetch(`${qdrantUrl}/collections/${collectionName}/index`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
+        body: JSON.stringify({ field_name: field, field_schema: "keyword" }),
+      });
+      if (!res.ok && res.status !== 400) {
+        console.warn(`[Qdrant] Failed to create index on "${field}" in "${collectionName}": ${res.status} ${await res.text()}`);
+      }
+    } catch (err) {
+      console.warn(`[Qdrant] Error creating index on "${field}" in "${collectionName}":`, err);
+    }
   }
 };
 

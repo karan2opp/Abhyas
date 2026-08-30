@@ -80,6 +80,48 @@ export function distributeQuestions<T extends Weightable>(
     }));
 }
 
+/**
+ * Distribute questions across subtopics guaranteeing every subtopic gets at
+ * least one question when there are enough questions. When there are more
+ * subtopics than questions, keep only the highest-weight subtopics so no
+ * planned subtopic is silently dropped to zero.
+ */
+export function distributeQuestionsAtLeastOne<T extends Weightable>(
+    values: T[],
+    totalQuestions: number
+): QuestionAllocation<T>[] {
+    if (values.length === 0 || totalQuestions <= 0) {
+        return [];
+    }
+
+    if (values.length > totalQuestions) {
+        // Not enough questions for every subtopic — keep the top ones by weight.
+        return values
+            .map((value, index) => ({ value, index }))
+            .sort((a, b) => b.value.weight - a.value.weight)
+            .slice(0, totalQuestions)
+            .map(({ value }) => ({ ...value, allocatedQuestions: 1 }));
+    }
+
+    // Give each subtopic 1, then distribute the remainder by weight.
+    const counts = values.map(() => 1);
+    let remaining = totalQuestions - values.length;
+    const totalWeight = values.reduce((sum, v) => sum + v.weight, 0) || values.length;
+
+    const exact = values.map((v) => (v.weight / totalWeight) * remaining);
+    const floors = exact.map(Math.floor);
+    let used = floors.reduce((s, f) => s + f, 0);
+    const order = exact.map((e, i) => ({ i, r: e - (floors[i] ?? 0) })).sort((a, b) => b.r - a.r);
+    let k = 0;
+    while (used < remaining) {
+        counts[order[k % order.length]!.i]!++;
+        used++;
+        k++;
+    }
+
+    return values.map((value, i) => ({ ...value, allocatedQuestions: counts[i]! }));
+}
+
 // Distribute a block's question_count across its topics and each topic's
 // subtopics. Subject/instructions/question_type come from the block.
 export function allocateSectionQuestions(
@@ -108,9 +150,9 @@ export function allocateSectionQuestions(
             // Distribute questions to topics in this block
             const topicsWithAllocations = distributeQuestions(blockOutput.topics, totalQuestions);
 
-            // Distribute questions to subtopics for each topic
+            // Distribute questions to subtopics for each topic (min 1 per subtopic)
             const topics = topicsWithAllocations.map((topic) => {
-                const subtopics = distributeQuestions(topic.subtopics, topic.allocatedQuestions);
+                const subtopics = distributeQuestionsAtLeastOne(topic.subtopics, topic.allocatedQuestions);
                 return {
                     ...topic,
                     subtopics

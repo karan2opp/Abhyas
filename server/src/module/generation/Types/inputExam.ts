@@ -3,6 +3,18 @@ import { z } from "zod";
 export const QuestionTypeZodEnum = z.enum(["mcq", "descriptive"]);
 export const ExamTypeZodEnum = z.enum(["programming", "tally", "fc", "other"]);
 
+// A block topic may be a plain name ("Variables") or an object with explicit
+// subtopics the teacher wants preserved ("{ topic: 'Variables', subtopics: ['Scope'] }").
+export const TopicInputZodSchema = z.union([
+    z.string(),
+    z.object({
+        topic: z.string(),
+        subtopics: z.array(z.string()).optional(),
+    }),
+]);
+
+export type TopicInput = z.infer<typeof TopicInputZodSchema>;
+
 export const IBlockZodSchema = z.object({
     name: z.string(),
     subject: z.string(),
@@ -10,7 +22,7 @@ export const IBlockZodSchema = z.object({
     question_count: z.number().int().positive(),
     question_type: QuestionTypeZodEnum,
     total_marks: z.number().int().positive(),
-    topics: z.array(z.string()),
+    topics: z.array(TopicInputZodSchema),
 });
 
 export const ISectionZodSchema = z.object({

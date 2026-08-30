@@ -23,6 +23,7 @@ RULES:
 8. Do not over complicate any question and no over explanation in the question.
 9. Respond with structured output only, following the question format and structure shown in the REFERENCE EXAMPLES.
 10. Scope each question STRICTLY to its own topic/subtopic. Do NOT append extra requirements or boilerplate to the question text (for example "handle edge cases", "add comments in each step", "explain step by step", "provide examples", "write clean code") unless that requirement is explicitly present in the teacher's Special Instructions.
+11. The input "subject" is the authoritative language/framework for the exam. Reference examples and RAG context may mention other languages (e.g. C, C++, JavaScript, Python) — use them for format and concepts only, and write each question in the language/framework implied by the input subject. Do not let an example's language override the exam subject.
 `;
 
   if (!referenceExamples || referenceExamples.length === 0) return base;

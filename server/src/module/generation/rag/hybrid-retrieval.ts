@@ -165,8 +165,9 @@ const rerankTop = async (
 };
 
 /**
- * Standard retrieval (question generation): subject(+topic)-filtered hybrid
- * search with the existing fallback chain, then parent expansion + rerank.
+ * Standard retrieval (question generation): subject+topic-filtered hybrid search.
+ * The topic filter is ALWAYS applied (even when a custom query is supplied) so
+ * broad subject-only chunks never bleed into a specific topic's questions.
  */
 export const retrieveStandard = async (input: {
   subject: string;
@@ -185,43 +186,23 @@ export const retrieveStandard = async (input: {
     const matchedObj = collections.find((c) => c.subject.toLowerCase() === trimmedSub);
     const canonicalSubject = matchedObj ? matchedObj.subject : subject.trim();
 
-    const searchText = query && query.trim() ? query.trim() : `${topic} - ${subtopic}`;
-    const subjectOnly = !!query && query.trim().length > 0;
+    const trimmedTop = topic.trim().toLowerCase();
+    const matchedTopic = collections.find(
+      (c) => c.subject.toLowerCase() === canonicalSubject.toLowerCase() && c.topic.toLowerCase() === trimmedTop
+    );
+    const canonicalTopic = matchedTopic ? matchedTopic.topic : topic.trim();
+
+    const searchText = query && query.trim() ? query.trim() : [canonicalTopic, subtopic.trim()].filter(Boolean).join(" - ");
     const poolK = Math.max(topK * POOL_MULTIPLIER, MIN_POOL);
 
-    let filter: any = {
+    const filter: any = {
       must: [{ key: "metadata.subject", match: { value: canonicalSubject } }],
     };
-    if (!subjectOnly) {
-      filter.must.push({ key: "metadata.topic", match: { value: topic.trim() } });
+    if (canonicalTopic) {
+      filter.must.push({ key: "metadata.topic", match: { value: canonicalTopic } });
     }
 
-    let children = await hybridSearch(collectionName, searchText, filter, poolK);
-
-    if (!subjectOnly) {
-      if (children.length === 0) {
-        const trimmedTop = topic.trim().toLowerCase();
-        const matchedTopic = collections.find(
-          (c) => c.subject.toLowerCase() === canonicalSubject.toLowerCase() && c.topic.toLowerCase() === trimmedTop
-        );
-        if (matchedTopic) {
-          filter = {
-            must: [
-              { key: "metadata.subject", match: { value: canonicalSubject } },
-              { key: "metadata.topic", match: { value: matchedTopic.topic } },
-            ],
-          };
-          children = await hybridSearch(collectionName, searchText, filter, poolK);
-        }
-      }
-
-      if (children.length === 0) {
-        filter = {
-          must: [{ key: "metadata.subject", match: { value: canonicalSubject } }],
-        };
-        children = await hybridSearch(collectionName, searchText, filter, poolK);
-      }
-    }
+    const children = await hybridSearch(collectionName, searchText, filter, poolK);
 
     if (children.length === 0) {
       console.warn(`No relevant chunks found for subject: "${subject}", topic: "${topic}"`);

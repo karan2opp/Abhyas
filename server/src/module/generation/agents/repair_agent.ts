@@ -14,6 +14,32 @@ export interface QuestionItem {
     [key: string]: any;
 }
 
+export interface AllowedUnit {
+    topic: string;
+    subtopic?: string;
+}
+
+/**
+ * Checks that a question's topic/subtopic belongs to one of the planned units.
+ * Topic must match an allowed topic exactly; subtopic is checked only when the
+ * unit defines one (phrasing variance is tolerated so repair does not loop).
+ */
+export function matchesAllowedUnits(q: any, allowedUnits: AllowedUnit[]): boolean {
+    if (!allowedUnits || allowedUnits.length === 0) return true;
+
+    const qTopic = ((q.topic || q.topic_name || "") as string).trim().toLowerCase();
+    const qSub = ((q.subtopic || q.subtopic_name || "") as string).trim().toLowerCase();
+    if (!qTopic) return false;
+
+    return allowedUnits.some((u) => {
+        const ut = (u.topic || "").trim().toLowerCase();
+        if (qTopic !== ut) return false;
+        if (!u.subtopic) return true;
+        const us = u.subtopic.trim().toLowerCase();
+        return !qSub || qSub === us;
+    });
+}
+
 /**
  * Validates whether a single generated question object meets basic structural and content completeness.
  */
@@ -67,6 +93,7 @@ export async function repairQuestionGeneration<TPayload>({
     generateDeltaFn,
     label = "Question Generation",
     existingQuestions = [],
+    allowedUnits = [],
 }: {
     payload: TPayload;
     initialQuestions: QuestionItem[];
@@ -74,12 +101,16 @@ export async function repairQuestionGeneration<TPayload>({
     generateDeltaFn: (deltaPayload: TPayload, missingCount: number, existingQuestions: QuestionItem[]) => Promise<QuestionItem[]>;
     label?: string;
     existingQuestions?: QuestionItem[];
+    allowedUnits?: AllowedUnit[];
 }): Promise<QuestionItem[]> {
     const getQuestionText = (q: QuestionItem): string =>
         q.question_text || q.description || q.question || q.text || "";
 
-    // 1. Filter out invalid/incomplete questions from initial run
-    let validQuestions = (initialQuestions || []).filter(isValidQuestion).slice(0, expectedCount);
+    const isAccepted = (q: any): boolean =>
+        isValidQuestion(q) && matchesAllowedUnits(q, allowedUnits);
+
+    // 1. Filter out invalid/incomplete/off-topic questions from initial run
+    let validQuestions = (initialQuestions || []).filter(isAccepted).slice(0, expectedCount);
 
     const MAX_RETRIES = 2;
     let attempt = 0;
@@ -92,7 +123,7 @@ export async function repairQuestionGeneration<TPayload>({
 
         try {
             const deltaQuestions = await generateDeltaFn(payload, missingCount, validQuestions);
-            const validDelta = (deltaQuestions || []).filter(isValidQuestion);
+            const validDelta = (deltaQuestions || []).filter(isAccepted);
             validQuestions.push(...validDelta);
         } catch (retryErr: any) {
             console.error(`[RepairAgent] ${label} count retry ${attempt} encountered error:`, retryErr?.message || retryErr);
@@ -122,7 +153,7 @@ export async function repairQuestionGeneration<TPayload>({
 
         try {
             const regenerated = await generateDeltaFn(payload, duplicateIndices.size, [...existingQuestions, ...kept]);
-            const validRegen = (regenerated || []).filter(isValidQuestion);
+            const validRegen = (regenerated || []).filter(isAccepted);
             validQuestions = [...kept, ...validRegen];
         } catch (retryErr: any) {
             console.error(`[RepairAgent] ${label} dedup retry ${attempt} encountered error:`, retryErr?.message || retryErr);

@@ -15,6 +15,11 @@ import { ApiError } from "../../../common/utils/ApiError.js";
 // reference examples by the generation agent (NOT the factual RAG source).
 export const QUESTION_EXAMPLES_COLLECTION = "question_examples";
 
+// Normalizes topic/subtopic into a stable key ("Variable Scope" -> "variablescope")
+// so retrieval matches regardless of casing/spacing (JavaScript vs Javascript).
+export const normalizeKey = (s: string): string =>
+  (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
 // ── Per-org collection resolution ─────────────────────────────────────────────
 // Each organisation gets its own question-bank collection
 // ("question_examples_{orgId}") so one org's curated examples are isolated from
@@ -139,7 +144,9 @@ const upsertQuestionPoint = async (
 
   const metadata: Record<string, any> = {
     topic: question.topic,
+    topicKey: normalizeKey(question.topic),
     subtopic: question.subtopic,
+    subtopicKey: normalizeKey(question.subtopic),
     type: question.type,
     marks: question.marks,
     questionId: question.questionId,
@@ -295,6 +302,7 @@ export const retrieveExampleQuestions = async (
   await ensureQuestionExamplesCollection(organisationId);
 
   const trimmedTopic = topic.trim();
+  const topicKey = normalizeKey(trimmedTopic);
   const query = [trimmedTopic, subtopic.trim()].filter(Boolean).join(" - ");
   if (!trimmedTopic || !query) return [];
 
@@ -334,15 +342,17 @@ export const retrieveExampleQuestions = async (
     }));
   };
 
-  // Tiered topic-scoped filters. If both come back empty, return nothing.
+  // Tiered topic-scoped filters. Match on the exact topic OR the normalized
+  // topicKey (so existing + newly ingested points both work). If both come back
+  // empty, return nothing.
+  const topicMatch = (field: string, value: string) => ({ key: field, match: { value } });
+  const topicShould = [
+    topicMatch("metadata.topic", trimmedTopic),
+    topicMatch("metadata.topicKey", topicKey),
+  ];
   const filters: (Record<string, unknown> | null)[] = [
-    {
-      must: [
-        { key: "metadata.topic", match: { value: trimmedTopic } },
-        { key: "metadata.type", match: { value: type } },
-      ],
-    },
-    { must: [{ key: "metadata.topic", match: { value: trimmedTopic } }] },
+    { must: [{ key: "metadata.type", match: { value: type } }], should: topicShould },
+    { should: topicShould },
   ];
 
   let results: { text: string; metadata: any }[] = [];

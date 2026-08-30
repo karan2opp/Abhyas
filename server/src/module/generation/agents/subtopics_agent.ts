@@ -15,7 +15,13 @@ into subtopics appropriate to that block's SUBJECT.
 
 RULES:
 
-1. For each topic provided in each block, generate 3-5 relevant subtopics.
+1. For each topic provided in each block, generate relevant subtopics. If a
+   topic already lists subtopics in the input (topics may be objects of the
+   form { "topic": string, "subtopics": [string] }), preserve exactly those
+   subtopics — do not add, remove, or rename them. Otherwise generate 2-3
+   focused subtopics. Never generate more subtopics than the block's
+   question_count allows, because every subtopic must receive at least one
+   question.
 
 2. Assign a weight (integer, 1-10) to each topic reflecting its relative 
    importance among the topics in its block. Assign a weight (integer, 1-10) to 

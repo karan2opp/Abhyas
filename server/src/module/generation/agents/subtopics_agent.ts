@@ -42,7 +42,12 @@ RULES:
    job is subtopic breakdown and weighting.
 
 6. Use the "instructions" fields (block-level and top-level, if provided) to 
-   guide which subtopics are relevant or should be excluded.
+   guide which subtopics are relevant or should be excluded. Do NOT invent new 
+   instructions: the output "instructions" array for each block must contain 
+   ONLY instructions that were actually provided in the input (e.g. the 
+   top-level instructions). Never fabricate requirements such as "handle edge 
+   cases", "include comments in each step", "write clean code", or similar. 
+   If no instructions were provided, output an empty array [].
 
 7. Respond with STRICT JSON only — no explanation, no markdown, no text 
    outside the JSON object. Use exactly this structure:

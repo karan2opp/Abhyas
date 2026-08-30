@@ -7,16 +7,24 @@ import { getSystemPrompt } from "../prompt.js";
 
 async function generationAgent(input: any): Promise<BatchGenerationAgentOutput> {
     const client = await getClientForModel(env.GENERATION_MODEL);
+
+    // Reference examples are few-shot format guidance — load them into the
+    // system prompt so the model treats them as behaviour/format rules, and keep
+    // the actual task (batch + rag_context + instructions) in the user message.
+    const referenceExamples = Array.isArray(input?.reference_examples) ? input.reference_examples : [];
+    const taskInput = { ...(input || {}) };
+    delete taskInput.reference_examples;
+
     const response = await client.chat.completions.create({
         model: env.GENERATION_MODEL,
         messages: [
             {
                 role: "system",
-                content: getSystemPrompt()
+                content: getSystemPrompt(referenceExamples)
             },
             {
                 role: "user",
-                content: JSON.stringify(input)
+                content: JSON.stringify(taskInput)
             }
         ],
         response_format: zodResponseFormat(

@@ -15,7 +15,7 @@ import {
   BankQuestion,
 } from "@/services/questionBank.service";
 
-const QUICK_SUBJECTS = ["JavaScript", "Python", "Tally", "React", "Database", "Operating Systems"];
+const QUICK_TOPICS = ["Variables", "Functions", "Arrays", "Promises", "Control Flow", "OOP"];
 
 export default function QuestionBankView() {
   const role = useAuthStore((state) => state.user?.role);
@@ -23,11 +23,9 @@ export default function QuestionBankView() {
   const [activeTab, setActiveTab] = useState<"add" | "upload" | "list">(canEmbed ? "add" : "list");
 
   // Add form state
-  const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
   const [subtopic, setSubtopic] = useState("");
   const [type, setType] = useState<"mcq" | "descriptive">("mcq");
-  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [marks, setMarks] = useState<number>(1);
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState<string[]>(["", "", "", ""]);
@@ -67,8 +65,8 @@ export default function QuestionBankView() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subject.trim()) {
-      toast.error("Subject is required.");
+    if (!topic.trim()) {
+      toast.error("Topic is required.");
       return;
     }
     if (!question.trim()) {
@@ -91,11 +89,9 @@ export default function QuestionBankView() {
     setIsAdding(true);
     try {
       const payload: any = {
-        subject: subject.trim(),
-        topic: topic.trim() || undefined,
+        topic: topic.trim(),
         subtopic: subtopic.trim() || undefined,
         type,
-        difficulty,
         question: question.trim(),
         marks,
       };
@@ -112,7 +108,6 @@ export default function QuestionBankView() {
       }
 
       // Reset form
-      setSubject("");
       setTopic("");
       setSubtopic("");
       setQuestion("");
@@ -197,7 +192,7 @@ export default function QuestionBankView() {
   };
 
   const filteredBank = bank.filter((q) => {
-    const hay = `${q.subject} ${q.topic} ${q.subtopic} ${q.question}`.toLowerCase();
+    const hay = `${q.topic} ${q.subtopic} ${q.question}`.toLowerCase();
     return hay.includes(listSearch.toLowerCase());
   });
 
@@ -217,7 +212,7 @@ export default function QuestionBankView() {
               <div>
                 <h1 className="text-2xl font-bold text-white tracking-tight">Curated Question Bank</h1>
                 <p className="text-sm text-gray-400">
-                  Embed reference questions that the AI uses to calibrate difficulty & format during exam generation.
+                  Embed reference questions that the AI uses for style & format during exam generation.
                 </p>
               </div>
             </div>
@@ -286,39 +281,39 @@ export default function QuestionBankView() {
 
             <form onSubmit={handleAdd} className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Subject */}
+                {/* Topic */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    Subject Name <span className="text-orange-500">*</span>
+                    Topic Name <span className="text-orange-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. JavaScript, Python, Tally"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="e.g. Variables, Functions, Arrays"
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
                     className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
                   />
                   <div className="flex flex-wrap gap-1.5 mt-2.5">
                     <span className="text-[11px] text-gray-500 self-center mr-1">Quick select:</span>
-                    {QUICK_SUBJECTS.map((s) => (
+                    {QUICK_TOPICS.map((t) => (
                       <button
-                        key={s}
+                        key={t}
                         type="button"
-                        onClick={() => setSubject(s)}
+                        onClick={() => setTopic(t)}
                         className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
-                          subject === s
+                          topic === t
                             ? "bg-orange-600 text-white border-orange-500 font-semibold"
                             : "bg-white/5 text-gray-400 border-white/10 hover:text-white hover:bg-white/10"
                         }`}
                       >
-                        {s}
+                        {t}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Marks + Difficulty */}
+                {/* Marks */}
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
@@ -332,48 +327,11 @@ export default function QuestionBankView() {
                       className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                      Difficulty <span className="text-orange-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      {(["easy", "medium", "hard"] as const).map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setDifficulty(d)}
-                          className={`flex-1 capitalize text-xs px-3 py-2 rounded-xl border font-medium transition-all ${
-                            difficulty === d
-                              ? d === "easy"
-                                ? "bg-emerald-600 text-white border-emerald-500"
-                                : d === "medium"
-                                ? "bg-amber-600 text-white border-amber-500"
-                                : "bg-red-600 text-white border-red-500"
-                              : "bg-white/5 text-gray-400 border-white/10 hover:text-white"
-                          }`}
-                        >
-                          {d}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               </div>
 
-              {/* Topic + Subtopic */}
+              {/* Subtopic */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
-                    Topic (Recommended)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Functions, Variables"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-black border border-white/15 text-white placeholder-gray-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none text-sm transition-all"
-                  />
-                </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
                     Subtopic
@@ -509,7 +467,7 @@ export default function QuestionBankView() {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
                   <p>
-                    The AI is told to use them as <strong className="text-gray-200">style & difficulty references</strong> only — never copied verbatim.
+                    The AI is told to use them as <strong className="text-gray-200">style references</strong> only — never copied verbatim.
                   </p>
                 </div>
               </div>
@@ -537,9 +495,9 @@ export default function QuestionBankView() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-400 text-xs">Subjects</span>
+                  <span className="text-gray-400 text-xs">Topics</span>
                   <span className="font-bold text-white text-sm">
-                    {new Set(bank.map((q) => q.subject)).size}
+                    {new Set(bank.map((q) => q.topic)).size}
                   </span>
                 </div>
               </div>
@@ -663,11 +621,9 @@ export default function QuestionBankView() {
                 </p>
                 <pre className="bg-black/60 border border-white/10 rounded-xl p-3 text-[11px] font-mono text-gray-300 overflow-x-auto">
 {`---
-subject: JavaScript
 topic: Variables
 subtopic: Hoisting
 type: mcq
-difficulty: medium
 marks: 1
 ---
 
@@ -679,8 +635,8 @@ Question text...
 - [ ] Option 4`}
                 </pre>
                 <ul className="space-y-2">
-                  <li><strong className="text-gray-200">subject</strong> is required; <strong className="text-gray-200">topic</strong>/<strong className="text-gray-200">subtopic</strong> optional.</li>
-                  <li><strong className="text-gray-200">type</strong>: mcq | descriptive &nbsp; <strong className="text-gray-200">difficulty</strong>: easy | medium | hard.</li>
+                  <li><strong className="text-gray-200">topic</strong> is required; <strong className="text-gray-200">subtopic</strong> optional. <strong className="text-gray-200">subject</strong> is not stored.</li>
+                  <li><strong className="text-gray-200">type</strong>: mcq | descriptive.</li>
                   <li>MCQ must have exactly 4 options with one <strong className="text-gray-200">- [x]</strong>.</li>
                   <li>A JSON array of question objects is also accepted.</li>
                 </ul>
@@ -699,7 +655,7 @@ Question text...
                 <Search className="h-4 w-4 absolute left-3 top-3 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search subject, topic, subtopic or question..."
+                  placeholder="Search topic, subtopic or question..."
                   value={listSearch}
                   onChange={(e) => setListSearch(e.target.value)}
                   className="w-full pl-9 pr-4 py-2 bg-black border border-white/15 rounded-xl text-white placeholder-gray-500 text-sm focus:border-orange-500 outline-none"
@@ -729,21 +685,10 @@ Question text...
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[10px] font-mono text-gray-500">#{idx + 1}</span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-600/20 text-orange-400 border border-orange-500/30 font-semibold uppercase">
-                          {q.subject}
+                          {q.topic}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-gray-300 border border-white/10 font-semibold uppercase">
                           {q.type}
-                        </span>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase border ${
-                            q.difficulty === "easy"
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                              : q.difficulty === "hard"
-                              ? "bg-red-500/10 text-red-400 border-red-500/30"
-                              : "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                          }`}
-                        >
-                          {q.difficulty}
                         </span>
                         <span className="text-[10px] text-gray-500 font-mono">Marks: {q.marks}</span>
                       </div>

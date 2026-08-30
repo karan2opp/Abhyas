@@ -48,7 +48,6 @@ export const assignments = pgTable("assignments", {
   sequenceOrder: integer("sequence_order"),
   dayGap: integer("day_gap"),
   unlockOffsetDays: integer("unlock_offset_days"),
-  difficulty: text("difficulty").$type<"easy" | "medium" | "hard">().default("medium").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

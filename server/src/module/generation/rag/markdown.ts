@@ -1,8 +1,3 @@
-import fs from "fs";
-import { Document } from "@langchain/core/documents";
-import { MarkdownTextSplitter } from "@langchain/textsplitters";
-import { ApiError } from "../../../common/utils/ApiError.js";
-
 const TASKS_HEADING = /^##\s+Tasks\b/m;
 const SOURCE_LINE = /^\s*>\s*Source:\s*.+$/gm;
 const IMPORTANCE_LINE = /^\s*importance:\s*\d+\s*$/gm;
@@ -35,57 +30,4 @@ export const cleanMarkdown = (raw: string): string => {
   content = content.replace(/\n{3,}/g, "\n\n");
 
   return content.trim();
-};
-
-export const loadMarkdownChunks = async (
-  filePath: string,
-  originalFileName: string,
-  subject: string,
-  topic?: string,
-  subtopic?: string,
-  fileHash?: string,
-  organisationId?: string | null
-): Promise<Document[]> => {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(filePath, "utf-8");
-  } catch (readError) {
-    console.error("Failed to read markdown file:", readError);
-    throw ApiError.badRequest("Failed to read markdown file.");
-  }
-
-  const cleaned = cleanMarkdown(raw);
-  if (cleaned.length === 0) {
-    throw ApiError.badRequest("Markdown file contains no readable content.");
-  }
-
-  const splitter = new MarkdownTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 150,
-  });
-  const texts = await splitter.splitText(cleaned);
-
-  if (texts.length === 0) {
-    throw ApiError.badRequest("Markdown file produced no chunks.");
-  }
-
-  const timestamp = Date.now();
-  return texts
-    .map((text) => text.trim())
-    .filter((text) => text.length > 0)
-    .map((text) => {
-      return new Document({
-        pageContent: text,
-        metadata: {
-          subject: subject.trim(),
-          topic: topic ? topic.trim() : "",
-          subtopic: subtopic ? subtopic.trim() : "",
-          sourceFile: originalFileName,
-          fileHash: fileHash || "",
-          indexedAt: timestamp,
-          docType: "markdown",
-          organisationId: organisationId || "",
-        },
-      });
-    });
 };

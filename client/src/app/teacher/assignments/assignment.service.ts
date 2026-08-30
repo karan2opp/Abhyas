@@ -121,7 +121,6 @@ export const gradeSubmissionService = async (
 export const generateAssignmentService = async (data: {
   subject: string;
   examType?: string;
-  difficulty: string;
   questionType: string;
   topics: string[];
   marksPerQuestion: number;
@@ -134,7 +133,6 @@ export const generateAssignmentService = async (data: {
 
 export const generateSingleQuestionService = async (data: {
   subject: string;
-  difficulty: string;
   questionType: string;
   topic: string;
   marks: number;

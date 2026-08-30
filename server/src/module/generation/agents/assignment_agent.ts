@@ -9,7 +9,6 @@ export const getAssignmentSystemPrompt = (): string => {
 
 INPUTS YOU WILL RECEIVE:
 - Subject, Topic (each with its own reference context and exact question count required)
-- Difficulty: "easy", "medium", or "hard"
 - Question Type: "mcq" or "descriptive"
 - Special Instructions from the teacher
 - RAG Context, labeled per Topic

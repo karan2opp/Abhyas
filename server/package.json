@@ -9,7 +9,10 @@
     "start": "node ./dist/src/index.js",
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "rag:reset": "tsx src/scripts/reset-qdrant-collections.ts",
+    "rag:reset-question-bank": "tsx src/scripts/reset-question-bank.ts",
+    "rag:index-docs": "tsx src/scripts/index-docs-folder.ts"
   },
   "author": "",
   "license": "ISC",
@@ -29,11 +32,9 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@langchain/community": "^1.1.29",
     "@langchain/core": "^1.2.5",
     "@langchain/openai": "^1.5.6",
     "@langchain/qdrant": "^1.0.3",
-    "@langchain/textsplitters": "^1.0.1",
     "@openai/agents": "^0.13.2",
     "@paralleldrive/cuid2": "^3.3.0",
     "bcrypt": "^6.0.0",
@@ -50,10 +51,10 @@
     "multer": "^2.1.1",
     "openai": "^6.44.0",
     "p-limit": "^7.3.0",
-    "pdf-parse": "^2.4.5",
-    "yaml": "^2.9.0",
+    "pdfjs-dist": "^5.6.205",
     "pg": "^8.21.0",
     "resend": "^6.12.4",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, BarChart2, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 import { BlueprintTreeViewer } from "@/components/BlueprintTreeViewer";
-import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService, generateBlueprintService, verifyBlueprintService, enqueueGenerateFromBlueprintService, getGenerationJobService } from "../../../../exams/exam.service";
+import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService, generateBlueprintService, enqueueGenerateFromBlueprintService, getGenerationJobService } from "../../../../exams/exam.service";
 import { generateSingleQuestionService } from "../../../../assignments/assignment.service";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
@@ -489,7 +489,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
   
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiSubject, setAiSubject] = useState(examDetail?.subject || examDetail?.title || "SQL");
-  const [aiDifficulty, setAiDifficulty] = useState("Medium");
   const [aiQuestionType, setAiQuestionType] = useState(type);
   const [aiMarks, setAiMarks] = useState(marks);
   const [aiTopic, setAiTopic] = useState("");
@@ -517,7 +516,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
     setImagePreview(config.question?.images?.[0]?.url || null);
     setShowAiModal(false);
     setAiSubject(examDetail?.subject || examDetail?.title || "");
-    if (examDetail?.difficulty) setAiDifficulty(examDetail.difficulty.toLowerCase());
     setAiQuestionType(config.question?.type || "mcq");
     setAiMarks(config.question?.marks?.toString() || "1");
     setAiTopic("");
@@ -538,7 +536,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
 
       const payload = {
         subject: aiSubject,
-        difficulty: aiDifficulty.toLowerCase(),
         topic: aiTopic.trim() || "General",
         questionType: aiQuestionType,
         marks: Number(aiMarks) || 1,
@@ -752,21 +749,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-300">Difficulty</label>
-                      <select
-                        value={aiDifficulty}
-                        onChange={(e) => setAiDifficulty(e.target.value)}
-                        className="w-full bg-[#14151f] border border-white/15 text-white rounded-xl h-11 px-3.5 focus:outline-none focus:border-white/30 text-sm"
-                      >
-                        <option value="Easy">Easy</option>
-                        <option value="Medium">Medium</option>
-                        <option value="Hard">Hard</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
                       <label className="text-sm font-semibold text-gray-300">Question Type</label>
                       <select
                         value={aiQuestionType}
@@ -926,44 +908,23 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
 // -------------------------------------------------------------
 // AI EXAM GENERATOR FORM
 // -------------------------------------------------------------
-// Filters out verification warnings that only differ by case or
-// whitespace (e.g. suggesting "Variables" when the topic is already
-// "variables") — those are trivial and not worth showing/applying.
-const isTrivialWarningFix = (w: any): boolean => {
-  if (!w.suggestedTopic) return false;
-  const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-  return norm(w.topic) === norm(w.suggestedTopic);
-};
-
 function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, initialTargetSectionId = null, onBack, onSuccess }: { examId: string, examDetail?: any, existingSectionsCount?: number, initialTargetSectionId?: string | null, onBack: () => void, onSuccess: () => void }) {
-  const [difficulty, setDifficulty] = useState(
-    examDetail?.difficulty 
-      ? examDetail.difficulty.charAt(0).toUpperCase() + examDetail.difficulty.slice(1).toLowerCase() 
-      : "Medium"
-  );
   const [instructions, setInstructions] = useState<string[]>(
     examDetail?.specialInstructions && examDetail.specialInstructions.trim() !== ""
       ? [examDetail.specialInstructions]
 : [""]
   );
   const [isGenerating, setIsGenerating] = useState(false);
-  const [genPhase, setGenPhase] = useState<"blueprint" | "questions" | "verify">("blueprint");
+  const [genPhase, setGenPhase] = useState<"blueprint" | "questions">("blueprint");
   const [genProgress, setGenProgress] = useState<{ done: number; total: number; message?: string } | null>(null);
 
   // 3-Stage Workflow States
   const [aiStage, setAiStage] = useState<"config" | "blueprint">("config");
   const [blueprint, setBlueprint] = useState<any | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
 
   // Sync state if examDetail is loaded or updated asynchronously
   useEffect(() => {
     if (examDetail) {
-      if (examDetail.difficulty) {
-        const capitalized = examDetail.difficulty.charAt(0).toUpperCase() + examDetail.difficulty.slice(1).toLowerCase();
-        setDifficulty(capitalized);
-      }
       if (examDetail.specialInstructions && examDetail.specialInstructions.trim() !== "") {
         setInstructions([examDetail.specialInstructions]);
       }
@@ -1126,7 +1087,6 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     try {
       const payload = {
         title: `${(sections[0]?.blocks?.[0]?.subject?.trim() || "Untitled")} Exam`,
-        difficulty: (difficulty || "medium").toLowerCase(),
         instructions: instructions.map(i => i.trim()).filter(i => i !== ""),
         sections: sections.map(s => ({
           name: s.name.trim(),
@@ -1157,132 +1117,10 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     }
   };
 
-  // Step 2: Verify Blueprint Tree
+  // Verification step is intentionally skipped — go straight to question generation.
   const handleVerifyAndProceed = async () => {
     if (!blueprint) return;
-
-    setIsVerifying(true);
-    setGenPhase("verify");
-    setGenProgress(null);
-    try {
-      const res = await verifyBlueprintService(blueprint);
-      const result = res.data || res;
-      setVerificationResult(result);
-
-      if (result.isValid && (!result.warnings || result.warnings.length === 0)) {
-        toast.success("Everything looks good!");
-        await executeFinalGeneration(blueprint);
-      } else {
-        setShowVerificationModal(true);
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Verification failed");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  // Step 3: Apply AI Suggestions to Blueprint
-  const handleApplySuggestionsAndProceed = async () => {
-    if (!blueprint || !verificationResult || !verificationResult.warnings) return;
-
-    const warningsToApply = (verificationResult.warnings || []).filter((w: any) => !isTrivialWarningFix(w));
-
-    const updatedBp = JSON.parse(JSON.stringify(blueprint));
-
-    // Capture each section's total question count BEFORE any changes so we can
-    // restore it after moving subtopics (prevents the "asked 5, got 6" inflation).
-    const sectionTotals = (updatedBp.sections || []).map((sec: any) =>
-      (sec.blocks || []).reduce((bs: number, block: any) =>
-        bs + (block.topics || []).reduce((sum: number, top: any) =>
-          sum + (top.subtopics || []).reduce((s: number, st: any) => s + (st.allocatedQuestions || 0), 0), 0), 0)
-    );
-
-    warningsToApply.forEach((warn: any) => {
-      if (!warn.suggestedTopic) return;
-      (updatedBp.sections || []).forEach((sec: any) => {
-        // Relocate the flagged subtopic, preserving its original allocated count.
-        let movedAllocation = 1;
-        for (const block of sec.blocks || []) {
-          for (const top of block.topics || []) {
-            const found = (top.subtopics || []).find((st: any) => st.name.toLowerCase() === (warn.subtopic || "").toLowerCase());
-            if (found) {
-              movedAllocation = found.allocatedQuestions || 1;
-              top.subtopics = top.subtopics.filter((st: any) => st.name.toLowerCase() !== (warn.subtopic || "").toLowerCase());
-              break;
-            }
-          }
-          if (movedAllocation !== 1 || block.topics.some((t: any) => (t.subtopics || []).some((st: any) => st.name.toLowerCase() === (warn.subtopic || "").toLowerCase()))) break;
-        }
-        let targetTopicObj: any = null;
-        for (const block of sec.blocks || []) {
-          targetTopicObj = block.topics.find((t: any) => t.topic.toLowerCase() === (warn.suggestedTopic || "").toLowerCase());
-          if (targetTopicObj) {
-            targetTopicObj.subtopics.push({ name: warn.subtopic, allocatedQuestions: movedAllocation });
-            break;
-          }
-        }
-        if (!targetTopicObj) {
-          const firstBlock = sec.blocks?.[0];
-          if (firstBlock) {
-            const newTopic = { topic: warn.suggestedTopic, subtopics: [{ name: warn.subtopic, allocatedQuestions: movedAllocation }] };
-            firstBlock.topics.push(newTopic);
-          }
-        }
-      });
-    });
-
-    // Rebalance each section so the total allocated questions equals the original total.
-    const redistribute = (subtopics: any[], target: number) => {
-      if (!subtopics.length || target < 1) return;
-      const totalW = subtopics.reduce((s, st) => s + (st.weight ?? st.allocatedQuestions ?? 1), 0) || subtopics.length;
-      const exact = subtopics.map((st) => ((st.weight ?? st.allocatedQuestions ?? 1) / totalW) * target);
-      const counts = exact.map(Math.floor);
-      let used = counts.reduce((s, c) => s + c, 0);
-      const order = exact.map((e, i) => ({ i, r: e - counts[i] })).sort((a, b) => b.r - a.r);
-      let k = 0;
-      while (used < target) { counts[order[k % order.length].i]++; used++; k++; }
-      subtopics.forEach((_, i) => { counts[i] = Math.max(1, counts[i]); });
-      let sum = counts.reduce((s, c) => s + c, 0);
-      if (sum > target) {
-        const byWeight = exact.map((e, i) => ({ i, w: e })).sort((a, b) => a.w - b.w);
-        for (const o of byWeight) {
-          if (sum <= target) break;
-          if (counts[o.i] > 1) { counts[o.i]--; sum--; }
-        }
-      }
-      subtopics.forEach((st, i) => { st.allocatedQuestions = counts[i]; });
-    };
-
-    (updatedBp.sections || []).forEach((sec: any, sIdx: number) => {
-      const targetTotal = Math.max(1, sectionTotals[sIdx] || 1);
-      const subtopics: any[] = [];
-      for (const block of sec.blocks || []) {
-        for (const top of block.topics || []) {
-          for (const st of top.subtopics || []) {
-            subtopics.push({ ...st });
-          }
-        }
-      }
-      if (subtopics.length === 0) return;
-      const currentTotal = subtopics.reduce((s, st) => s + (st.allocatedQuestions || 0), 0);
-      if (currentTotal === targetTotal) return;
-      redistribute(subtopics, targetTotal);
-      let idx = 0;
-      for (const block of sec.blocks || []) {
-        for (const top of block.topics || []) {
-          for (let j = 0; j < (top.subtopics || []).length; j++) {
-            top.subtopics[j].allocatedQuestions = subtopics[idx]?.allocatedQuestions ?? 1;
-            idx++;
-          }
-        }
-      }
-    });
-
-    setBlueprint(updatedBp);
-    setShowVerificationModal(false);
-    toast.success("Suggestions applied successfully!");
-    await executeFinalGeneration(updatedBp);
+    await executeFinalGeneration(blueprint);
   };
 
   // Final Step: Enqueue generation job, poll for result, save generated exam
@@ -1337,14 +1175,12 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     }
   };
 
-  if (isGenerating || isVerifying) {
+  if (isGenerating) {
     const hasQuestionProgress = genPhase === "questions" && !!genProgress && genProgress.total > 0;
     const pct = hasQuestionProgress ? Math.min(100, Math.round((genProgress!.done / genProgress!.total) * 100)) : 0;
-    const loaderTitle = genPhase === "verify"
-      ? "Verifying..."
-      : genPhase === "questions"
-        ? "Generating questions..."
-        : "Planning subtopics...";
+    const loaderTitle = genPhase === "questions"
+      ? "Generating questions..."
+      : "Planning subtopics...";
 
     return (
       <div className="flex flex-col items-center justify-center py-24 space-y-5">
@@ -1372,8 +1208,6 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     );
   }
 
-  const meaningfulWarnings = (verificationResult?.warnings || []).filter((w: any) => !isTrivialWarningFix(w));
-
   return (
     <div className="space-y-0 animate-in fade-in slide-in-from-bottom-1 duration-150 w-full max-w-full px-2 pb-6">
 
@@ -1394,10 +1228,9 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
 
             <Button
               onClick={handleVerifyAndProceed}
-              disabled={isVerifying}
               className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-7 font-bold text-sm shadow-xl shadow-purple-950/40 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Sparkles className="h-4 w-4 mr-2 text-purple-200" /> Verify & Generate Questions
+              <Sparkles className="h-4 w-4 mr-2 text-purple-200" /> Generate Questions
             </Button>
           </div>
         </div>
@@ -1408,7 +1241,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
             <div className="flex items-center justify-between border-b border-white/5 pb-4">
               <div>
                 <h5 className="font-bold text-white text-base tracking-wider uppercase">EXAM SETTINGS & SECTIONS</h5>
-                <p className="text-xs text-gray-400">Configure difficulty, instructions, and organize section topics for blueprint planning</p>
+                <p className="text-xs text-gray-400">Configure instructions and organize section topics for blueprint planning</p>
               </div>
               <Button
                 type="button"
@@ -1420,25 +1253,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
               </Button>
             </div>
 
-            {/* DIFFICULTY + SPECIAL INSTRUCTIONS */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">DIFFICULTY *</label>
-                <Select value={difficulty} onValueChange={val => setDifficulty(val || "Medium")}>
-                  <SelectTrigger className="w-full bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-9 text-sm focus:ring-orange-500 rounded-xl px-3.5">
-                    <div className="flex items-center gap-2">
-                      <BarChart2 className="h-4 w-4 text-orange-400 shrink-0" />
-                      <SelectValue placeholder="Select Difficulty" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#14151f] border border-white/15 text-white text-sm min-w-[200px] shadow-2xl z-50">
-                    <SelectItem value="Easy">Easy</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="Hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+            {/* SPECIAL INSTRUCTIONS */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SPECIAL INSTRUCTIONS</label>
@@ -1474,7 +1289,6 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
                   ))}
                 </div>
               </div>
-            </div>
 
             {/* SECTIONS & TOPICS */}
             <div className="border-t border-white/5 pt-5 space-y-4">
@@ -1698,88 +1512,6 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
         </div>
       )}
 
-      {/* VERIFICATION AGENT WARNINGS MODAL */}
-      <Dialog open={showVerificationModal} onOpenChange={setShowVerificationModal}>
-        <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-xl rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-400" /> Verification Agent Blueprint Analysis
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
-            {verificationResult?.overallFeedback && (
-              <p className="text-xs text-zinc-300 bg-[#14151f] border border-white/10 p-3 rounded-xl">
-                {verificationResult.overallFeedback}
-              </p>
-            )}
-
-            <div className="space-y-3">
-              <h6 className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                Semantic Warnings ({meaningfulWarnings.length})
-              </h6>
-
-              {meaningfulWarnings.length === 0 ? (
-                <p className="text-xs text-zinc-400 bg-[#14151f] border border-white/10 p-3 rounded-xl">
-                  No significant semantic issues found. The warnings were minor formatting differences.
-                </p>
-              ) : (
-                meaningfulWarnings.map((warn: any, idx: number) => (
-                  <div key={idx} className="bg-[#14151f] border border-amber-500/30 rounded-xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0">
-                        Subtopic
-                      </span>
-                      <span className="text-xs font-bold text-white text-right">{warn.subtopic}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="text-gray-400">Current Topic</span>
-                      <span className="text-white font-semibold text-right">{warn.topic}</span>
-                    </div>
-                    <p className="text-xs text-zinc-300 leading-relaxed border-t border-white/5 pt-2.5">{warn.reason}</p>
-                    {warn.suggestedTopic && (
-                      <div className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg font-medium">
-                        Suggested Topic: <span className="font-bold">{warn.suggestedTopic}</span>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <DialogFooter className="flex flex-col sm:flex-row gap-2.5 pt-3 border-t border-white/10">
-            <Button
-              variant="outline"
-              onClick={() => setShowVerificationModal(false)}
-              className="bg-transparent border-white/15 text-zinc-300 hover:text-white"
-            >
-              Edit Blueprint
-            </Button>
-
-            {meaningfulWarnings.some((w: any) => w.suggestedTopic) && (
-              <Button
-                onClick={handleApplySuggestionsAndProceed}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold"
-              >
-                <Sparkles className="h-4 w-4 mr-2" /> Apply AI Suggestions & Proceed
-              </Button>
-            )}
-
-            <Button
-              onClick={() => {
-                setShowVerificationModal(false);
-                if (blueprint) executeFinalGeneration(blueprint);
-              }}
-              variant="outline"
-              className="bg-orange-600/20 border-orange-500/40 text-orange-400 hover:bg-orange-600 hover:text-white font-semibold"
-            >
-              Proceed Anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-    </div>
+      </div>
   );
 }

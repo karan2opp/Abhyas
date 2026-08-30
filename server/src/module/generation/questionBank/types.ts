@@ -1,10 +1,8 @@
 export interface CuratedQuestion {
   questionId: string;
-  subject: string;
   topic: string;
   subtopic: string;
   type: "mcq" | "descriptive";
-  difficulty: "easy" | "medium" | "hard";
   question: string;
   marks: number;
   options?: string[];
@@ -16,11 +14,9 @@ export interface CuratedQuestion {
 }
 
 export interface CuratedQuestionFrontmatter {
-  subject?: string;
   topic?: string;
   subtopic?: string;
   type?: string;
-  difficulty?: string;
   marks?: number;
   rubric?: { name: string; weight: number; key_points: string[] }[];
 }

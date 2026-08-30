@@ -23,16 +23,13 @@ RULES:
    Weights do not need to sum to any fixed number — they represent relative 
    importance only; normalization happens downstream.
 
-3. The requested "difficulty" determines WHICH subtopics you choose. Each
-   block may include a "reference_examples" field: an array of objects
-   { "topic": string, "examples": [previous questions tagged with the
-   requested difficulty from the question bank] }. Use those examples as the
-   ground truth for what that difficulty looks like for that topic — choose
-   subtopics consistent with the difficulty the examples demonstrate. Do
-   NOT judge a topic's difficulty by its name or by general assumptions.
-   Use the examples only to gauge difficulty, never to copy their content.
-   If a topic has no examples, infer its difficulty from the subject, the
-   other topics in the exam, and the instructions.
+3. Each block may include a "reference_examples" field: an array of objects
+   { "topic": string, "examples": [previous questions from the question bank] }.
+   Use those examples to understand the style and depth of previous questions
+   for that topic — choose subtopics consistent with that level of depth. Do
+   NOT copy their content; use them only as a gauge for how the topic has been
+   assessed before. If a topic has no examples, choose subtopics based on the
+   subject, the other topics in the exam, and the instructions.
 
    If a topic is narrow (has a small fixed set of concepts), it is fine 
    for its subtopics to stay similar in nature — do not invent artificial 
@@ -77,7 +74,6 @@ RULES:
 }
 
 export async function Subtopics_Agent(input: any) {
-    const difficulty = input.difficulty || "medium";
     const client = await getClientForModel(env.GENERATION_MODEL);
     const response = await client.chat.completions.create({
         model: env.GENERATION_MODEL,

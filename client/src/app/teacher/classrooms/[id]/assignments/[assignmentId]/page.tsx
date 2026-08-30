@@ -91,7 +91,6 @@ export default function AssignmentDetailPage() {
   const [aiGenDialogOpen, setAiGenDialogOpen] = useState(false);
   const [aiEditingQuestionId, setAiEditingQuestionId] = useState<string | null>(null);
   const [aiSubject, setAiSubject] = useState("");
-  const [aiDifficulty, setAiDifficulty] = useState("medium");
   const [aiQuestionType, setAiQuestionType] = useState("mcq");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [aiTopicInput, setAiTopicInput] = useState("");
@@ -151,7 +150,6 @@ export default function AssignmentDetailPage() {
 
         const response = await generateSingleQuestionService({
           subject: aiSubject.trim(),
-          difficulty: aiDifficulty,
           questionType: aiQuestionType,
           topic,
           marks,
@@ -195,7 +193,6 @@ export default function AssignmentDetailPage() {
 
         const response = await generateAssignmentService({
           subject: aiSubject.trim(),
-          difficulty: aiDifficulty,
           questionType: aiQuestionType,
           topics,
           marksPerQuestion: marks,
@@ -812,21 +809,6 @@ export default function AssignmentDetailPage() {
                   onChange={(e) => setAiSubject(e.target.value)}
                   className="w-full bg-[#14151f] border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-400 focus:outline-none focus:border-white/30 transition-all text-sm h-11"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-gray-300">Difficulty</label>
-                  <select
-                    value={aiDifficulty}
-                    onChange={(e) => setAiDifficulty(e.target.value)}
-                    className="w-full bg-[#14151f] border border-white/15 text-white rounded-xl h-11 px-3.5 focus:outline-none focus:border-white/30 text-sm"
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -1,11 +1,11 @@
-import { Document } from "@langchain/core/documents";
-import { QdrantVectorStore } from "@langchain/qdrant";
+import crypto from "crypto";
 import {
-  ensureQdrantCollection,
   getEmbeddings,
-  getQdrantConfig,
   getQdrantHeaders,
-} from "../rag/rag.service.js";
+  ensureRagCollection,
+  embedInBatches,
+} from "../rag/qdrant-client.js";
+import { buildSparseVector } from "../rag/sparse.js";
 import { cosineSimilarity } from "../dedupe.js";
 import { parseCuratedQuestions } from "./parser.js";
 import type { CuratedQuestion } from "./types.js";
@@ -25,7 +25,8 @@ export const getQuestionExamplesCollectionForOrg = (organisationId?: string | nu
 };
 
 export const ensureQuestionExamplesCollection = async (organisationId?: string | null): Promise<void> => {
-  await ensureQdrantCollection(getQuestionExamplesCollectionForOrg(organisationId));
+  // Named vectors (dense + sparse) so retrieval can run hybrid (semantic + BM25).
+  await ensureRagCollection(getQuestionExamplesCollectionForOrg(organisationId));
 };
 
 /**
@@ -45,12 +46,6 @@ export const addCuratedQuestions = async (
     throw ApiError.badRequest("No questions could be parsed from the input.");
   }
 
-  const embeddings = getEmbeddings();
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    getQdrantConfig(collectionName)
-  );
-
   let indexed = 0;
   let skipped = 0;
   for (const question of questions) {
@@ -58,7 +53,7 @@ export const addCuratedQuestions = async (
       skipped++;
       continue;
     }
-    await vectorStore.addDocuments([questionToDocument(question, organisationId)]);
+    await upsertQuestionPoint(collectionName, question, organisationId);
     indexed++;
   }
 
@@ -105,7 +100,7 @@ export const listCuratedQuestions = async (organisationId?: string | null): Prom
     const metadata = payload.metadata || {};
     return {
       ...metadata,
-      question: payload.content || metadata.question || "",
+      question: payload.pageContent || metadata.question || "",
     };
   });
 };
@@ -129,26 +124,47 @@ export const deleteCuratedQuestion = async (questionId: string, organisationId?:
   return true;
 };
 
-const questionToDocument = (q: CuratedQuestion, organisationId?: string | null): Document => {
+/**
+ * Embeds (dense) and builds a BM25 (sparse) vector for a question and upserts it
+ * into the question-bank collection. Subject is intentionally NOT stored — the
+ * bank is topic-scoped only.
+ */
+const upsertQuestionPoint = async (
+  collectionName: string,
+  question: CuratedQuestion,
+  organisationId?: string | null
+): Promise<void> => {
+  const embeddings = getEmbeddings();
+  const [dense] = await embedInBatches(embeddings, [question.question], 1);
+
   const metadata: Record<string, any> = {
-    subject: q.subject,
-    topic: q.topic,
-    subtopic: q.subtopic,
-    type: q.type,
-    difficulty: q.difficulty,
-    marks: q.marks,
-    questionId: q.questionId,
-    source: q.source,
+    topic: question.topic,
+    subtopic: question.subtopic,
+    type: question.type,
+    marks: question.marks,
+    questionId: question.questionId,
+    source: question.source,
     organisationId: organisationId || "",
   };
-  if (q.options) metadata.options = q.options;
-  if (q.correctOption) metadata.correct_option = q.correctOption;
-  if (q.rubric) metadata.rubric = q.rubric;
+  if (question.options) metadata.options = question.options;
+  if (question.correctOption) metadata.correct_option = question.correctOption;
+  if (question.rubric) metadata.rubric = question.rubric;
 
-  return new Document({
-    pageContent: q.question,
-    metadata,
+  const point = {
+    id: crypto.randomUUID(),
+    vector: { dense, sparse: buildSparseVector(question.question) },
+    payload: { pageContent: question.question, metadata },
+  };
+
+  const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
+  const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points?wait=true`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
+    body: JSON.stringify({ points: [point] }),
   });
+  if (!res.ok) {
+    throw new Error(`Qdrant upsert failed: ${res.status} ${await res.text()}`);
+  }
 };
 
 const questionIdExists = async (questionId: string, organisationId?: string | null): Promise<boolean> => {
@@ -193,12 +209,6 @@ export const indexQuestionBankContent = async (
 
   const questions = parseCuratedQuestions(content, sourceFile);
 
-  const embeddings = getEmbeddings();
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    getQdrantConfig(collectionName)
-  );
-
   let indexed = 0;
   let skipped = 0;
   let errors = 0;
@@ -209,7 +219,7 @@ export const indexQuestionBankContent = async (
         skipped++;
         continue;
       }
-      await vectorStore.addDocuments([questionToDocument(question, organisationId)]);
+      await upsertQuestionPoint(collectionName, question, organisationId);
       indexed++;
     } catch (error: any) {
       console.error(`- Failed to index question in ${sourceFile}:`, error?.message || error);
@@ -229,7 +239,6 @@ export interface RetrievedExample {
   topic: string;
   subtopic: string;
   type: string;
-  difficulty: string;
   score: number;
 }
 
@@ -267,16 +276,16 @@ const mmrSelect = (
 };
 
 /**
- * Retrieves diverse previous questions (reference examples) for a subtopic.
- * Filters tiered: subject+type+difficulty -> subject+type -> subject. Fetches a
- * larger candidate pool then applies MMR to return `topK` diverse examples.
+ * Retrieves diverse previous questions (reference examples) for a topic.
+ * Runs a hybrid search (dense embedding + BM25 sparse, fused with Qdrant's
+ * native RRF) scoped to the topic via filter: topic+type first, then topic
+ * alone. If nothing matches we return [] — there is no subject fallback. The
+ * candidate pool is then re-scored and MMR selects `topK` diverse examples.
  */
 export const retrieveExampleQuestions = async (
-  subject: string,
   topic: string,
   subtopic: string,
   type: string,
-  difficulty: string,
   topK: number = 3,
   candidatePool: number = 15,
   lambda: number = 0.7,
@@ -285,39 +294,64 @@ export const retrieveExampleQuestions = async (
   const collectionName = getQuestionExamplesCollectionForOrg(organisationId);
   await ensureQuestionExamplesCollection(organisationId);
 
+  const trimmedTopic = topic.trim();
+  const query = [trimmedTopic, subtopic.trim()].filter(Boolean).join(" - ");
+  if (!trimmedTopic || !query) return [];
+
   const embeddings = getEmbeddings();
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    getQdrantConfig(collectionName)
-  );
 
-  // Build a meaningful embedding query. topic/subtopic may be empty (metadata is
-  // optional now) — fall back to whatever parts are present, then subject.
-  const parts = [topic.trim(), subtopic.trim()].filter(Boolean);
-  const query = parts.length > 0 ? parts.join(" - ") : subject.trim();
+  const hybridSearch = async (filter: Record<string, unknown> | null): Promise<{ text: string; metadata: any }[]> => {
+    const [dense, sparse] = await Promise.all([
+      embeddings.embedQuery(query),
+      Promise.resolve(buildSparseVector(query)),
+    ]);
 
-  const filters: any[] = [
+    const body: Record<string, unknown> = {
+      prefetch: [
+        { query: dense, using: "dense", limit: candidatePool },
+        { query: { indices: sparse.indices, values: sparse.values }, using: "sparse", limit: candidatePool },
+      ],
+      query: { rrf: { k: 60 } },
+      limit: candidatePool,
+      with_payload: true,
+    };
+    if (filter) body.filter = filter;
+
+    const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
+    const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`Qdrant hybrid query failed: ${res.status} ${await res.text()}`);
+    }
+
+    const data: any = await res.json();
+    return (data.result?.points ?? []).map((p: any) => ({
+      text: p.payload?.pageContent ?? "",
+      metadata: p.payload?.metadata ?? {},
+    }));
+  };
+
+  // Tiered topic-scoped filters. If both come back empty, return nothing.
+  const filters: (Record<string, unknown> | null)[] = [
     {
       must: [
-        { key: "metadata.subject", match: { value: subject } },
-        { key: "metadata.type", match: { value: type } },
-        { key: "metadata.difficulty", match: { value: difficulty } },
-      ],
-    },
-    {
-      must: [
-        { key: "metadata.subject", match: { value: subject } },
+        { key: "metadata.topic", match: { value: trimmedTopic } },
         { key: "metadata.type", match: { value: type } },
       ],
     },
-    {
-      must: [{ key: "metadata.subject", match: { value: subject } }],
-    },
+    { must: [{ key: "metadata.topic", match: { value: trimmedTopic } }] },
   ];
 
-  let results: [Document, number][] = [];
+  let results: { text: string; metadata: any }[] = [];
   for (const filter of filters) {
-    results = await vectorStore.similaritySearchWithScore(query, candidatePool, filter);
+    try {
+      results = await hybridSearch(filter);
+    } catch (error) {
+      console.warn(`Question-bank hybrid search failed for topic "${trimmedTopic}":`, error);
+    }
     if (results.length > 0) break;
   }
 
@@ -325,7 +359,7 @@ export const retrieveExampleQuestions = async (
 
   // Recompute a consistent relevance score (cosine) and use candidate vectors
   // for pairwise diversity, independent of Qdrant's raw score semantics.
-  const texts = results.map(([doc]) => doc.pageContent);
+  const texts = results.map((r) => r.text);
   const [queryVec, candidateVecs] = await Promise.all([
     embeddings.embedQuery(query),
     embeddings.embedDocuments(texts),
@@ -336,18 +370,16 @@ export const retrieveExampleQuestions = async (
   const selectedIdx = mmrSelect(relevance, similarity, lambda, Math.min(topK, results.length));
 
   return selectedIdx.map((idx) => {
-    const [doc] = results[idx]!;
-    const md = doc.metadata as any;
+    const { text, metadata } = results[idx]!;
     return {
-      question: doc.pageContent,
-      options: md.options,
-      correctOption: md.correct_option,
-      rubric: md.rubric,
-      marks: typeof md.marks === "number" ? md.marks : 1,
-      topic: md.topic || "",
-      subtopic: md.subtopic || "",
-      type: md.type || type,
-      difficulty: md.difficulty || difficulty,
+      question: text,
+      options: metadata.options,
+      correctOption: metadata.correct_option,
+      rubric: metadata.rubric,
+      marks: typeof metadata.marks === "number" ? metadata.marks : 1,
+      topic: metadata.topic || trimmedTopic,
+      subtopic: metadata.subtopic || "",
+      type: metadata.type || type,
       score: relevance[idx]!,
     };
   });

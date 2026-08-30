@@ -1,7 +1,10 @@
 import { Worker } from "bullmq";
+import fs from "fs";
 import { env } from "../../env.js";
 import { generateExamFromBlueprint } from "../../module/generation/generation.service.js";
 import { evaluateDescriptiveAnswers } from "../../module/submissions/submission.service.js";
+import { indexDocument } from "../../module/generation/rag/rag.service.js";
+import { retrieveStandard, retrieveAdvanced } from "../../module/generation/rag/hybrid-retrieval.js";
 import { evaluationQueue } from "./queues.js";
 import db from "../../common/db/index.js";
 import { submissions } from "../../common/db/schema.js";
@@ -90,6 +93,51 @@ export const startWorkers = () => {
         },
         { connection, concurrency: 5 }
     ).on("failed", (job, err) => console.error(`Evaluation job ${job?.id} failed:`, err?.message));
+
+    // RAG document indexing. Long-running (PDF parsing + OpenAI embeddings of
+    // every chunk), so it runs on a dedicated worker. The temp uploaded file is
+    // deleted only on success so retries can still read it; a job that exhausts
+    // all attempts leaves the file in tmp/ for a later cleanup pass.
+    new Worker(
+        "rag-index",
+        async (job) => {
+            const { filePath, originalFileName, subject, topic, subtopic, organisationId } = job.data;
+            const result = await indexDocument(
+                filePath,
+                originalFileName,
+                subject,
+                topic,
+                subtopic,
+                organisationId
+            );
+            if (filePath && fs.existsSync(filePath)) {
+                try {
+                    fs.unlinkSync(filePath);
+                } catch (unlinkError) {
+                    console.error(`Failed to delete temp file ${filePath}:`, unlinkError);
+                }
+            }
+            return result;
+        },
+        { connection, concurrency: 2 }
+    ).on("failed", (job, err) => console.error(`RAG index job ${job?.id} failed:`, err?.message));
+
+    // RAG retrieval. Runs the advanced pipeline (sub-questions, step-back, HyDE,
+    // hybrid search, RRF, parent expansion, re-ranking) which makes several LLM
+    // calls and Qdrant queries per request. Two modes share this worker:
+    //  - standard: subject-filtered retrieval for the question generation agent.
+    //  - advanced: whole-collection retrieval for the chatbot.
+    new Worker(
+        "rag-retrieval",
+        async (job) => {
+            const data = job.data;
+            if (data.mode === "standard") {
+                return await retrieveStandard(data);
+            }
+            return await retrieveAdvanced(data);
+        },
+        { connection, concurrency: 5 }
+    ).on("failed", (job, err) => console.error(`RAG retrieval job ${job?.id} failed:`, err?.message));
 
     console.log("BullMQ workers started.");
 };

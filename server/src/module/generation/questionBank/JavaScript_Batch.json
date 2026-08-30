@@ -1,6 +1,5 @@
 [
   {
-    "subject": "JavaScript",
     "topic": "Arrays",
     "subtopic": "Array Methods",
     "type": "mcq",
@@ -11,7 +10,6 @@
     "correctOption": "push()"
   },
   {
-    "subject": "JavaScript",
     "topic": "Arrays",
     "subtopic": "Array Methods",
     "type": "mcq",
@@ -22,7 +20,6 @@
     "correctOption": "shift()"
   },
   {
-    "subject": "JavaScript",
     "topic": "Promises",
     "subtopic": "Async/Await",
     "type": "descriptive",

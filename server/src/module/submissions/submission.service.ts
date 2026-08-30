@@ -73,7 +73,7 @@ const runAndPersistAiEvaluation = async (textAnswersToEvaluate: TextAnswer[], mo
 
 // ── Build the list of descriptive answers eligible for AI evaluation ───────────
 // Skips any answer already graded by a teacher, so AI never overwrites a manual grade.
-const buildTextAnswersForEvaluation = async (submissionId: string, difficulty: string): Promise<TextAnswer[]> => {
+const buildTextAnswersForEvaluation = async (submissionId: string): Promise<TextAnswer[]> => {
     const submissionAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
 
     const textAnswersToEvaluate: TextAnswer[] = [];
@@ -90,7 +90,6 @@ const buildTextAnswersForEvaluation = async (submissionId: string, difficulty: s
             maxMarks: question.marks,
             questionImages: question.images as any,
             rubric: question.rubric,
-            difficulty,
         });
     }
     return textAnswersToEvaluate;
@@ -103,10 +102,7 @@ export const evaluateDescriptiveAnswers = async (submissionId: string, mode: str
     const [submission] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
     if (!submission) throw ApiError.notFound("Submission not found");
 
-    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
-    const difficulty = exam?.difficulty || "medium";
-
-    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId, difficulty);
+    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId);
 
     if (textAnswersToEvaluate.length > 0) {
         const evalMode: ResponseMode = (mode === "detailed" || mode === "marks_and_feedback") ? "marks_and_feedback" : "marks_only";
@@ -337,10 +333,7 @@ const evaluateSubmissionWithAI = async (submissionId: string, data: EvaluateWith
 
     await assertCanManageExamSubmissions(requester, submission.examId);
 
-    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
-    const difficulty = exam?.difficulty || "medium";
-
-    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId, difficulty);
+    const textAnswersToEvaluate = await buildTextAnswersForEvaluation(submissionId);
 
     if (textAnswersToEvaluate.length === 0) {
         throw ApiError.badRequest("No descriptive answers are eligible for AI evaluation (they may already be manually graded)");

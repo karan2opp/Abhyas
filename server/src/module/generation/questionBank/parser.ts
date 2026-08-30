@@ -7,11 +7,9 @@ const OPTION_LINE = /^\s*-\s*\[([ xX])\]\s*(.+)$/;
 const FRONTMATTER_BLOCK = /^\s*---\s*\n([\s\S]*?)\n---\s*\n?/gm;
 
 interface QuestionData {
-  subject: string;
   topic: string;
   subtopic: string;
   type: "mcq" | "descriptive";
-  difficulty: "easy" | "medium" | "hard";
   question: string;
   marks: number;
   options?: string[] | undefined;
@@ -19,26 +17,24 @@ interface QuestionData {
   rubric?: CuratedQuestion["rubric"] | undefined;
 }
 
-function makeQuestionId(fields: { subject: string; topic: string; subtopic: string; type: string; difficulty: string; question: string }): string {
+function makeQuestionId(fields: { topic: string; subtopic: string; type: string; question: string }): string {
   return crypto
     .createHash("sha256")
-    .update(`${fields.subject}|${fields.topic}|${fields.subtopic}|${fields.type}|${fields.difficulty}|${fields.question}`)
+    .update(`${fields.topic}|${fields.subtopic}|${fields.type}|${fields.question}`)
     .digest("hex");
 }
 
 // Validate + normalize the common metadata shared by all input formats.
-// `subject` is the one hard requirement (multi-subject isolation depends on it);
-// topic/subtopic are optional — retrieval relies on semantic similarity instead.
+// `topic` is the one hard requirement (retrieval is topic-scoped); subtopic is
+// optional — retrieval relies on semantic similarity instead.
 function validateCommon(data: any, sourceFile: string) {
-  const subject = (data.subject || "").trim();
   const topic = (data.topic || "").trim();
   const subtopic = (data.subtopic || "").trim();
   const type = (data.type || "").trim().toLowerCase();
-  const difficulty = (data.difficulty || "medium").trim().toLowerCase();
 
-  if (!subject) {
+  if (!topic) {
     throw ApiError.badRequest(
-      `Curated question in "${sourceFile}" must define a subject.`
+      `Curated question in "${sourceFile}" must define a topic.`
     );
   }
   if (type !== "mcq" && type !== "descriptive") {
@@ -46,30 +42,21 @@ function validateCommon(data: any, sourceFile: string) {
       `Curated question in "${sourceFile}" has invalid type "${type}" (expected "mcq" or "descriptive").`
     );
   }
-  if (difficulty !== "easy" && difficulty !== "medium" && difficulty !== "hard") {
-    throw ApiError.badRequest(
-      `Curated question in "${sourceFile}" has invalid difficulty "${difficulty}".`
-    );
-  }
 
-  return { subject, topic, subtopic, type, difficulty };
+  return { topic, subtopic, type };
 }
 
 function buildCuratedQuestion(data: QuestionData, sourceFile: string): CuratedQuestion {
   const result: CuratedQuestion = {
     questionId: makeQuestionId({
-      subject: data.subject,
       topic: data.topic,
       subtopic: data.subtopic,
       type: data.type,
-      difficulty: data.difficulty,
       question: data.question,
     }),
-    subject: data.subject,
     topic: data.topic,
     subtopic: data.subtopic,
     type: data.type,
-    difficulty: data.difficulty,
     question: data.question,
     marks: data.marks,
     source: sourceFile,
@@ -177,16 +164,14 @@ function parseMarkdownQuestion(frontmatter: any, body: string, sourceFile: strin
  * Parses a curated-question file into one or more questions. Supports:
  *
  * 1. JSON batch file — an array of question objects:
- *    [{ subject, topic, subtopic, type, difficulty, question, marks,
+ *    [{ topic, subtopic, type, question, marks,
  *       options[], correctOption, rubric }]
  *
  * 2. Markdown list — one or more frontmatter blocks, each followed by its body:
  *    ---
- *    subject: JavaScript
  *    topic: Variables
  *    subtopic: Variable Scope
  *    type: mcq
- *    difficulty: medium
  *    marks: 1
  *    ---
  *    Question text...

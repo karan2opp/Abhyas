@@ -152,7 +152,6 @@ const createAssignment = async (data: CreateAssignmentDto, teacherId: string) =>
         dayGap,
         sequenceOrder,
         unlockOffsetDays,
-        difficulty: data.difficulty || "medium",
     }).returning();
 
     if (!assignment) throw ApiError.internal("Failed to create assignment");
@@ -814,7 +813,6 @@ const runAssignmentAiEvaluation = async (submissionId: string) => {
         const [assignment] = await db.select().from(assignments).where(
             eq(assignments.id, submission.assignmentId)
         );
-        const difficulty = assignment?.difficulty || "medium";
 
         const textAnswersToEvaluate: TextAnswer[] = [];
 
@@ -833,7 +831,6 @@ const runAssignmentAiEvaluation = async (submissionId: string) => {
                     studentAnswer: answer.textAnswer ?? "",
                     maxMarks: question.marks,
                     rubric: (question as any).rubric || null,
-                    difficulty,
                 });
             }
         }
@@ -1058,7 +1055,6 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
 const generateAssignmentFromForm = async (data: any, teacherId: string, organisationId?: string | null) => {
     const generatorInput = {
         exam_type: data.examType || "other",
-        difficulty: data.difficulty || "medium",
         instructions: data.specialInstructions ? [data.specialInstructions] : [],
         blocks: Array.isArray(data.blocks) && data.blocks.length > 0
             ? data.blocks.map((b: any) => ({
@@ -1106,7 +1102,6 @@ const generateSingleQuestionFromForm = async (data: any, teacherId: string, orga
     const generatorInput = {
         subject: data.subject,
         exam_type: data.examType || "other",
-        difficulty: data.difficulty || "medium",
         question_type: data.questionType || "mcq",
         topic: data.topic,
         marks: Number(data.marks) || 5,

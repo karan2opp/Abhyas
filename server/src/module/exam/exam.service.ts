@@ -168,7 +168,6 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                 createdBy: requester.id,
                 classroomId: data.classroomId ?? null,
                 groupId: data.groupId ?? null,
-                difficulty: data.difficulty || "medium",
                 status: data.status || "DRAFT",
             }).returning();
             exam = newExam;

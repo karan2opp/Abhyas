@@ -160,7 +160,7 @@ export default function SystemAdminLayout({ children }: { children: React.ReactN
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#050505]">
+        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar relative bg-[#050505]">
           {children}
         </main>
       </div>

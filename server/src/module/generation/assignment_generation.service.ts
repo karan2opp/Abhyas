@@ -6,7 +6,7 @@ import { repairQuestionGeneration } from "./agents/repair_agent.js";
 import { runGenerationBatch, type GenerationUnit } from "./runner.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { z } from "zod";
-import { ExamTypeZodEnum, DifficultyZodEnum, QuestionTypeZodEnum } from "./Types/inputExam.js";
+import { ExamTypeZodEnum, QuestionTypeZodEnum } from "./Types/inputExam.js";
 
 const AssignmentBlockInputSchema = z.object({
     name: z.string(),
@@ -20,7 +20,6 @@ const AssignmentBlockInputSchema = z.object({
 
 const AssignmentGenerationInputSchema = z.object({
     exam_type: ExamTypeZodEnum,
-    difficulty: DifficultyZodEnum,
     instructions: z.array(z.string()).optional(),
     blocks: z.array(AssignmentBlockInputSchema).min(1),
 });
@@ -28,7 +27,6 @@ const AssignmentGenerationInputSchema = z.object({
 const SingleQuestionGenerationInputSchema = z.object({
     subject: z.string(),
     exam_type: ExamTypeZodEnum,
-    difficulty: DifficultyZodEnum,
     question_type: QuestionTypeZodEnum,
     topic: z.string(),
     marks: z.number().positive(),
@@ -92,7 +90,6 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput, o
                             subject: unit.subject,
                             topic: unit.topic,
                             subtopic: unit.topic,
-                            difficulty: data.difficulty,
                             question_type: unit.questionType,
                             instructions: [...(data.instructions || []), ...(block.instructions || [])],
                         });
@@ -123,7 +120,6 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput, o
                     buildPayload: (batchUnits, contexts) => ({
                         subject: block.subject,
                         exam_type: data.exam_type,
-                        difficulty: data.difficulty,
                         question_type: block.question_type,
                         batch: batchUnits.map((u) => ({ topic: u.topic, question_type: u.questionType, count: u.count, marks: u.marks })),
                         rag_context: batchUnits.flatMap((u, i) =>
@@ -156,7 +152,6 @@ export const generateMockAssignment = async (input: AssignmentGenerationInput, o
     }
 
     return {
-        difficulty: data.difficulty,
         instructions: data.instructions || [],
         blocks: finalBlocks,
     };
@@ -182,7 +177,6 @@ export const generateSingleAssignmentQuestion = async (input: SingleQuestionGene
         subject: data.subject,
         topic: data.topic,
         subtopic: data.topic,
-        difficulty: data.difficulty,
         question_type: data.question_type,
         instructions: data.instructions || [],
     });
@@ -218,7 +212,6 @@ export const generateSingleAssignmentQuestion = async (input: SingleQuestionGene
     const generationPayload = {
         subject: data.subject,
         exam_type: data.exam_type,
-        difficulty: data.difficulty,
         question_type: data.question_type,
         batch: [{
             topic: data.topic,

@@ -14,29 +14,27 @@ import type { IInputExam } from "./Types/inputExam.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 
 /**
- * Attaches per-topic "reference_examples" (previous questions tagged with the
- * requested difficulty) from the question bank to a deep clone of the exam
- * input, so the Subtopics Agent can gauge difficulty from real questions.
- * Each block gets a "reference_examples" array of { topic, examples }. Fetches
- * are cached per (subject, topic, difficulty, question_type) within a single
- * planning call; empty/error results leave the field absent so the agent
- * falls back to the subject/topics/instructions.
+ * Attaches per-topic "reference_examples" (previous questions) from the question
+ * bank to a deep clone of the exam input, so the Subtopics Agent can see how a
+ * topic has been assessed before. Each block gets a "reference_examples" array
+ * of { topic, examples }. Fetches are cached per (subject, topic, question_type)
+ * within a single planning call; empty/error results leave the field absent so
+ * the agent falls back to the subject/topics/instructions.
  */
 const attachPlanningExamples = async (data: IInputExam, organisationId?: string | null): Promise<IInputExam> => {
     const clone = structuredClone(data);
     const cache = new Map<string, any[]>();
-    const difficulty = data.difficulty || "medium";
 
     for (const section of clone.sections) {
         for (const block of section.blocks) {
             const type = block.question_type || "mcq";
             const blockExamples: { topic: string; examples: any[] }[] = [];
             for (const topic of block.topics || []) {
-                const key = `${block.subject}|${topic}|${difficulty}|${type}`;
+                const key = `${block.subject}|${topic}|${type}`;
                 if (!cache.has(key)) {
                     let examples: any[] = [];
                     try {
-                        examples = await retrieveExampleQuestions(block.subject, topic, "", type, difficulty, 3, 15, 0.7, organisationId);
+                        examples = await retrieveExampleQuestions(topic, "", type, 3, 15, 0.7, organisationId);
                     } catch (err) {
                         console.error(`Failed to fetch planning examples for topic "${topic}":`, err);
                     }
@@ -82,7 +80,7 @@ export const generateExamBlueprint = async (input: IInputExam, organisationId?: 
         `Generate an exam blueprint and exam questions for: ${blockSummaries}. Topics covered: ${allTopics}. Special instructions: ${specialInstructions}.`
     );
 
-    // Subtopics Agent Planner (with per-topic difficulty examples from the bank)
+    // Subtopics Agent Planner (with per-topic reference examples from the bank)
     let agentOutput;
     try {
         const planningInput = await attachPlanningExamples(data, organisationId);
@@ -97,7 +95,6 @@ export const generateExamBlueprint = async (input: IInputExam, organisationId?: 
 
     return {
         title: data.title || "Untitled Exam",
-        difficulty: data.difficulty,
         exam_type: data.exam_type,
         instructions: data.instructions || [],
         sections: allocatedSections
@@ -210,7 +207,6 @@ export const generateExamFromBlueprint = async (
                                 subject: unit.subject,
                                 topic: unit.topic,
                                 subtopic: unit.subtopic ?? "",
-                                difficulty: blueprint.difficulty || "medium",
                                 question_type: unit.questionType,
                                 instructions: [...(blueprint.instructions || []), ...(block.instructions || [])],
                             });
@@ -245,11 +241,9 @@ export const generateExamFromBlueprint = async (
                             let examples: any[] = [];
                             try {
                                 examples = await retrieveExampleQuestions(
-                                    unit.subject,
                                     unit.topic,
                                     unit.subtopic ?? "",
                                     unit.questionType,
-                                    blueprint.difficulty || "medium",
                                     3,
                                     15,
                                     0.7,
@@ -263,7 +257,6 @@ export const generateExamFromBlueprint = async (
                         buildPayload: (batchUnits, contexts, examples) => ({
                             subject: block.subject,
                             exam_type: blueprint.exam_type || "programming",
-                            difficulty: blueprint.difficulty || "medium",
                             batch: batchUnits.map((u) => ({
                                 topic: u.topic,
                                 subtopics: [{ name: u.subtopic, question_type: u.questionType, count: u.count, marks: u.marks }],
@@ -275,7 +268,6 @@ export const generateExamFromBlueprint = async (
                                 (examples[i] || []).map((e: any) => ({
                                     subtopic: u.subtopic,
                                     type: e.type,
-                                    difficulty: e.difficulty,
                                     question: e.question,
                                     options: e.options,
                                     correct_option: e.correctOption,
@@ -362,7 +354,6 @@ export const generateExamFromBlueprint = async (
 
     return {
         title: blueprint.title || "Untitled Exam",
-        difficulty: blueprint.difficulty || "medium",
         instructions: blueprint.instructions || [],
         sections: finalSections
     };

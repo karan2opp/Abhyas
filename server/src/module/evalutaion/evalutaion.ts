@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getClientForModel } from "../../common/agent/openai.client.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { env } from "../../env.js";
-import { getEvaluationPromptForDifficulty, runGuardrail } from "./agents/evalAgent.js";
+import { getEvaluationPrompt, runGuardrail } from "./agents/evalAgent.js";
 
 const EvaluationOutputSchema = z.object({
     marksAwarded: z.number().optional(),
@@ -30,7 +30,6 @@ export interface TextAnswer {
             key_points: string[];
         }[];
     } | null;
-    difficulty?: string;
 }
 
 export interface EvaluationOutcome {
@@ -41,7 +40,6 @@ export interface EvaluationOutcome {
 export const calculateMarksFromScores = (
     categoryScores: { name: string; score: number }[],
     maxMarks: number,
-    _difficulty: string,
     rubric?: { categories: { name: string; weight: number }[] } | null
 ): number => {
     let totalWeightedScore = 0;
@@ -98,7 +96,7 @@ const evaluateSingleAnswer = async (
     let attempt = 0;
     while (true) {
         try {
-            const systemPrompt = getEvaluationPromptForDifficulty(answer.difficulty || "medium");
+            const systemPrompt = getEvaluationPrompt();
 
             const response = await client.chat.completions.create({
                 model: modelToUse,
@@ -120,7 +118,6 @@ const evaluateSingleAnswer = async (
                     marksAwarded = calculateMarksFromScores(
                         evalObj.category_scores,
                         answer.maxMarks,
-                        answer.difficulty || "medium",
                         answer.rubric
                     );
                 }

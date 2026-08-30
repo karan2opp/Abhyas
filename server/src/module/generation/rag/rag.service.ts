@@ -1,103 +1,61 @@
-import fs from "fs";
 import crypto from "crypto";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import { QdrantVectorStore } from "@langchain/qdrant";
+import fs from "fs";
 import { ApiError } from "../../../common/utils/ApiError.js";
-import { loadMarkdownChunks } from "./markdown.js";
+import { chunkMarkdown } from "./markdown-chunker.js";
+import { chunkPdf } from "./pdf-chunker.js";
 import { subjectMatchAgent } from "../agents/subject_match_agent.js";
-const COLLECTION_NAME = "exams";
+import {
+  getCollectionForOrg,
+  getEmbeddings,
+  getQdrantHeaders,
+  getQdrantConfig,
+  ensureQdrantCollection,
+  ensureRagCollection,
+  upsertChunkedDocument,
+  getDistinctCollections,
+  invalidateCollectionsCache,
+} from "./qdrant-client.js";
 
-// ── Per-org collection resolution ─────────────────────────────────────────────
-// Each organisation gets its own Qdrant collection ("knowledge_{orgId}") so an
-// org's uploaded material is isolated from every other org. When no org is given
-// (e.g. system-admin global uploads), fall back to the shared collection.
-export const getCollectionForOrg = (organisationId?: string | null): string => {
-  return organisationId ? `knowledge_${organisationId}` : COLLECTION_NAME;
+// Re-exported so existing consumers (question bank, scripts) keep working.
+export {
+  getCollectionForOrg,
+  getEmbeddings,
+  getQdrantHeaders,
+  getQdrantConfig,
+  ensureQdrantCollection,
+  getDistinctCollections,
 };
 
-let embeddings: OpenAIEmbeddings | null = null;
-
-export const getEmbeddings = (): OpenAIEmbeddings => {
-  if (!embeddings) {
-    embeddings = new OpenAIEmbeddings({
-      model: 'text-embedding-3-small',
-      apiKey: process.env.OPENAI_API_KEY || '',
-    });
-  }
-  return embeddings;
-};
-
-export const getQdrantHeaders = () => {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (process.env.QDRANT_API_KEY) {
-    headers['api-key'] = process.env.QDRANT_API_KEY;
-  }
-  return headers;
-};
-
-export const getQdrantConfig = (collectionName: string = COLLECTION_NAME) => {
-  const config: { url: string; collectionName: string; apiKey?: string } = {
-    url: process.env.QDRANT_URL || 'http://localhost:6333',
-    collectionName,
-  };
-  if (process.env.QDRANT_API_KEY) {
-    config.apiKey = process.env.QDRANT_API_KEY;
-  }
-  return config;
-};
-
-export const ensureQdrantCollection = async (collectionName: string = COLLECTION_NAME): Promise<void> => {
-  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+const computeFileHash = (filePath: string): string => {
   try {
-    const res = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
-      headers: getQdrantHeaders()
-    });
-    if (res.ok) {
-      return; // Already exists
-    }
-    
-    // Collection doesn't exist, create it
-    console.log(`Creating Qdrant collection: ${collectionName}`);
-    const createRes = await fetch(`${qdrantUrl}/collections/${collectionName}`, {
-      method: 'PUT',
-      headers: getQdrantHeaders(),
-      body: JSON.stringify({
-        vectors: {
-          size: 1536, // size for text-embedding-3-small
-          distance: 'Cosine'
-        }
-      })
-    });
-    if (!createRes.ok) {
-      const errorText = await createRes.text();
-      throw new Error(`Failed to create Qdrant collection: ${errorText}`);
-    }
-  } catch (error) {
-    console.error("Error in ensureQdrantCollection:", error);
-    throw error;
+    const fileBuffer = fs.readFileSync(filePath);
+    return crypto.createHash("sha256").update(fileBuffer).digest("hex");
+  } catch (hashError) {
+    console.error("Error computing file hash:", hashError);
+    throw ApiError.internal("Failed to process file hash");
   }
 };
 
-// Delete all previously indexed chunks for a given source file. Used when a file
-// is re-indexed after being edited (new hash) so old content does not accumulate.
+// Delete all previously indexed chunks (parents + children) for a given source
+// file. Used when a file is re-indexed after being edited (new hash) so old
+// content does not accumulate.
 const deleteChunksForSourceFile = async (sourceFile: string, organisationId?: string | null): Promise<void> => {
-  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+  const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
   const collectionName = getCollectionForOrg(organisationId);
   try {
     const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/delete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getQdrantHeaders() },
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getQdrantHeaders() },
       body: JSON.stringify({
         filter: {
           must: [
             {
               key: "metadata.sourceFile",
-              match: { value: sourceFile }
-            }
-          ]
-        }
-      })
+              match: { value: sourceFile },
+            },
+          ],
+        },
+      }),
     });
     if (!res.ok) {
       console.warn(`[RAG] Failed to delete stale chunks for "${sourceFile}" in ${collectionName}: ${res.statusText}`);
@@ -110,29 +68,27 @@ const deleteChunksForSourceFile = async (sourceFile: string, organisationId?: st
 };
 
 export const checkIfHashIndexed = async (fileHash: string, organisationId?: string | null): Promise<boolean> => {
-  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
+  const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
   const collectionName = getCollectionForOrg(organisationId);
   try {
-    await ensureQdrantCollection(collectionName);
+    await ensureRagCollection(collectionName);
 
     const res = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         filter: {
           must: [
             {
               key: "metadata.fileHash",
-              match: {
-                value: fileHash
-              }
-            }
-          ]
+              match: { value: fileHash },
+            },
+          ],
         },
         limit: 1,
         with_payload: true,
-        with_vector: false
-      })
+        with_vector: false,
+      }),
     });
 
     if (!res.ok) {
@@ -147,6 +103,50 @@ export const checkIfHashIndexed = async (fileHash: string, organisationId?: stri
   }
 };
 
+const indexChunkedFile = async (
+  filePath: string,
+  originalFileName: string,
+  subject: string,
+  topic: string,
+  subtopic: string,
+  organisationId: string | null | undefined,
+  docType: "markdown" | "pdf"
+): Promise<{ chunksIndexed: number; fileHash: string }> => {
+  const fileHash = computeFileHash(filePath);
+  const collectionName = getCollectionForOrg(organisationId);
+
+  await ensureRagCollection(collectionName);
+
+  if (await checkIfHashIndexed(fileHash, organisationId)) {
+    return { chunksIndexed: 0, fileHash };
+  }
+
+  const doc =
+    docType === "markdown"
+      ? chunkMarkdown(fs.readFileSync(filePath, "utf-8"), originalFileName)
+      : await chunkPdf(filePath, originalFileName);
+
+  if (doc.parents.length === 0 || doc.children.length === 0) {
+    throw ApiError.badRequest("File produced no indexable parent/child chunks.");
+  }
+
+  await deleteChunksForSourceFile(originalFileName, organisationId);
+
+  const chunksIndexed = await upsertChunkedDocument(collectionName, doc, {
+    subject: subject.trim(),
+    topic: topic.trim(),
+    subtopic: subtopic.trim(),
+    sourceFile: originalFileName,
+    fileHash,
+    indexedAt: Date.now(),
+    organisationId: organisationId ?? "",
+    docType,
+  });
+
+  invalidateCollectionsCache();
+  return { chunksIndexed, fileHash };
+};
+
 export const indexPdfDocument = async (
   filePath: string,
   originalFileName: string,
@@ -155,75 +155,34 @@ export const indexPdfDocument = async (
   subtopic?: string,
   organisationId?: string | null
 ): Promise<{ chunksIndexed: number; fileHash: string }> => {
-  // Compute SHA-256 hash of the file content
-  let fileHash: string;
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
-  } catch (hashError) {
-    console.error("Error computing file hash:", hashError);
-    throw ApiError.internal("Failed to process file hash");
-  }
-
-  const collectionName = getCollectionForOrg(organisationId);
-
-  // Check Qdrant for duplicate hash
-  const isAlreadyIndexed = await checkIfHashIndexed(fileHash, organisationId);
-  if (isAlreadyIndexed) {
-    return { chunksIndexed: 0, fileHash };
-  }
-
-  // Load PDF using PDFLoader
-  let documents;
-  try {
-    const loader = new PDFLoader(filePath);
-    documents = await loader.load();
-  } catch (parseError) {
-    console.error("PDF Parsing failed:", parseError);
-    throw ApiError.badRequest("Failed to parse PDF file. Ensure it is a valid, unencrypted PDF.");
-  }
-
-  if (!documents || documents.length === 0) {
-    throw ApiError.badRequest("PDF contains no readable page-level content.");
-  }
-
-  // Attach metadata to every chunk before embedding
-  const timestamp = Date.now();
-  documents.forEach((doc) => {
-    doc.metadata = {
-      ...doc.metadata,
-      subject: subject.trim(),
-      topic: topic ? topic.trim() : "",
-      subtopic: subtopic ? subtopic.trim() : "",
-      sourceFile: originalFileName,
-      fileHash,
-      indexedAt: timestamp,
-      organisationId: organisationId || "",
-    };
-  });
-
-
-  // Ensure collection exists
-  await ensureQdrantCollection(collectionName);
-
-  // Initialize embedding model
-  const embeddings = getEmbeddings();
-
-  // Get Vector Store and add documents
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    getQdrantConfig(collectionName)
+  return indexChunkedFile(
+    filePath,
+    originalFileName,
+    subject,
+    topic ?? "",
+    subtopic ?? "",
+    organisationId,
+    "pdf"
   );
+};
 
-  try {
-    await vectorStore.addDocuments(documents);
-    invalidateCollectionsCache();
-  } catch (qdrantError: any) {
-    console.error("Qdrant indexing failed:", qdrantError);
-    throw ApiError.internal(`Failed to store document embeddings in Qdrant: ${qdrantError?.message || qdrantError}`);
-  }
-
-  return { chunksIndexed: documents.length, fileHash };
+const indexMarkdownDocument = async (
+  filePath: string,
+  originalFileName: string,
+  subject: string,
+  topic?: string,
+  subtopic?: string,
+  organisationId?: string | null
+): Promise<{ chunksIndexed: number; fileHash: string }> => {
+  return indexChunkedFile(
+    filePath,
+    originalFileName,
+    subject,
+    topic ?? "",
+    subtopic ?? "",
+    organisationId,
+    "markdown"
+  );
 };
 
 export const indexDocument = async (
@@ -243,166 +202,7 @@ export const indexDocument = async (
   return indexPdfDocument(filePath, originalFileName, subject, topic, subtopic, organisationId);
 };
 
-const indexMarkdownDocument = async (
-  filePath: string,
-  originalFileName: string,
-  subject: string,
-  topic?: string,
-  subtopic?: string,
-  organisationId?: string | null
-): Promise<{ chunksIndexed: number; fileHash: string }> => {
-  // Compute SHA-256 hash of the file content
-  let fileHash: string;
-  try {
-    const fileBuffer = fs.readFileSync(filePath);
-    fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
-  } catch (hashError) {
-    console.error("Error computing file hash:", hashError);
-    throw ApiError.internal("Failed to process file hash");
-  }
-
-  const collectionName = getCollectionForOrg(organisationId);
-
-  // Check Qdrant for duplicate hash
-  const isAlreadyIndexed = await checkIfHashIndexed(fileHash, organisationId);
-  if (isAlreadyIndexed) {
-    return { chunksIndexed: 0, fileHash };
-  }
-
-  // Load markdown, clean it and chunk it
-  const documents = await loadMarkdownChunks(
-    filePath,
-    originalFileName,
-    subject,
-    topic,
-    subtopic,
-    fileHash,
-    organisationId
-  );
-
-  // Ensure collection exists
-  await ensureQdrantCollection(collectionName);
-
-  // Remove stale chunks from a previously indexed version of this file before
-  // adding the updated one, so outdated content does not accumulate in Qdrant.
-  await deleteChunksForSourceFile(originalFileName, organisationId);
-
-  // Initialize embedding model
-  const embeddings = getEmbeddings();
-
-  // Get Vector Store and add documents
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    getQdrantConfig(collectionName)
-  );
-
-  try {
-    await vectorStore.addDocuments(documents);
-    invalidateCollectionsCache();
-  } catch (qdrantError: any) {
-    console.error("Qdrant indexing failed:", qdrantError);
-    throw ApiError.internal(`Failed to store document embeddings in Qdrant: ${qdrantError?.message || qdrantError}`);
-  }
-
-  return { chunksIndexed: documents.length, fileHash };
-};
-
-// ── Distinct-collections cache ────────────────────────────────────────────────
-// getDistinctCollections() scrolls a Qdrant collection, so we cache the result
-// per collection with a short TTL to avoid rescanning on every retrieval.
-const COLLECTIONS_CACHE_TTL_MS = 60 * 1000;
-let collectionsCache: { key: string; data: { subject: string; topic: string; count: number }[]; expiresAt: number } | null = null;
-
-const invalidateCollectionsCache = () => {
-  collectionsCache = null;
-};
-
-export const getDistinctCollections = async (organisationId?: string | null): Promise<{ subject: string; topic: string; count: number }[]> => {
-  const collectionName = getCollectionForOrg(organisationId);
-  const cacheKey = collectionName;
-
-  // Serve a fresh cached result if available
-  if (collectionsCache && collectionsCache.key === cacheKey && Date.now() < collectionsCache.expiresAt) {
-    return collectionsCache.data;
-  }
-
-  const qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333';
-  
-  // Check if collection exists
-  try {
-    const checkRes = await fetch(`${qdrantUrl}/collections/${collectionName}`);
-    if (!checkRes.ok) {
-      return [];
-    }
-  } catch (checkError) {
-    console.error("Qdrant connection error:", checkError);
-    return [];
-  }
-
-  // Scroll through all points in the org's Qdrant collection
-  const points: any[] = [];
-  let nextPageOffset: string | number | null = null;
-  let hasMore = true;
-
-  while (hasMore) {
-    const body: any = {
-      limit: 100,
-      with_payload: true,
-      with_vector: false
-    };
-    if (nextPageOffset !== null) {
-      body.offset = nextPageOffset;
-    }
-
-    const scrollRes = await fetch(`${qdrantUrl}/collections/${collectionName}/points/scroll`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!scrollRes.ok) {
-      throw new Error(`Failed to scroll points from Qdrant: ${scrollRes.statusText}`);
-    }
-
-    const data: any = await scrollRes.json();
-    const batch = data.result?.points || [];
-    points.push(...batch);
-
-    nextPageOffset = data.result?.next_page_offset || null;
-    if (!nextPageOffset) {
-      hasMore = false;
-    }
-  }
-
-  // Group by (subject, topic) in memory
-  const groups: Record<string, { subject: string; topic: string; count: number }> = {};
-  for (const point of points) {
-    const metadata = point.payload?.metadata;
-    if (metadata && metadata.subject && metadata.topic) {
-      const key = `${metadata.subject.trim()}|||${metadata.topic.trim()}`;
-      if (!groups[key]) {
-        groups[key] = {
-          subject: metadata.subject.trim(),
-          topic: metadata.topic.trim(),
-          count: 0
-        };
-      }
-      groups[key].count++;
-    }
-  }
-
-  const result = Object.values(groups);
-  collectionsCache = { key: cacheKey, data: result, expiresAt: Date.now() + COLLECTIONS_CACHE_TTL_MS };
-  return result;
-};
-
 // ── Subject fuzzy matching ────────────────────────────────────────────────────
-// When the user's subject doesn't exactly match any indexed subject, we ask a
-// small matching agent whether the user's subject is related to any indexed
-// subject. The search is then rewritten to use that indexed subject, so the user
-// doesn't have to know the exact stored subject name. If nothing is related
-// (e.g. "Cooking" vs an org that only has "JavaScript"), we return no match and
-// rely on agent-generated context instead.
 const SUBJECT_MATCH_CACHE_TTL_MS = 5 * 60 * 1000;
 let subjectMatchCache: { key: string; matched: string | null; expiresAt: number } | null = null;
 
@@ -426,19 +226,16 @@ export const resolveIndexedSubject = async (
     return { matched: subjectMatchCache.matched, score: subjectMatchCache.matched ? 1 : 0 };
   }
 
-  // Fast path: exact (case-insensitive) match — no agent call needed.
   const exact = subjects.find((s) => s.trim().toLowerCase() === userSubject.trim().toLowerCase());
   if (exact) {
     subjectMatchCache = { key: cacheKey, matched: exact, expiresAt: Date.now() + SUBJECT_MATCH_CACHE_TTL_MS };
     return { matched: exact, score: 1 };
   }
 
-  // Agent-based judgment: is the user's subject related to any indexed subject?
   let matched: string | null = null;
   try {
     const result = await subjectMatchAgent(userSubject.trim(), subjects);
     matched = result.matchedSubject;
-    // The agent must return one of the available subjects; ignore any drift.
     if (matched && !subjects.includes(matched)) matched = null;
   } catch (err) {
     console.error(`Subject match agent failed for "${userSubject}":`, err);
@@ -447,6 +244,21 @@ export const resolveIndexedSubject = async (
 
   subjectMatchCache = { key: cacheKey, matched, expiresAt: Date.now() + SUBJECT_MATCH_CACHE_TTL_MS };
   return { matched, score: matched ? 1 : 0 };
+};
+
+// ── Retrieval (Phase 2) ──────────────────────────────────────────────────────
+// Both modes run on the dedicated "rag-retrieval" BullMQ worker because each
+// request makes several LLM calls (sub-questions/step-back/HyDE/rerank) and
+// Qdrant queries. The callers keep their existing synchronous call patterns via
+// waitUntilFinished.
+import { ragRetrievalQueue, ragRetrievalEvents } from "../../../common/queue/queues.js";
+
+const RETRIEVAL_JOB_TIMEOUT_MS = 4 * 60 * 1000;
+const RETRIEVAL_JOB_OPTS = {
+  attempts: 2,
+  backoff: { type: "exponential", delay: 2000 },
+  removeOnComplete: true,
+  removeOnFail: false,
 };
 
 export const queryRelevantChunks = async (
@@ -458,113 +270,50 @@ export const queryRelevantChunks = async (
   query?: string
 ): Promise<{ text: string; score: number; sourceFile: string }[]> => {
   try {
-    const collectionName = getCollectionForOrg(organisationId);
-    const collections = await getDistinctCollections(organisationId);
-    const trimmedSub = subject.trim().toLowerCase();
-    const matchedObj = collections.find((c) => c.subject.toLowerCase() === trimmedSub);
-    const canonicalSubject = matchedObj ? matchedObj.subject : subject.trim();
-
-    const searchText = (query && query.trim()) ? query.trim() : `${topic} - ${subtopic}`;
-
-    const embeddings = getEmbeddings();
-
-    const vectorStore = await QdrantVectorStore.fromExistingCollection(
-      embeddings,
-      getQdrantConfig(collectionName)
+    const job = await ragRetrievalQueue.add(
+      "retrieve-standard",
+      { mode: "standard", subject, topic, subtopic, topK, organisationId, query },
+      RETRIEVAL_JOB_OPTS
     );
-
-    // Fetch a larger candidate pool so re-ranking has something to work with.
-    const poolK = Math.max(topK * 4, 20);
-
-    // When a generated-context query is provided, run a single subject-scoped
-    // semantic search with NO topic filter. The vector search does the topical
-    // ranking, so the topic metadata no longer has to match exactly — chunks
-    // about the topic surface on their own because the query text is about it.
-    const subjectOnly = !!query && query.trim().length > 0;
-
-    let filter: any = {
-      must: [
-        {
-          key: "metadata.subject",
-          match: {
-            value: canonicalSubject
-          }
-        }
-      ]
-    };
-    if (!subjectOnly) {
-      filter.must.push({ key: "metadata.topic", match: { value: topic.trim() } });
-    }
-
-    let results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
-
-    // Backward-compatible fallback chain (used when no generated query is given):
-    // exact topic, then case-insensitive topic, then subject-only.
-    if (!subjectOnly) {
-      // 2. If no results, try case-insensitive topic match from indexed collections
-      if (!results || results.length === 0) {
-        const trimmedTop = topic.trim().toLowerCase();
-        const matchedTopic = collections.find(
-          (c) => c.subject.toLowerCase() === canonicalSubject.toLowerCase() && c.topic.toLowerCase() === trimmedTop
-        );
-        if (matchedTopic) {
-          filter = {
-            must: [
-              { key: "metadata.subject", match: { value: canonicalSubject } },
-              { key: "metadata.topic", match: { value: matchedTopic.topic } }
-            ]
-          };
-          results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
-        }
-      }
-
-      // 3. If still no results, fallback to subject-only filter for semantic vector search across the entire subject
-      if (!results || results.length === 0) {
-        filter = {
-          must: [
-            {
-              key: "metadata.subject",
-              match: {
-                value: canonicalSubject
-              }
-            }
-          ]
-        };
-        results = await vectorStore.similaritySearchWithScore(searchText, poolK, filter);
-      }
-    }
-
-    if (!results || results.length === 0) {
-      console.warn(`No relevant chunks found in Qdrant for subject: "${subject}", topic: "${topic}"`);
-      return [];
-    }
-
-    // Re-rank: boost chunks whose topic/subtopic metadata matches the query, then
-    // keep the best topK by combined score.
-    const trimmedTopic = topic.trim().toLowerCase();
-    const trimmedSubtopic = (subtopic || "").trim().toLowerCase();
-    const ranked = results
-      .map(([doc, score]: [any, number]) => {
-        const md = doc.metadata || {};
-        let combined = score;
-        if (md.topic && md.topic.trim().toLowerCase() === trimmedTopic) combined += 0.05;
-        if (trimmedSubtopic && md.subtopic && md.subtopic.trim().toLowerCase() === trimmedSubtopic) combined += 0.1;
-        return { doc, score: combined };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK);
-
-    console.log(`Successfully retrieved ${ranked.length} relevant chunk(s) from Qdrant for subject: "${subject.trim()}", topic: "${topic.trim()}", subtopic: "${subtopic.trim()}"`);
-
-    return ranked.map(({ doc, score }) => ({
-      text: doc.pageContent,
-      score: score,
-      sourceFile: (doc.metadata.sourceFile || doc.metadata.source || "") as string
-    }));
-
+    const result = await job.waitUntilFinished(ragRetrievalEvents, RETRIEVAL_JOB_TIMEOUT_MS);
+    return result as { text: string; score: number; sourceFile: string }[];
   } catch (error) {
-    console.warn(`Error or empty result querying relevant chunks for "${subject} - ${topic} - ${subtopic}":`, error);
+    console.warn(`Error querying relevant chunks for "${subject} - ${topic} - ${subtopic}":`, error);
     return [];
   }
 };
 
+export const retrieveChatChunks = async (
+  question: string,
+  topK: number = 5,
+  organisationId?: string | null
+): Promise<{
+  text: string;
+  childText: string;
+  score: number;
+  sourceFile: string;
+  heading: string;
+  parentHeading: string;
+  page: number | undefined;
+}[]> => {
+  try {
+    const job = await ragRetrievalQueue.add(
+      "retrieve-advanced",
+      { mode: "advanced", question, topK, organisationId },
+      RETRIEVAL_JOB_OPTS
+    );
+    const result = await job.waitUntilFinished(ragRetrievalEvents, RETRIEVAL_JOB_TIMEOUT_MS);
+    return result as {
+      text: string;
+      childText: string;
+      score: number;
+      sourceFile: string;
+      heading: string;
+      parentHeading: string;
+      page: number | undefined;
+    }[];
+  } catch (error) {
+    console.warn(`Error retrieving chat chunks for question: "${question.slice(0, 80)}":`, error);
+    return [];
+  }
+};

@@ -1,13 +1,6 @@
 import { getClientForModel } from "../../../common/agent/openai.client.js";
 import { env } from "../../../env.js";
-import {
-  Eval_Easy_INPUT,
-  Eval_Easy_OUTPUT,
-  Eval_Medium_INPUT,
-  Eval_Medium_OUTPUT,
-  Eval_Hard_INPUT,
-  Eval_Hard_OUTPUT
-} from "../Examples/pr.js";
+import { Eval_Medium_INPUT, Eval_Medium_OUTPUT } from "../Examples/pr.js";
 
 export const getEvaluationSystemPrompt = (examplesText: string): string => {
   return `You are an strict answer evaluation agent for descriptive exam questions.
@@ -74,18 +67,8 @@ EXAMPLES:
 `;
 };
 
-export const getEvaluationPromptForDifficulty = (difficulty: string): string => {
-  const diff = (difficulty || "medium").toLowerCase();
-  let examplesText = "";
-
-  if (diff === "easy") {
-    examplesText = `Input:\n${JSON.stringify(Eval_Easy_INPUT, null, 2)}\n\nOutput:\n${JSON.stringify(Eval_Easy_OUTPUT, null, 2)}`;
-  } else if (diff === "hard") {
-    examplesText = `Input:\n${JSON.stringify(Eval_Hard_INPUT, null, 2)}\n\nOutput:\n${JSON.stringify(Eval_Hard_OUTPUT, null, 2)}`;
-  } else {
-    examplesText = `Input:\n${JSON.stringify(Eval_Medium_INPUT, null, 2)}\n\nOutput:\n${JSON.stringify(Eval_Medium_OUTPUT, null, 2)}`;
-  }
-
+export const getEvaluationPrompt = (): string => {
+  const examplesText = `Input:\n${JSON.stringify(Eval_Medium_INPUT, null, 2)}\n\nOutput:\n${JSON.stringify(Eval_Medium_OUTPUT, null, 2)}`;
   return getEvaluationSystemPrompt(examplesText);
 };
 

@@ -1,11 +1,9 @@
 import api from "@/utils/axios";
 
 export interface BankQuestionInput {
-  subject: string;
-  topic?: string;
+  topic: string;
   subtopic?: string;
   type: "mcq" | "descriptive";
-  difficulty: "easy" | "medium" | "hard";
   question: string;
   marks: number;
   options?: string[];
@@ -14,11 +12,9 @@ export interface BankQuestionInput {
 
 export interface BankQuestion {
   questionId: string;
-  subject: string;
   topic: string;
   subtopic: string;
   type: string;
-  difficulty: string;
   question: string;
   marks: number;
   options?: string[];

@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { UploadCloud, FileText, Database, Search, CheckCircle2, AlertCircle, RefreshCw, Layers, Sparkles, X, FileCode, BookOpen } from "lucide-react";
+import { UploadCloud, FileText, Database, Search, CheckCircle2, AlertCircle, RefreshCw, Layers, Sparkles, X, FileCode, BookOpen, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
+import RagChatView from "@/components/RagChatView";
 import { 
   uploadKnowledgeDocumentService, 
   getKnowledgeCollectionsService, 
@@ -18,7 +19,7 @@ const QUICK_SUBJECTS = ["JavaScript", "Python", "Tally", "React", "Database", "O
 export default function KnowledgeUploadView() {
   const role = useAuthStore((state) => state.user?.role);
   const canEmbed = role === "manager" || role === "system_admin";
-  const [activeTab, setActiveTab] = useState<"upload" | "collections" | "playground">(canEmbed ? "upload" : "collections");
+  const [activeTab, setActiveTab] = useState<"upload" | "collections" | "playground" | "chat">(canEmbed ? "upload" : "collections");
 
   // Upload State
   const [file, setFile] = useState<File | null>(null);
@@ -174,7 +175,7 @@ export default function KnowledgeUploadView() {
   const totalChunksCount = collections.reduce((acc, c) => acc + c.count, 0);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 h-full overflow-y-auto custom-scrollbar">
       {/* Header Banner */}
       <div className="bg-[#09090b] border border-white/10 rounded-2xl p-6 relative overflow-hidden shadow-2xl">
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-orange-600/10 rounded-full blur-3xl pointer-events-none" />
@@ -235,6 +236,18 @@ export default function KnowledgeUploadView() {
           >
             <Search className="h-4 w-4" />
             Vector Similarity Tester
+          </button>
+
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0 ${
+              activeTab === "chat"
+                ? "bg-orange-600 text-white shadow-lg shadow-orange-950/40 font-semibold"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <Bot className="h-4 w-4" />
+            RAG Chatbot
           </button>
         </div>
       </div>
@@ -522,9 +535,9 @@ export default function KnowledgeUploadView() {
             </div>
 
             {filteredCollections.length > 0 ? (
-              <div className="overflow-x-auto border border-white/10 rounded-xl">
+              <div className="overflow-x-auto overflow-y-auto max-h-[480px] border border-white/10 rounded-xl custom-scrollbar">
                 <table className="w-full text-left text-sm text-gray-300">
-                  <thead className="bg-black text-gray-400 text-xs uppercase tracking-wider border-b border-white/10">
+                  <thead className="bg-black text-gray-400 text-xs uppercase tracking-wider border-b border-white/10 sticky top-0 z-10">
                     <tr>
                       <th className="p-4 font-semibold">Subject</th>
                       <th className="p-4 font-semibold">Topic</th>
@@ -535,15 +548,17 @@ export default function KnowledgeUploadView() {
                   <tbody className="divide-y divide-white/5 bg-black/40">
                     {filteredCollections.map((col, idx) => (
                       <tr key={idx} className="hover:bg-white/5 transition-colors">
-                        <td className="p-4 font-semibold text-white flex items-center gap-2">
-                          <BookOpen className="h-4 w-4 text-orange-400 shrink-0" />
-                          {col.subject}
+                        <td className="p-4 font-semibold text-white">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <BookOpen className="h-4 w-4 text-orange-400 shrink-0" />
+                            <span className="break-words min-w-0">{col.subject}</span>
+                          </div>
                         </td>
-                        <td className="p-4 text-gray-300">{col.topic}</td>
-                        <td className="p-4 text-right font-mono font-bold text-orange-400">
+                        <td className="p-4 text-gray-300 break-words">{col.topic}</td>
+                        <td className="p-4 text-right font-mono font-bold text-orange-400 whitespace-nowrap">
                           {col.count} chunk{col.count > 1 ? "s" : ""}
                         </td>
-                        <td className="p-4 text-center">
+                        <td className="p-4 text-center whitespace-nowrap">
                           <button
                             onClick={() => {
                               setSearchSubject(col.subject);
@@ -668,7 +683,7 @@ export default function KnowledgeUploadView() {
                         </div>
                       </div>
 
-                      <div className="bg-black/60 border border-white/5 rounded-xl p-4 text-xs font-mono text-gray-200 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto custom-scrollbar">
+                      <div className="bg-black/60 border border-white/5 rounded-xl p-4 text-xs font-mono text-gray-200 whitespace-pre-wrap break-words leading-relaxed max-h-60 overflow-y-auto custom-scrollbar">
                         {chunk.text}
                       </div>
                     </div>
@@ -686,6 +701,9 @@ export default function KnowledgeUploadView() {
           )}
         </div>
       )}
+
+      {/* ── TAB 4: RAG CHATBOT ───────────────────────────────────────────────── */}
+      {activeTab === "chat" && <RagChatView />}
     </div>
   );
 }

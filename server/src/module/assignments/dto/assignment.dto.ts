@@ -60,7 +60,6 @@ export const createAssignmentSchema = z.object({
     // Series-only field (weekly series):
     seriesId: z.string().min(1).optional(),
     dayGap: z.number().int().min(1).optional(),
-    difficulty: z.enum(["easy", "medium", "hard"]).optional().default("medium"),
     blocks: z.array(assignmentBlockSchema).optional(),
 });
 
@@ -74,7 +73,6 @@ export const updateAssignmentSchema = z.object({
     startDate: z.coerce.date().nullable().optional(),
     dueDate: z.coerce.date().nullable().optional(),
     dayGap: z.number().int().min(1).nullable().optional(),
-    difficulty: z.enum(["easy", "medium", "hard"]).optional(),
 });
 
 export type UpdateAssignmentDto = z.infer<typeof updateAssignmentSchema>;

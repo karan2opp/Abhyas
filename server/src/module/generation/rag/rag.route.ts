@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadDocument, getCollections, retrieveChunks } from "./rag.controller.js";
+import { uploadDocument, getCollections, retrieveChunks, chatRetrieve, streamChatRetrieve } from "./rag.controller.js";
 import { authenticate, authorize } from "../../../common/middleware/auth.middleware.js";
 
 const router = Router();
@@ -54,5 +54,12 @@ router.get("/api/rag/systemadmin/collections", authenticate, authorize("system_a
 // Routes for querying relevant chunks: staff only (teacher, manager, system_admin)
 router.get("/api/rag/retrieve", authenticate, authorize("teacher", "manager", "system_admin"), retrieveChunks);
 router.get("/api/rag/systemadmin/retrieve", authenticate, authorize("system_admin"), retrieveChunks);
+
+// Chatbot advanced retrieval (test endpoint until the chatbot wires to it):
+// whole-collection search with sub-questions + step-back + HyDE + RRF + rerank.
+router.post("/api/rag/chat/retrieve", authenticate, authorize("teacher", "manager", "system_admin"), chatRetrieve);
+
+// Chatbot streaming response (SSE): query router → (retrieval) → streamed answer.
+router.post("/api/rag/chat/stream", authenticate, authorize("teacher", "manager", "system_admin"), streamChatRetrieve);
 
 export default router;

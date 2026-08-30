@@ -1,5 +1,4 @@
 ---
-subject: JavaScript
 topic: Variables
 subtopic: Variable Scope
 type: mcq

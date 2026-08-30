@@ -1,5 +1,5 @@
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Variable Scope
 type: mcq
@@ -15,7 +15,7 @@ What is the scope of a variable declared with `let` inside a function?
 - [ ] Module scope
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Variable Scope
 type: mcq
@@ -31,7 +31,7 @@ Which statement correctly describes the difference between `var` and `let` in Ja
 - [ ] Both are function-scoped
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Variable Scope
 type: descriptive
@@ -52,7 +52,7 @@ rubric:
 Explain the difference between `var`, `let`, and `const` scoping in JavaScript, including the temporal dead zone.
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Data Types
 type: mcq
@@ -68,7 +68,7 @@ Which of the following is NOT a primitive data type in JavaScript?
 - [ ] Boolean
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Data Types
 type: mcq
@@ -84,7 +84,7 @@ What does `typeof null` return in JavaScript?
 - [ ] "number"
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Hoisting
 type: descriptive
@@ -114,7 +114,7 @@ rubric:
 Explain JavaScript hoisting in detail, covering `var`, `let`, `const`, and function declarations. Include the temporal dead zone and what happens with function expressions.
 
 ---
-subject: JavaScript
+
 topic: Variables
 subtopic: Hoisting
 type: mcq
@@ -130,7 +130,7 @@ What is the output of `console.log(x); var x = 5;`?
 - [ ] null
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Arrow Functions
 type: mcq
@@ -146,7 +146,7 @@ Which syntax correctly defines an arrow function?
 - [ ] `x :=> x * 2`
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Arrow Functions
 type: mcq
@@ -162,7 +162,7 @@ How does an arrow function behave differently from a regular function regarding 
 - [ ] It throws an error when using `this`
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Arrow Functions
 type: descriptive
@@ -183,7 +183,7 @@ rubric:
 Explain the differences between arrow functions and regular functions, focusing on `this` binding and the `arguments` object.
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Callbacks
 type: descriptive
@@ -204,7 +204,7 @@ rubric:
 What is a callback function in JavaScript? Provide a simple example of passing a callback to another function.
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Callbacks
 type: mcq
@@ -220,7 +220,7 @@ Which array method takes a callback function as its argument?
 - [ ] `array.concat`
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Callbacks
 type: descriptive
@@ -250,7 +250,7 @@ rubric:
 Explain the problem of callback hell and how nested callbacks can be refactored to avoid deeply nested code.
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Closures
 type: descriptive
@@ -280,7 +280,7 @@ rubric:
 What is a closure in JavaScript? Explain how closures are used to create private variables and describe a common pitfall when closures are used inside loops.
 
 ---
-subject: JavaScript
+
 topic: Functions
 subtopic: Closures
 type: mcq
@@ -297,7 +297,7 @@ What does this code output?
 - [ ] 0 0 0
 
 ---
-subject: JavaScript
+
 topic: Arrays
 subtopic: Array Methods
 type: mcq
@@ -313,7 +313,7 @@ Which method adds elements to the end of an array?
 - [ ] unshift()
 
 ---
-subject: JavaScript
+
 topic: Arrays
 subtopic: Array Methods
 type: mcq
@@ -329,7 +329,7 @@ Which method returns a new array containing only the elements that pass a test f
 - [ ] reduce()
 
 ---
-subject: JavaScript
+
 topic: Arrays
 subtopic: Array Methods
 type: mcq
@@ -345,7 +345,7 @@ What does `[1, 2, 3].reduce((acc, n) => acc + n, 10)` return?
 - [ ] 16.5
 
 ---
-subject: JavaScript
+
 topic: Arrays
 subtopic: Iteration
 type: descriptive
@@ -366,7 +366,7 @@ rubric:
 Explain the difference between `map()` and `forEach()` when iterating over arrays in JavaScript.
 
 ---
-subject: JavaScript
+
 topic: Arrays
 subtopic: Iteration
 type: mcq
@@ -382,7 +382,7 @@ Which statement is TRUE about `forEach()`?
 - [ ] It can only be used on strings
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Async/Await
 type: descriptive
@@ -403,7 +403,7 @@ rubric:
 What is the purpose of `async` and `await` in JavaScript? Provide a simple example.
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Async/Await
 type: mcq
@@ -419,7 +419,7 @@ What does an `async` function always return?
 - [ ] undefined
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Async/Await
 type: descriptive
@@ -449,7 +449,7 @@ rubric:
 Explain the difference between `.then()` chaining and `async/await` for handling asynchronous operations, and how error handling differs between them.
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Promise Chaining
 type: mcq
@@ -465,7 +465,7 @@ What does a `.then()` callback return?
 - [ ] null
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Promise Chaining
 type: descriptive
@@ -495,7 +495,7 @@ rubric:
 Explain how promise chaining works and how a single `.catch()` at the end of a chain handles errors that occur at any step.
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Error Handling
 type: mcq
@@ -511,7 +511,7 @@ Which is the recommended way to handle errors when using async/await?
 - [ ] Using a global window.onerror handler
 
 ---
-subject: JavaScript
+
 topic: Promises
 subtopic: Error Handling
 type: descriptive
@@ -532,7 +532,7 @@ rubric:
 How do you handle rejected Promises when using `async/await`? Explain the role of try/catch.
 
 ---
-subject: JavaScript
+
 topic: Objects
 subtopic: this keyword
 type: mcq
@@ -548,7 +548,7 @@ Inside a regular function called as a method of an object, what does `this` refe
 - [ ] undefined
 
 ---
-subject: JavaScript
+
 topic: Objects
 subtopic: this keyword
 type: mcq
@@ -564,7 +564,7 @@ What is `this` in a regular function (non-strict mode) called standalone in the 
 - [ ] null
 
 ---
-subject: JavaScript
+
 topic: Objects
 subtopic: this keyword
 type: descriptive
@@ -594,7 +594,7 @@ rubric:
 Explain the four main binding rules for the `this` keyword in JavaScript and how arrow functions change `this` binding.
 
 ---
-subject: JavaScript
+
 topic: Objects
 subtopic: call apply bind
 type: mcq
@@ -610,7 +610,7 @@ Which method creates a new function with `this` permanently bound to a specified
 - [ ] invoke()
 
 ---
-subject: JavaScript
+
 topic: Objects
 subtopic: call apply bind
 type: descriptive
@@ -640,7 +640,7 @@ rubric:
 Explain the difference between `call()`, `apply()`, and `bind()`. When would you use `bind()` instead of `call()`?
 
 ---
-subject: JavaScript
+
 topic: Control Flow
 subtopic: Conditionals
 type: mcq
@@ -656,7 +656,7 @@ Which statement is used to check a condition and execute different code paths in
 - [ ] array
 
 ---
-subject: JavaScript
+
 topic: Control Flow
 subtopic: Conditionals
 type: descriptive
@@ -677,7 +677,7 @@ rubric:
 Explain how truthy and falsy values affect conditional statements in JavaScript, and when you might use a ternary operator instead of if/else.
 
 ---
-subject: JavaScript
+
 topic: Control Flow
 subtopic: Loops
 type: mcq
@@ -693,7 +693,7 @@ Which loop is best suited for iterating over the properties of an object?
 - [ ] do...while loop
 
 ---
-subject: JavaScript
+
 topic: Control Flow
 subtopic: Loops
 type: mcq
@@ -709,7 +709,7 @@ What is the key difference between `for...in` and `for...of` loops?
 - [ ] There is no difference
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Variables
 type: mcq
@@ -725,7 +725,7 @@ Which statement correctly declares a variable in Python?
 - [ ] `int x = 5`
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Variables
 type: descriptive
@@ -746,7 +746,7 @@ rubric:
 Explain Python's dynamic typing and why you do not need to declare variable types.
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Data Types
 type: mcq
@@ -762,7 +762,7 @@ Which of the following is an immutable data type in Python?
 - [ ] set
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Data Types
 type: mcq
@@ -778,7 +778,7 @@ What is the output of `print(type(3.14))`?
 - [ ] <class 'decimal'>
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Lists
 type: mcq
@@ -794,7 +794,7 @@ Which method adds an element to the end of a Python list?
 - [ ] push()
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Lists
 type: mcq
@@ -810,7 +810,7 @@ What does list slicing `my_list[1:3]` return for `my_list = [0, 10, 20, 30]`?
 - [ ] [20, 30]
 
 ---
-subject: Python
+
 topic: Basics
 subtopic: Lists
 type: descriptive
@@ -831,7 +831,7 @@ rubric:
 Explain how list slicing works in Python, including the `start:stop:step` syntax and what happens with negative indices.
 
 ---
-subject: Python
+
 topic: Functions
 subtopic: Function Definition
 type: mcq
@@ -847,7 +847,7 @@ Which keyword is used to define a function in Python?
 - [ ] lambda
 
 ---
-subject: Python
+
 topic: Functions
 subtopic: Function Definition
 type: descriptive
@@ -868,7 +868,7 @@ rubric:
 How do you define a function in Python and return a value from it? Provide an example.
 
 ---
-subject: Python
+
 topic: Functions
 subtopic: Lambdas
 type: mcq
@@ -884,7 +884,7 @@ Which of the following is a valid lambda function in Python?
 - [ ] `lambda x => x * 2`
 
 ---
-subject: Python
+
 topic: Functions
 subtopic: Lambdas
 type: descriptive
@@ -905,7 +905,7 @@ rubric:
 What is a lambda function in Python, and when would you use one instead of a regular named function?
 
 ---
-subject: Python
+
 topic: OOP
 subtopic: Classes
 type: mcq
@@ -921,7 +921,7 @@ Which method is called automatically when a Python class instance is created?
 - [ ] __main__
 
 ---
-subject: Python
+
 topic: OOP
 subtopic: Classes
 type: descriptive
@@ -951,7 +951,7 @@ rubric:
 Explain how classes and objects work in Python, including the role of `__init__`, `self`, and the difference between class and instance attributes.
 
 ---
-subject: Python
+
 topic: OOP
 subtopic: Inheritance
 type: mcq
@@ -967,7 +967,7 @@ Which keyword is used to refer to the parent class in Python?
 - [ ] ancestor
 
 ---
-subject: Python
+
 topic: OOP
 subtopic: Inheritance
 type: descriptive
@@ -997,7 +997,7 @@ rubric:
 Explain inheritance in Python, including method overriding and the use of `super()`. How does Python resolve method resolution order in multiple inheritance?
 
 ---
-subject: General Knowledge
+
 topic: Solar System
 subtopic: Planets
 type: mcq
@@ -1013,7 +1013,7 @@ Which planet is known as the Red Planet?
 - [ ] Mercury
 
 ---
-subject: General Knowledge
+
 topic: Solar System
 subtopic: Planets
 type: mcq
@@ -1029,7 +1029,7 @@ Which planet has the most moons in the Solar System?
 - [ ] Mercury
 
 ---
-subject: General Knowledge
+
 topic: Solar System
 subtopic: Planets
 type: descriptive

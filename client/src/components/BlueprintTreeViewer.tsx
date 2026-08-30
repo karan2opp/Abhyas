@@ -31,7 +31,6 @@ export interface BlueprintSection {
 
 export interface BlueprintTree {
   title: string;
-  difficulty?: string;
   exam_type?: string;
   instructions?: string[];
   sections: BlueprintSection[];

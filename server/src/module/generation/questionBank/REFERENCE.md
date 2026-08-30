@@ -1,29 +1,30 @@
 # Question Bank Reference Format
-Only `subject` is required. `type` is mcq|descriptive, `difficulty` is easy|medium|hard.
-MCQ must have exactly 4 options with exactly one `- [x]`. Copy any block below into your subject file.
+Only `topic` is required. `subject` is intentionally **not** stored — the bank is
+topic-scoped and retrieval is a hybrid (semantic + BM25) search filtered by topic.
+`type` is mcq|descriptive, `difficulty` is easy|medium|hard.
+MCQ must have exactly 4 options with exactly one `- [x]`. Copy any block below into your topic file.
 
 ---
-subject: JavaScript
+topic: Variables
 type: descriptive
 difficulty: medium
 marks: 5
-# topic/subtopic optional
+# subtopic optional
 ---
 Explain the difference between `let` and `var` in JavaScript, using an example of block scoping.
 
 ---
-subject: JavaScript
 topic: Functions
 subtopic: Closures
 type: descriptive
 difficulty: hard
 marks: 5
-# topic/subtopic shown as optional example
+# subtopic shown as optional example
 ---
 What is a closure in JavaScript? Show a practical example and explain when closures are useful.
 
 ---
-subject: JavaScript
+topic: Variables
 type: mcq
 difficulty: easy
 marks: 1
@@ -35,7 +36,6 @@ Which keyword declares a block-scoped variable in JavaScript?
 - [ ] this
 
 ---
-subject: Python
 topic: Data Structures
 type: mcq
 difficulty: medium
@@ -48,7 +48,7 @@ Which data structure is mutable, ordered, and allows duplicate elements?
 - [x] List
 
 ---
-subject: Python
+topic: Functions
 type: descriptive
 difficulty: medium
 marks: 5
@@ -56,7 +56,7 @@ marks: 5
 Write a Python function that takes a list of numbers and returns the list containing only the even numbers, preserving order.
 
 ---
-subject: Tally
+topic: Vouchers
 type: mcq
 difficulty: easy
 marks: 1

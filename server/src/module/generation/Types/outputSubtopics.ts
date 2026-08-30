@@ -16,7 +16,6 @@ export const TopicZodSchema = z.object({
 export const BlockOutputZodSchema = z.object({
     name: z.string().describe("The name of the block"),
     subject: z.string().describe("The subject of this block"),
-    instructions: z.array(z.string()).describe("Instructions specific to this block (empty array if none)"),
     topics: z.array(TopicZodSchema).describe("List of topics under this block"),
 });
 

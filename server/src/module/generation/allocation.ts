@@ -162,7 +162,10 @@ export function allocateSectionQuestions(
             return {
                 name: blockOutput.name,
                 subject: blockOutput.subject,
-                instructions: blockOutput.instructions || [],
+                // Only the teacher's own instructions are preserved. The Subtopics
+                // Agent no longer produces instructions, so nothing it generates
+                // can leak extra requirements into question generation.
+                instructions: inputBlock?.instructions || [],
                 question_type: questionType,
                 total_marks: totalMarks,
                 topics

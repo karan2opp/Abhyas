@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, LayoutDashboard, School, Users, User, CreditCard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookMarked } from "lucide-react";import { cn } from "@/lib/utils";
+import { Building2, LayoutDashboard, School, Users, User, CreditCard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookMarked, Database } from "lucide-react";import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -14,6 +14,7 @@ const sidebarLinks = [
   { name: "Teachers", href: "/manager/teachers", icon: Users },
   { name: "Billing", href: "/manager/billing", icon: CreditCard },
   { name: "Question Bank", href: "/manager/question-bank", icon: BookMarked },
+  { name: "Knowledge Base", href: "/manager/knowledge", icon: Database },
   { name: "Profile", href: "/manager/profile", icon: User },
 ];
 

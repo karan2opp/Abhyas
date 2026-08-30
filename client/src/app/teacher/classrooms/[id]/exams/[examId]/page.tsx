@@ -58,12 +58,6 @@ export default function EditExamBuilder() {
     return "0";
   }, [startTime, endTime]);
 
-  // When a full window (start + end) is selected, the exam's total time derives
-  // from it for both SCHEDULED and ON_DEMAND; otherwise fall back to the manual value.
-  const windowSet = Boolean(startTime && endTime);
-  const computedMins = parseInt(calculatedDuration) || 0;
-  const effectiveDuration = windowSet && computedMins > 0 ? calculatedDuration : duration;
-
   useEffect(() => {
     if (!examId) return;
     const fetchExam = async () => {
@@ -137,7 +131,7 @@ export default function EditExamBuilder() {
         payload.startTime = new Date(startTime).toISOString();
         payload.endTime = new Date(endTime).toISOString();
       } else {
-        payload.duration = parseInt(effectiveDuration);
+        payload.duration = parseInt(duration);
         if (startTime) payload.startTime = new Date(startTime).toISOString();
         if (endTime) payload.endTime = new Date(endTime).toISOString();
       }
@@ -348,9 +342,8 @@ export default function EditExamBuilder() {
                   ) : (
                     <Input 
                       type="number"
-                      value={effectiveDuration}
+                      value={duration}
                       onChange={(e) => setDuration(e.target.value)}
-                      readOnly={windowSet && computedMins > 0}
                       placeholder="60"
                       className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-12 rounded-lg focus-visible:ring-blue-500/50 w-full"
                     />

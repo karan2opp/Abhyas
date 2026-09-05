@@ -13,3 +13,4 @@ export * from "../../module/feedback/feedback.schema.js";
 export * from "../../module/billing/billing.schema.js";
 export * from "../../module/blocks/block.schema.js";
 export * from "../../module/questions/question-type.enum.js";
+export * from "../../module/generation_agents/exam_intent_session.schema.js";

@@ -92,6 +92,7 @@ const createQuestion = async (
             description: data.description,
             marks: data.marks,
             images: uploadedImages.length > 0 ? uploadedImages : null,
+            rubric: data.rubric ?? null,
         }).returning();
 
         if (!question) throw ApiError.internal("Failed to create question");
@@ -160,6 +161,7 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, reque
                 ...(data.description && { description: data.description }),
                 ...(data.marks && { marks: data.marks }),
                 ...(uploadedImages.length > 0 && { images: uploadedImages }),
+                ...(data.rubric !== undefined && { rubric: data.rubric }),
                 updatedAt: new Date(),
             })
             .where(eq(questions.id, questionId))

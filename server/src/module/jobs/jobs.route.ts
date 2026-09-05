@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { authenticate } from "../../common/middleware/auth.middleware.js";
-import { generationQueue, evaluationQueue } from "../../common/queue/queues.js";
+import { evaluationQueue } from "../../common/queue/queues.js";
 
 const router = Router();
 
 router.get("/:id", authenticate, async (req, res) => {
     const id = req.params.id as string;
-    const job = (await generationQueue.getJob(id)) || (await evaluationQueue.getJob(id));
+    const job = await evaluationQueue.getJob(id);
 
     if (!job) {
         return res.status(404).json({ success: false, message: "Job not found" });

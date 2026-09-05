@@ -118,26 +118,3 @@ export const gradeSubmissionService = async (
   return res.data;
 };
 
-export const generateAssignmentService = async (data: {
-  subject: string;
-  examType?: string;
-  questionType: string;
-  topics: string[];
-  marksPerQuestion: number;
-  questionCount: number;
-  specialInstructions?: string;
-}) => {
-  const res = await api.post("/assignments/generate-from-form", data);
-  return res.data;
-};
-
-export const generateSingleQuestionService = async (data: {
-  subject: string;
-  questionType: string;
-  topic: string;
-  marks: number;
-  specialInstructions?: string;
-}) => {
-  const res = await api.post("/assignments/generate-single-question", data);
-  return res.data;
-};

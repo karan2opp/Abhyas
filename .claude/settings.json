@@ -31,12 +31,36 @@
       "Bash(curl -s --compressed http://localhost:3000/teacher/classrooms/test-id/assignments/test-assignment-id/preview -o /tmp/preview.html)",
       "Bash(rm -rf \"/d/AI_MOCK_EXAM_PLATFORM/client/src/app/student/classrooms/[id]/submissions\")",
       "Bash(npx next *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomUUID\\(\\)\\)\")",
+      "Bash(node tmp_add_questions_columns.mjs)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 127.0.0.1 -Port 5455 -InformationLevel Quiet\")",
+      "Bash(where docker *)",
+      "Bash(where redis-server *)",
+      "Bash(where memurai *)",
+      "Bash(wsl --list --quiet)",
+      "Bash(wsl -d Ubuntu -- bash -c \"which redis-server && redis-server --version\")",
+      "PowerShell(Start-Process \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(docker start *)",
+      "Bash(rm /d/AI_MOCK_EXAM_PLATFORM/server/tmp_add_questions_columns.mjs)",
+      "Bash(nohup npm run inngest:dev)",
+      "Bash(echo \"started with pid $!\")",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:platform.openai.com)",
+      "Bash(rm -rf src/module/generation)",
+      "Bash(rm -f src/scripts/reset-qdrant-collections.ts src/scripts/ensure-qdrant-indexes.ts src/scripts/reset-question-bank.ts src/scripts/index-docs-folder.ts)",
+      "Bash(rm -rf \"src/app/manager/knowledge\" \"src/app/teacher/knowledge\" \"src/app/system_admin/knowledge\" \"src/app/manager/question-bank\" \"src/app/teacher/question-bank\" \"src/app/system_admin/question-bank\")",
+      "Bash(rm -f \"src/components/KnowledgeUploadView.tsx\" \"src/components/RagChatView.tsx\" \"src/components/QuestionBankView.tsx\" \"src/services/knowledge.service.ts\" \"src/services/questionBank.service.ts\")",
+      "Bash(sed -i '599,759d' \"src/app/teacher/classrooms/[id]/assignments/[assignmentId]/page.tsx\" && sed -n '590,605p' \"src/app/teacher/classrooms/[id]/assignments/[assignmentId]/page.tsx\")",
+      "Bash(sed -i '706,793d' \"src/app/teacher/classrooms/[id]/exams/new/QuestionBuilder.tsx\" && sed -n '700,712p' \"src/app/teacher/classrooms/[id]/exams/new/QuestionBuilder.tsx\")"
     ],
     "additionalDirectories": [
       "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\classrooms\\[id]\\roster",
       "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\assignments\\[id]",
-      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\student\\classrooms\\[id]\\submissions"
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\student\\classrooms\\[id]\\submissions",
+      "D:\\AI_MOCK_EXAM_PLATFORM\\server",
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\classrooms\\[id]\\assignments\\[assignmentId]",
+      "D:\\AI_MOCK_EXAM_PLATFORM\\client\\src\\app\\teacher\\classrooms\\[id]\\exams\\new"
     ]
   }
 }

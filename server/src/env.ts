@@ -6,6 +6,8 @@ const envSchema = z.object({
   GENERATION_MODEL: z.string().default("mistral-small-latest"),
   EVALUATION_MODEL: z.string().default("mistral-small-latest"),
   GUARDRAIL_MODEL: z.string().default("mistral-small-latest"),
+  REALTIME_MODEL: z.string().default("gpt-realtime"),
+  REALTIME_VOICE: z.string().default("marin"),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

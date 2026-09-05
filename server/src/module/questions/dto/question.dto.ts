@@ -6,6 +6,14 @@ const optionSchema = z.object({
   isCorrect: z.boolean({ message: "isCorrect is required" }),
 })
 
+const rubricSchema = z.object({
+  categories: z.array(z.object({
+    name: z.string(),
+    weight: z.number(),
+    key_points: z.array(z.string()),
+  })),
+})
+
 export const createQuestionSchema = z.object({
   sectionId: z.string({ message: "Section ID is required" })
     .min(1, { message: "Section ID cannot be empty" }),
@@ -33,6 +41,7 @@ export const createQuestionSchema = z.object({
       .max(5, { message: "MCQ cannot have more than 5 options" })
       .optional()
   ),
+  rubric: rubricSchema.nullable().optional(),
 })
   .refine((data) => {
     if (data.type === "mcq" && (!data.options || data.options.length === 0)) return false
@@ -74,6 +83,7 @@ export const updateQuestionSchema = z.object({
       .max(5, { message: "MCQ cannot have more than 5 options" })
       .optional()
   ),
+  rubric: rubricSchema.nullable().optional(),
 })
 
 export type UpdateQuestionDto = z.infer<typeof updateQuestionSchema>

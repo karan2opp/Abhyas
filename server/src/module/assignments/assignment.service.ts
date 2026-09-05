@@ -16,7 +16,6 @@ import {
 } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { PermissionService } from "../../common/permissions/index.js";
-import { generateMockAssignment, generateSingleAssignmentQuestion } from "../generation/assignment_generation.service.js";
 import { assertQuota, recordUsage } from "../billing/usage.service.js";
 import { evaluateAnswer, type TextAnswer } from "../evalutaion/evalutaion.js";
 import type {
@@ -1052,79 +1051,6 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
     });
 };
 
-const generateAssignmentFromForm = async (data: any, teacherId: string, organisationId?: string | null) => {
-    const generatorInput = {
-        exam_type: data.examType || "other",
-        instructions: data.specialInstructions ? [data.specialInstructions] : [],
-        blocks: Array.isArray(data.blocks) && data.blocks.length > 0
-            ? data.blocks.map((b: any) => ({
-                name: b.name || "Block 1",
-                subject: b.subject,
-                question_type: (b.questionType || "mcq").toLowerCase(),
-                question_count: Number(b.questionCount) || 5,
-                marks_per_question: Number(b.marksPerQuestion) || 5,
-                instructions: b.specialInstructions ? [b.specialInstructions] : [],
-                topics: b.topics || [],
-            }))
-            : [{
-                name: "Block 1",
-                subject: data.subject,
-                question_type: (data.questionType || "mcq").toLowerCase(),
-                question_count: Number(data.questionCount) || 5,
-                marks_per_question: Number(data.marksPerQuestion) || 5,
-                instructions: data.specialInstructions ? [data.specialInstructions] : [],
-                topics: data.topics || [],
-            }],
-    };
-
-    if (organisationId) {
-        const estimated = generatorInput.blocks.reduce((s: number, b: any) => s + b.question_count, 0);
-        await assertQuota(organisationId, "question_generation", estimated);
-    }
-
-    const generated = await generateMockAssignment(generatorInput, organisationId);
-
-    if (organisationId) {
-        const generatedCount = Array.isArray(generated?.blocks)
-            ? generated.blocks.reduce((s: number, b: any) => s + (Array.isArray(b.questions) ? b.questions.length : 0), 0)
-            : 0;
-        try {
-            await recordUsage(organisationId, "question_generation", generatedCount);
-        } catch (meterErr) {
-            console.error(`[Billing] Failed to record assignment generation usage for org ${organisationId}:`, meterErr);
-        }
-    }
-
-    return generated;
-};
-
-const generateSingleQuestionFromForm = async (data: any, teacherId: string, organisationId?: string | null) => {
-    const generatorInput = {
-        subject: data.subject,
-        exam_type: data.examType || "other",
-        question_type: data.questionType || "mcq",
-        topic: data.topic,
-        marks: Number(data.marks) || 5,
-        instructions: data.specialInstructions ? [data.specialInstructions] : []
-    };
-
-    if (organisationId) {
-        await assertQuota(organisationId, "question_generation", 1);
-    }
-
-    const generated = await generateSingleAssignmentQuestion(generatorInput, organisationId);
-
-    if (organisationId) {
-        try {
-            await recordUsage(organisationId, "question_generation", 1);
-        } catch (meterErr) {
-            console.error(`[Billing] Failed to record single question usage for org ${organisationId}:`, meterErr);
-        }
-    }
-
-    return generated;
-};
-
 export {
     createSeries,
     listSeriesForClassroom,
@@ -1150,6 +1076,4 @@ export {
     getSubmissionsForAssignment,
     getSubmissionById,
     gradeSubmission,
-    generateAssignmentFromForm,
-    generateSingleQuestionFromForm,
 };

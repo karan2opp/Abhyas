@@ -23,8 +23,6 @@ router.patch("/series/:id", authenticate, authorize("teacher", "manager"), valid
 router.delete("/series/:id", authenticate, authorize("teacher", "manager"), controller.deleteSeries);
 
 // teacher: assignment CRUD
-router.post("/generate-single-question", authenticate, authorize("teacher", "manager"), controller.generateSingleQuestionFromForm);
-router.post("/generate-from-form", authenticate, authorize("teacher", "manager"), controller.generateAssignmentFromForm);
 router.post("/", authenticate, authorize("teacher", "manager"), validate(createAssignmentSchema), controller.createAssignment);
 router.get("/classroom/:classroomId", authenticate, authorize("teacher", "manager"), controller.listAssignmentsForClassroom);
 

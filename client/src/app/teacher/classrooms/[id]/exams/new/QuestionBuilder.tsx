@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,30 @@ import { normalizeCodeBlocks } from "@/lib/markdown";
 import remarkGfm from "remark-gfm";
 
 import { BlueprintTreeViewer } from "@/components/BlueprintTreeViewer";
-import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService, generateBlueprintService, enqueueGenerateFromBlueprintService, getGenerationJobService } from "../../../../exams/exam.service";
-import { generateSingleQuestionService } from "../../../../assignments/assignment.service";
+import BlueprintRefinementChat from "@/components/BlueprintRefinementChat";
+import QuestionReviewChat from "@/components/QuestionReviewChat";
+import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService } from "../../../../exams/exam.service";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
+import {
+  triggerBlueprintGeneration,
+  getBlueprintStatus,
+  triggerQuestionGeneration,
+  getQuestionsStatus,
+  ExamBlueprintSection,
+  GeneratedExam,
+  ExamInput,
+} from "@/services/generationAgents.service";
+import { useRealtimeVoiceAgent } from "@/hooks/useRealtimeVoiceAgent";
+import {
+  buildExamInputFromConfig,
+  sectionsToLegacyTree,
+  legacyTreeToSections,
+  computeTotalQuestions,
+  computeGeneratedCount,
+  generatedExamToSaveShape,
+  LegacyBlueprintTree,
+  SectionBlockMapEntry,
+} from "./blueprintAdapter";
 
 export type EditorConfig = {
   isOpen: boolean;
@@ -31,6 +52,7 @@ export function QuestionBuilder({ examId }: { examId: string }) {
   const { isAiMode, setIsAiMode, isAddingSection, setIsAddingSection } = useExamBuilderStore();
   const [examDetail, setExamDetail] = useState<any>(null);
   const [aiTargetSectionId, setAiTargetSectionId] = useState<string | null>(null);
+  const [showQuestionReview, setShowQuestionReview] = useState(false);
 
   useEffect(() => {
     if (!examId || examId === "new") {
@@ -228,6 +250,38 @@ export function QuestionBuilder({ examId }: { examId: string }) {
           )}
 
         </div>
+      )}
+
+      {/* Question Review Agent — voice-based editing of the real, saved
+          questions, available as a floating panel on top of the normal
+          exam view rather than a separate page. */}
+      {!isAiMode && !isAddingSection && sections.length > 0 && (
+        <>
+          {showQuestionReview ? (
+            <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[560px] shadow-2xl">
+              <QuestionReviewChat
+                examId={examId}
+                onSectionsChange={setSections}
+                onDone={() => setShowQuestionReview(false)}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowQuestionReview(false)}
+                className="absolute -top-3 -right-3 h-7 w-7 p-0 rounded-full bg-zinc-800 border border-white/10 text-gray-300 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => setShowQuestionReview(true)}
+              className="fixed bottom-6 right-6 z-50 h-12 px-5 rounded-full bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-2xl"
+            >
+              <Sparkles className="h-4 w-4 mr-2" /> Question Review Agent
+            </Button>
+          )}
+        </>
       )}
 
     </div>
@@ -486,14 +540,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
   const [isSaving, setIsSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(config.question?.images?.[0]?.url || null);
-  
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiSubject, setAiSubject] = useState(examDetail?.subject || examDetail?.title || "SQL");
-  const [aiQuestionType, setAiQuestionType] = useState(type);
-  const [aiMarks, setAiMarks] = useState(marks);
-  const [aiTopic, setAiTopic] = useState("");
-  const [aiInstructions, setAiInstructions] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -514,60 +560,7 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
     );
     setImageFile(null);
     setImagePreview(config.question?.images?.[0]?.url || null);
-    setShowAiModal(false);
-    setAiSubject(examDetail?.subject || examDetail?.title || "");
-    setAiQuestionType(config.question?.type || "mcq");
-    setAiMarks(config.question?.marks?.toString() || "1");
-    setAiTopic("");
-    setAiInstructions("");
   }, [config, examDetail]);
-
-  const handleEditWithAi = async () => {
-    if (!aiSubject.trim()) {
-      toast.error("Subject is required");
-      return;
-    }
-    setIsAiLoading(true);
-    try {
-      const specialInst = [
-        description ? `Original description: "${description}"` : "",
-        aiInstructions.trim()
-      ].filter(Boolean).join("\n");
-
-      const payload = {
-        subject: aiSubject,
-        topic: aiTopic.trim() || "General",
-        questionType: aiQuestionType,
-        marks: Number(aiMarks) || 1,
-        specialInstructions: specialInst
-      };
-
-      const res = await generateSingleQuestionService(payload);
-      const generated = res.data || res;
-
-      if (generated) {
-        setDescription(generated.question_text || generated.description || "");
-        setType(aiQuestionType);
-        setMarks(aiMarks.toString());
-        if (generated.type === "mcq" && generated.options) {
-          const formattedOpts = generated.options.map((optVal: string, idx: number) => {
-            const letter = ["A", "B", "C", "D"][idx];
-            return {
-              value: optVal,
-              isCorrect: generated.correct_option === letter
-            };
-          });
-          setOptions(formattedOpts);
-        }
-        toast.success("Question updated with AI!");
-        setShowAiModal(false);
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || err.message || "Failed to edit question with AI");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -703,15 +696,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowAiModal(true)}
-                className="h-7 text-xs bg-orange-500/10 border-orange-500/30 text-orange-400 hover:text-white hover:bg-orange-500/30 font-semibold"
-              >
-                Edit with AI
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
                 onClick={handleInsertCodeBlock}
                 className="h-7 text-xs bg-orange-500/10 border-orange-500/30 text-orange-400 hover:text-white hover:bg-orange-500/30 font-semibold"
               >
@@ -719,94 +703,6 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
               </Button>
             </div>
           </div>
-
-          {/* Edit Question with AI Dialog */}
-          <Dialog open={showAiModal} onOpenChange={setShowAiModal}>
-            <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-lg rounded-2xl p-6">
-              <DialogHeader>
-                <DialogTitle className="text-white text-xl font-bold">
-                  Edit Question with AI
-                </DialogTitle>
-              </DialogHeader>
-
-              {isAiLoading ? (
-                <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                  <Loader2 className="h-10 w-10 text-orange-500 animate-spin" />
-                  <p className="text-sm text-gray-400 text-center">Generating question...</p>
-                </div>
-              ) : (
-                <div className="space-y-4 py-2 max-h-[65vh] overflow-y-auto custom-scrollbar">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-gray-300">Subject</label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. SQL, JavaScript"
-                      value={aiSubject}
-                      onChange={(e) => setAiSubject(e.target.value)}
-                      className="bg-[#14151f] border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-400 focus:outline-none focus:border-white/30 text-sm h-11"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-300">Question Type</label>
-                      <select
-                        value={aiQuestionType}
-                        onChange={(e) => setAiQuestionType(e.target.value as "mcq" | "descriptive")}
-                        className="w-full bg-[#14151f] border border-white/15 text-white rounded-xl h-11 px-3.5 focus:outline-none focus:border-white/30 text-sm"
-                      >
-                        <option value="mcq">MCQ</option>
-                        <option value="descriptive">Descriptive</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-semibold text-gray-300">Marks</label>
-                      <Input
-                        type="number"
-                        step="0.5"
-                        min="0.5"
-                        value={aiMarks}
-                        onChange={(e) => setAiMarks(e.target.value)}
-                        className="bg-[#14151f] border border-white/15 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-white/30 text-sm h-11"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-gray-300">Topic</label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. Variables"
-                      value={aiTopic}
-                      onChange={(e) => setAiTopic(e.target.value)}
-                      className="bg-[#14151f] border border-white/15 rounded-xl px-4 py-2.5 text-white placeholder:text-zinc-400 focus:outline-none focus:border-white/30 text-sm h-11"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-gray-300">Special Instructions (optional)</label>
-                    <Textarea
-                      placeholder="e.g. Include scenario-based real-world application questions"
-                      value={aiInstructions}
-                      onChange={(e) => setAiInstructions(e.target.value)}
-                      rows={2}
-                      className="bg-[#14151f] border border-white/15 rounded-xl p-3 text-white placeholder:text-zinc-400 focus:outline-none focus:border-white/30 text-sm resize-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <DialogFooter className="bg-transparent border-0 p-0 mt-4 flex items-center justify-end gap-3">
-                <Button variant="ghost" className="text-gray-300 hover:text-white font-semibold" onClick={() => setShowAiModal(false)} disabled={isAiLoading}>
-                  Cancel
-                </Button>
-                <Button className="bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl px-6 h-11 shadow-lg shadow-orange-950/40" onClick={handleEditWithAi} disabled={isAiLoading}>
-                  Generate & Save
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
           <Textarea
             ref={textareaRef}
             placeholder="Enter question text here..."
@@ -909,63 +805,58 @@ function SidebarQuestionEditor({ config, onClose, onSaveAndAnother, refresh, exa
 // AI EXAM GENERATOR FORM
 // -------------------------------------------------------------
 function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, initialTargetSectionId = null, onBack, onSuccess }: { examId: string, examDetail?: any, existingSectionsCount?: number, initialTargetSectionId?: string | null, onBack: () => void, onSuccess: () => void }) {
-  const [instructions, setInstructions] = useState<string[]>(
-    examDetail?.specialInstructions && examDetail.specialInstructions.trim() !== ""
-      ? [examDetail.specialInstructions]
-: [""]
-  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [genPhase, setGenPhase] = useState<"blueprint" | "questions">("blueprint");
   const [genProgress, setGenProgress] = useState<{ done: number; total: number; message?: string } | null>(null);
 
-  // 3-Stage Workflow States
-  const [aiStage, setAiStage] = useState<"config" | "blueprint">("config");
-  const [blueprint, setBlueprint] = useState<any | null>(null);
+  // 4-Stage Workflow States: config form -> spoken intent conversation ->
+  // interactive blueprint tree -> question generation, which saves
+  // immediately and hands off to the real exam view (the Question Review
+  // Agent lives there, not in this AI flow — see QuestionBuilder below).
+  const [aiStage, setAiStage] = useState<"config" | "intent" | "blueprint">("config");
+  const [blueprint, setBlueprint] = useState<LegacyBlueprintTree | null>(null);
 
-  // Sync state if examDetail is loaded or updated asynchronously
-  useEffect(() => {
-    if (examDetail) {
-      if (examDetail.specialInstructions && examDetail.specialInstructions.trim() !== "") {
-        setInstructions([examDetail.specialInstructions]);
+  // generation_agents backend session powering this exam end to end — created
+  // by the Exam Intent Agent voice call below, then reused by blueprint
+  // generation, the refinement chat, and question generation.
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  // Refs (not state) so the voice hook's tool-result callback — captured once
+  // when the WebRTC data channel opens — always reads the current value
+  // instead of whatever was in scope at that moment.
+  const sessionIdRef = useRef<string | null>(null);
+  const mappingRef = useRef<SectionBlockMapEntry[]>([]);
+  const examTitleRef = useRef<string>("Untitled Exam");
+
+  // "Latest callback" ref — proceedToBlueprintGeneration is defined further
+  // down (it needs state setters declared below), but the voice hook is
+  // created here and its tool-result handler is captured once when the
+  // WebRTC data channel opens. Calling through this ref (updated on every
+  // render, just below the real function's definition) means that handler
+  // always invokes the current version instead of a stale one.
+  const proceedToBlueprintGenerationRef = useRef<() => Promise<void>>(async () => {});
+
+  const intentVoice = useRealtimeVoiceAgent({
+    agent: "intent",
+    onToolResult: (name) => {
+      if (name === "save_exam_intent_summary") {
+        void proceedToBlueprintGenerationRef.current();
       }
-    }
-  }, [examDetail]);
+    },
+  });
 
-  const addInstruction = () => {
-    setInstructions(prev => [...prev, ""]);
-  };
-
-  const removeInstruction = (idx: number) => {
-    setInstructions(prev => {
-      const next = prev.filter((_, i) => i !== idx);
-      return next.length === 0 ? [""] : next;
-    });
-  };
-
-  const updateInstruction = (idx: number, val: string) => {
-    setInstructions(prev => {
-      const next = [...prev];
-      next[idx] = val;
-      return next;
-    });
-  };
-
+  // A "section" here maps 1:1 onto a generation_agents pipeline section
+  // (subject + question type + count + topics) — there's no separate
+  // "block" layer, since the pipeline has none.
   const [sections, setSections] = useState<any[]>([
     {
       id: Date.now().toString(),
       name: `Section ${String.fromCharCode(65 + existingSectionsCount)}`,
       targetSectionId: initialTargetSectionId || null,
-      blocks: [
-        {
-          id: Date.now().toString() + "-b0",
-          name: "Block 1",
-          subject: "",
-          topics: [""],
-          questionType: "mcq",
-          numberOfQuestions: "5",
-          marksPerQuestion: "1"
-        }
-      ]
+      subject: "",
+      topics: [""],
+      questionType: "mcq",
+      numberOfQuestions: "5",
+      marksPerQuestion: "1"
     }
   ]);
 
@@ -976,17 +867,11 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
         id: Date.now().toString(),
         name: `Section ${String.fromCharCode(65 + existingSectionsCount + prev.length)}`,
         targetSectionId: null,
-        blocks: [
-          {
-            id: Date.now().toString() + "-b0",
-            name: "Block 1",
-            subject: "",
-            topics: [""],
-            questionType: "mcq",
-            numberOfQuestions: "5",
-            marksPerQuestion: "1"
-          }
-        ]
+        subject: "",
+        topics: [""],
+        questionType: "mcq",
+        numberOfQuestions: "5",
+        marksPerQuestion: "1"
       }
     ]);
   };
@@ -1003,119 +888,95 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     setSections(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
   };
 
-  const addBlockToSection = (sectionId: string) => {
-    setSections(prev => prev.map(s => s.id === sectionId ? {
-      ...s,
-      blocks: [...s.blocks, {
-        id: Date.now().toString() + "-b" + s.blocks.length,
-        name: `Block ${s.blocks.length + 1}`,
-        subject: "",
-        topics: [""],
-        questionType: "mcq",
-        numberOfQuestions: "5",
-        marksPerQuestion: "1"
-      }]
-    } : s));
+  const addTopicToSection = (sectionId: string) => {
+    setSections(prev => prev.map(s => s.id === sectionId ? { ...s, topics: [...s.topics, ""] } : s));
   };
 
-  const removeBlockFromSection = (sectionId: string, bIdx: number) => {
+  const removeTopicFromSection = (sectionId: string, idx: number) => {
     setSections(prev => prev.map(s => {
       if (s.id !== sectionId) return s;
-      if (s.blocks.length <= 1) return s;
-      const nextBlocks = s.blocks.filter((_: any, i: number) => i !== bIdx);
-      return { ...s, blocks: nextBlocks };
+      const nextTopics = s.topics.filter((_: string, j: number) => j !== idx);
+      return { ...s, topics: nextTopics.length === 0 ? [""] : nextTopics };
     }));
   };
 
-  const updateBlock = (sectionId: string, bIdx: number, field: string, value: any) => {
-    setSections(prev => prev.map(s => s.id === sectionId ? {
-      ...s,
-      blocks: s.blocks.map((b: any, i: number) => i === bIdx ? { ...b, [field]: value } : b)
-    } : s));
-  };
-
-  const addTopicToBlock = (sectionId: string, bIdx: number) => {
-    setSections(prev => prev.map(s => s.id === sectionId ? {
-      ...s,
-      blocks: s.blocks.map((b: any, i: number) => i === bIdx ? { ...b, topics: [...b.topics, ""] } : b)
-    } : s));
-  };
-
-  const removeTopicFromBlock = (sectionId: string, bIdx: number, idx: number) => {
+  const updateTopicInSection = (sectionId: string, idx: number, val: string) => {
     setSections(prev => prev.map(s => {
       if (s.id !== sectionId) return s;
-      return {
-        ...s,
-        blocks: s.blocks.map((b: any, i: number) => {
-          if (i !== bIdx) return b;
-          const nextTopics = b.topics.filter((_: string, j: number) => j !== idx);
-          return { ...b, topics: nextTopics.length === 0 ? [""] : nextTopics };
-        })
-      };
+      const nextTopics = [...s.topics];
+      nextTopics[idx] = val;
+      return { ...s, topics: nextTopics };
     }));
   };
 
-  const updateTopicInBlock = (sectionId: string, bIdx: number, idx: number, val: string) => {
-    setSections(prev => prev.map(s => {
-      if (s.id !== sectionId) return s;
-      return {
-        ...s,
-        blocks: s.blocks.map((b: any, i: number) => {
-          if (i !== bIdx) return b;
-          const nextTopics = [...b.topics];
-          nextTopics[idx] = val;
-          return { ...b, topics: nextTopics };
-        })
-      };
-    }));
-  };
-
-  // Step 1: Generate Blueprint Tree
-  const handleGenerateBlueprint = async () => {
-    const invalid = sections.some(s => {
-      if (!s.name.trim()) return true;
-      return !s.blocks.some((b: any) => b.subject.trim() && b.topics.filter((t: string) => t.trim() !== "").length > 0 && Number(b.numberOfQuestions) > 0);
-    });
+  // Step 1: build the pipeline's examInput from the config form and hand off
+  // to a real, spoken Exam Intent Agent conversation — the config form's
+  // UI is unchanged, but instead of a headless quick-start, the teacher now
+  // actually talks through preferences before a blueprint is planned.
+  const startIntentConversation = async () => {
+    const invalid = sections.some((s) =>
+      !s.name.trim() || !s.subject.trim() || s.topics.filter((t: string) => t.trim() !== "").length === 0 || Number(s.numberOfQuestions) <= 0
+    );
     if (invalid) {
-      toast.error("Please fill in each block's subject, topics, and question counts");
+      toast.error("Please fill in each section's subject, topics, and question count");
       return;
     }
+
+    const { examInput, mapping, title } = buildExamInputFromConfig(sections, []);
+    mappingRef.current = mapping;
+    examTitleRef.current = title;
+
+    setAiStage("intent");
+    try {
+      const newSessionId = await intentVoice.start({ examInput });
+      sessionIdRef.current = newSessionId;
+      setSessionId(newSessionId);
+    } catch {
+      toast.error(intentVoice.error || "Failed to start the exam intent conversation");
+      setAiStage("config");
+    }
+  };
+
+  // Step 2: once the Exam Intent Agent calls save_exam_intent_summary (voice
+  // hook's onToolResult, wired above via proceedToBlueprintGenerationRef),
+  // the session already has a real summary — trigger blueprint generation
+  // exactly as before, just without the headless quick-start step.
+  const proceedToBlueprintGeneration = async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    intentVoice.stop();
 
     setIsGenerating(true);
     setGenPhase("blueprint");
     setGenProgress(null);
     try {
-      const payload = {
-        title: `${(sections[0]?.blocks?.[0]?.subject?.trim() || "Untitled")} Exam`,
-        instructions: instructions.map(i => i.trim()).filter(i => i !== ""),
-        sections: sections.map(s => ({
-          name: s.name.trim(),
-          blocks: s.blocks.map((b: any) => {
-            const qCount = Math.max(1, Math.round(Number(b.numberOfQuestions) || 5));
-            const marks = Math.max(1, Math.round(qCount * (Number(b.marksPerQuestion) || 1)));
-            return {
-              name: (b.name || "Block").trim(),
-              subject: b.subject.trim(),
-              question_type: (b.questionType || "mcq").toLowerCase(),
-              question_count: qCount,
-              total_marks: marks,
-              topics: b.topics.map((t: string) => t.trim()).filter((t: string) => t !== "")
-            };
-          })
-        }))
-      };
+      await triggerBlueprintGeneration(sid);
 
-      const res = await generateBlueprintService(payload);
-      const bp = res.data || res;
-      setBlueprint(bp);
+      let finalSections: ExamBlueprintSection[] | null = null;
+      while (true) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const status = await getBlueprintStatus(sid);
+        if (status.blueprintStatus === "completed" && status.blueprint) {
+          finalSections = status.blueprint.sections;
+          break;
+        }
+        if (status.blueprintStatus === "failed") {
+          throw new Error(status.blueprintError || "Failed to plan subtopics");
+        }
+      }
+      if (!finalSections) throw new Error("Blueprint generation returned no result");
+
+      setBlueprint(sectionsToLegacyTree(finalSections, mappingRef.current, examTitleRef.current, []));
       setAiStage("blueprint");
       toast.success("Subtopics created!");
     } catch (err: any) {
       toast.error(err.response?.data?.message || err.message || "Failed to generate blueprint");
+      setAiStage("config");
     } finally {
       setIsGenerating(false);
     }
   };
+  proceedToBlueprintGenerationRef.current = proceedToBlueprintGeneration;
 
   // Verification step is intentionally skipped — go straight to question generation.
   const handleVerifyAndProceed = async () => {
@@ -1123,45 +984,46 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     await executeFinalGeneration(blueprint);
   };
 
-  // Final Step: Enqueue generation job, poll for result, save generated exam
-  const executeFinalGeneration = async (bpToUse: any) => {
+  // Final Step: trigger question generation (Inngest, section-wise, 5 topics
+  // in parallel), poll for the result, and save the generated exam.
+  const executeFinalGeneration = async (bpToUse: LegacyBlueprintTree) => {
+    if (!sessionId) {
+      toast.error("Missing generation session — please regenerate the blueprint.");
+      return;
+    }
+
     setIsGenerating(true);
     setGenPhase("questions");
-    const totalQ = (bpToUse.sections || []).reduce((s: number, sec: any) =>
-      s + (sec.blocks || []).reduce((b: number, blk: any) =>
-        b + (blk.question_count
-          || (blk.topics || []).reduce((t: number, top: any) =>
-            t + (top.subtopics || []).reduce((st: number, sb: any) => st + (sb.allocatedQuestions || 0), 0), 0)
-          || 5), 0), 0);
-    setGenProgress({ done: 0, total: totalQ });
-    try {
-      const enqueueRes = await enqueueGenerateFromBlueprintService(bpToUse);
-      const jobId = enqueueRes.data?.jobId || enqueueRes.jobId;
-      if (!jobId) throw new Error("No generation job id returned");
 
-      let generatedExam: any = null;
+    // Syncs whatever the tree editor (or refinement chat) last produced into
+    // the session's blueprint right before generation starts.
+    const flatSections = legacyTreeToSections(bpToUse, mappingRef.current);
+    const totalQ = computeTotalQuestions(flatSections);
+    setGenProgress({ done: 0, total: totalQ });
+
+    try {
+      await triggerQuestionGeneration(sessionId, flatSections);
+
+      let finalQuestions: GeneratedExam | null = null;
       while (true) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        const jobRes = await getGenerationJobService(jobId);
-        const job = jobRes.data || jobRes;
+        const status = await getQuestionsStatus(sessionId);
+        setGenProgress({ done: computeGeneratedCount(status.questions), total: totalQ });
 
-        if (job.progress && typeof job.progress === "object" && job.progress.total) {
-          setGenProgress(job.progress);
-        }
-
-        if (job.status === "completed") {
-          generatedExam = job.result;
+        if (status.questionsStatus === "completed" && status.questions) {
+          finalQuestions = status.questions;
           break;
         }
-        if (job.status === "failed") {
-          throw new Error(job.error || "Question generation failed");
+        if (status.questionsStatus === "failed") {
+          throw new Error(status.questionsError || "Question generation failed");
         }
       }
 
-      if (!generatedExam) throw new Error("Generation job returned no result");
+      if (!finalQuestions) throw new Error("Generation returned no result");
 
+      const saveShape = generatedExamToSaveShape(finalQuestions, mappingRef.current);
       await saveGeneratedExamService({
-        ...generatedExam,
+        ...saveShape,
         examId,
         status: "PUBLISHED",
       });
@@ -1212,9 +1074,22 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
     <div className="space-y-0 animate-in fade-in slide-in-from-bottom-1 duration-150 w-full max-w-full px-2 pb-6">
 
       {aiStage === "blueprint" && blueprint ? (
-        /* STAGE 2: INTERACTIVE BLUEPRINT TREE VIEW */
+        /* STAGE 2: INTERACTIVE BLUEPRINT TREE VIEW + REFINEMENT AGENT */
         <div className="space-y-6">
-          <BlueprintTreeViewer blueprint={blueprint} onChange={setBlueprint} />
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
+            <BlueprintTreeViewer blueprint={blueprint} onChange={setBlueprint} />
+            {sessionId && (
+              <BlueprintRefinementChat
+                sessionId={sessionId}
+                sections={legacyTreeToSections(blueprint, mappingRef.current)}
+                onSectionsChange={(updatedSections) =>
+                  setBlueprint((prev) =>
+                    prev ? sectionsToLegacyTree(updatedSections, mappingRef.current, prev.title, prev.instructions || []) : prev
+                  )
+                }
+              />
+            )}
+          </div>
 
           {/* Action Bar for Blueprint Tree */}
           <div className="sticky bottom-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-t border-white/10 p-4 rounded-t-2xl shadow-2xl flex items-center justify-between gap-4">
@@ -1234,6 +1109,56 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
             </Button>
           </div>
         </div>
+      ) : aiStage === "intent" ? (
+        /* STAGE INTENT: SPOKEN EXAM INTENT AGENT CONVERSATION */
+        <div className="bg-[#0f0f11] border border-white/10 rounded-2xl p-6 space-y-4 max-w-xl mx-auto">
+          <div className="flex items-center justify-between">
+            <h5 className="font-bold text-white text-base tracking-wider uppercase flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-orange-500" /> Exam Intent Agent
+            </h5>
+            <span
+              className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                intentVoice.status === "connected"
+                  ? "bg-green-500/10 text-green-400"
+                  : intentVoice.status === "connecting"
+                  ? "bg-orange-500/10 text-orange-300"
+                  : "bg-red-500/10 text-red-400"
+              }`}
+            >
+              {intentVoice.status === "connected" ? "Live" : intentVoice.status}
+            </span>
+          </div>
+          <p className="text-xs text-gray-400">
+            Talk through your preferences — question style, topic emphasis, sample questions — the agent will ask
+            one thing at a time and move on once it has enough to plan the exam.
+          </p>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar pr-1 min-h-[160px]">
+            {intentVoice.transcript.length === 0 && <p className="text-xs text-gray-500 italic">Listening...</p>}
+            {intentVoice.transcript.map((turn, i) => (
+              <div key={i} className={`flex ${turn.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-lg px-3.5 py-2.5 text-sm ${
+                    turn.role === "user" ? "bg-orange-600 text-white" : "bg-zinc-900 border border-white/10 text-gray-200"
+                  }`}
+                >
+                  {turn.text}
+                </div>
+              </div>
+            ))}
+            {intentVoice.partial && (
+              <div className={`flex ${intentVoice.partial.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div
+                  className={`max-w-[85%] rounded-lg px-3.5 py-2.5 text-sm italic opacity-70 ${
+                    intentVoice.partial.role === "user" ? "bg-orange-600 text-white" : "bg-zinc-900 border border-white/10 text-gray-200"
+                  }`}
+                >
+                  {intentVoice.partial.text}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         /* STAGE 1: INITIAL EXAM CONFIG FORM */
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start w-full">
@@ -1241,7 +1166,7 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
             <div className="flex items-center justify-between border-b border-white/5 pb-4">
               <div>
                 <h5 className="font-bold text-white text-base tracking-wider uppercase">EXAM SETTINGS & SECTIONS</h5>
-                <p className="text-xs text-gray-400">Configure instructions and organize section topics for blueprint planning</p>
+                <p className="text-xs text-gray-400">Organize section topics for blueprint planning</p>
               </div>
               <Button
                 type="button"
@@ -1253,50 +1178,13 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
               </Button>
             </div>
 
-            {/* SPECIAL INSTRUCTIONS */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SPECIAL INSTRUCTIONS</label>
-                  <Button
-                    type="button"
-                    onClick={addInstruction}
-                    variant="ghost"
-                    className="h-5 px-0 text-xs text-orange-400 hover:text-orange-300 bg-transparent"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {instructions.map((inst, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Input
-                        value={inst}
-                        onChange={e => updateInstruction(idx, e.target.value)}
-                        placeholder={`Instruction ${idx + 1}...`}
-                        className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-9 text-xs rounded-xl focus-visible:ring-orange-500"
-                      />
-                      {instructions.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeInstruction(idx)}
-                          className="text-gray-400 hover:text-red-400 transition-colors p-1"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
             {/* SECTIONS & TOPICS */}
             <div className="border-t border-white/5 pt-5 space-y-4">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">SECTIONS & TOPICS</label>
 
               <div className="space-y-4">
 {sections.map((section) => (
-                  <div key={section.id} className="space-y-4 pt-2 first:pt-0">
+                  <div key={section.id} className="bg-[#09090b] border border-white/10 rounded-xl p-3 space-y-3">
                     <div className="flex items-center justify-between border-b border-white/5 pb-3">
                       <Input
                         value={section.name}
@@ -1305,140 +1193,101 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
                         placeholder="Section Name"
                         required
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeSection(section.id)}
-                        className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 h-8 px-2.5 text-xs font-semibold shrink-0"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-
-                    {/* BLOCKS */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-gray-300 uppercase tracking-wider">BLOCKS (subject-scoped)</label>
+                      {sections.length > 1 && (
                         <Button
                           type="button"
-                          onClick={() => addBlockToSection(section.id)}
-                          variant="ghost"
-                          className="h-5 px-0 text-xs text-purple-400 hover:text-purple-300 bg-transparent"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeSection(section.id)}
+                          className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 h-8 px-2.5 text-xs font-semibold shrink-0"
                         >
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Add Block
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">SUBJECT</label>
+                      <Input
+                        value={section.subject}
+                        onChange={e => updateSection(section.id, 'subject', e.target.value)}
+                        placeholder="Subject (e.g. JavaScript)"
+                        className="bg-[#14151f] border border-white/15 text-white text-xs font-bold h-8 w-full rounded-lg focus-visible:ring-orange-500"
+                        required
+                      />
+                    </div>
+
+                    {/* TOPICS */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">TOPICS</label>
+                        <Button
+                          type="button"
+                          onClick={() => addTopicToSection(section.id)}
+                          className="h-8 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add Topic
                         </Button>
                       </div>
-
-                      {section.blocks.map((block: any, bIdx: number) => (
-                        <div key={block.id} className="bg-[#09090b] border border-purple-500/20 rounded-xl p-3 space-y-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 flex-1">
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">BLOCK</label>
-                                <Input
-                                  value={block.name}
-                                  onChange={e => updateBlock(section.id, bIdx, 'name', e.target.value)}
-                                  placeholder="Block name"
-                                  className="bg-[#14151f] border border-white/15 text-white text-xs font-bold h-8 w-full rounded-lg focus-visible:ring-orange-500"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">SUBJECT</label>
-                                <Input
-                                  value={block.subject}
-                                  onChange={e => updateBlock(section.id, bIdx, 'subject', e.target.value)}
-                                  placeholder="Subject (e.g. JavaScript)"
-                                  className="bg-[#14151f] border border-white/15 text-white text-xs font-bold h-8 w-full rounded-lg focus-visible:ring-orange-500"
-                                  required
-                                />
-                              </div>
-                            </div>
-                            {section.blocks.length > 1 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {section.topics.map((topic: string, tIdx: number) => (
+                          <div key={tIdx} className="flex items-center gap-2">
+                            <Input
+                              value={topic}
+                              onChange={e => updateTopicInSection(section.id, tIdx, e.target.value)}
+                              placeholder={`Topic ${tIdx + 1}`}
+                              className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-8 text-xs rounded-lg focus-visible:ring-orange-500 flex-1"
+                              required
+                            />
+                            {section.topics.length > 1 && (
                               <button
                                 type="button"
-                                onClick={() => removeBlockFromSection(section.id, bIdx)}
-                                className="text-gray-400 hover:text-red-400 transition-colors p-1 mt-5 shrink-0"
+                                onClick={() => removeTopicFromSection(section.id, tIdx)}
+                                className="text-gray-400 hover:text-red-400 transition-colors p-1 shrink-0"
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5" />
                               </button>
                             )}
                           </div>
+                        ))}
+                      </div>
+                    </div>
 
-                          {/* BLOCK TOPICS */}
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">TOPICS</label>
-                              <Button
-                                type="button"
-                                onClick={() => addTopicToBlock(section.id, bIdx)}
-                                className="h-8 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded-lg"
-                              >
-                                <Plus className="h-3 w-3 mr-1" /> Add Topic
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {block.topics.map((topic: string, tIdx: number) => (
-                                <div key={tIdx} className="flex items-center gap-2">
-                                  <Input
-                                    value={topic}
-                                    onChange={e => updateTopicInBlock(section.id, bIdx, tIdx, e.target.value)}
-                                    placeholder={`Topic ${tIdx + 1}`}
-                                    className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-8 text-xs rounded-lg focus-visible:ring-orange-500 flex-1"
-                                    required
-                                  />
-                                  {block.topics.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeTopicFromBlock(section.id, bIdx, tIdx)}
-                                      className="text-gray-400 hover:text-red-400 transition-colors p-1 shrink-0"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* TYPE, QUESTIONS, MARKS EACH */}
-                          <div className="grid grid-cols-3 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">TYPE</label>
-                              <Select value={block.questionType} onValueChange={val => updateBlock(section.id, bIdx, 'questionType', val)}>
-                                <SelectTrigger className="w-full bg-[#14151f] border border-white/15 text-white h-8 text-xs font-semibold rounded-lg px-2.5">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-[#14151f] border border-white/15 text-white text-xs">
-                                  <SelectItem value="mcq">MCQ</SelectItem>
-                                  <SelectItem value="descriptive">Descriptive</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">QUESTIONS</label>
-                              <Input
-                                type="number"
-                                min="1"
-                                max="50"
-                                value={block.numberOfQuestions}
-                                onChange={e => updateBlock(section.id, bIdx, 'numberOfQuestions', e.target.value)}
-                                className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">MARKS EACH</label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={block.marksPerQuestion}
-                                onChange={e => updateBlock(section.id, bIdx, 'marksPerQuestion', e.target.value)}
-                                className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    {/* TYPE, QUESTIONS, MARKS EACH */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">TYPE</label>
+                        <Select value={section.questionType} onValueChange={val => updateSection(section.id, 'questionType', val)}>
+                          <SelectTrigger className="w-full bg-[#14151f] border border-white/15 text-white h-8 text-xs font-semibold rounded-lg px-2.5">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-[#14151f] border border-white/15 text-white text-xs">
+                            <SelectItem value="mcq">MCQ</SelectItem>
+                            <SelectItem value="descriptive">Descriptive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">QUESTIONS</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={section.numberOfQuestions}
+                          onChange={e => updateSection(section.id, 'numberOfQuestions', e.target.value)}
+                          className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-gray-300 uppercase tracking-wider block">MARKS EACH</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={section.marksPerQuestion}
+                          onChange={e => updateSection(section.id, 'marksPerQuestion', e.target.value)}
+                          className="bg-[#14151f] border border-white/15 text-white h-8 text-xs font-bold rounded-lg text-center"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1466,34 +1315,19 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
                     <span className="text-lg font-extrabold text-white">{sections.length}</span>
                   </div>
                   <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Blocks</span>
-                    <span className="text-lg font-extrabold text-white">
-                      {sections.reduce((acc, s) => acc + (s.blocks?.length || 0), 0)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Questions</span>
                     <span className="text-lg font-extrabold text-purple-400">
-                      {sections.reduce((acc, s) => acc + (s.blocks?.reduce((bAcc: number, b: any) => bAcc + (Number(b.numberOfQuestions) || 0), 0) || 0), 0)}
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Marks</span>
-                    <span className="text-lg font-extrabold text-emerald-400">
-                      {sections.reduce((acc, s) => acc + (s.blocks?.reduce((bAcc: number, b: any) => bAcc + ((Number(b.numberOfQuestions) || 0) * (Number(b.marksPerQuestion) || 1)), 0) || 0), 0)}
+                      {sections.reduce((acc, s) => acc + (Number(s.numberOfQuestions) || 0), 0)}
                     </span>
                   </div>
                 </div>
 
-                {instructions.filter(i => i.trim() !== "").length > 0 && (
-                  <div className="p-2.5 rounded-xl bg-[#14151f] border border-white/5 text-xs flex items-center justify-between">
-                    <span className="text-gray-400 font-medium">Instructions</span>
-                    <span className="text-white font-bold">{instructions.filter(i => i.trim() !== "").length} Added</span>
-                  </div>
-                )}
+                <div className="p-3 rounded-xl bg-[#14151f] border border-white/5 text-center space-y-1">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Marks</span>
+                  <span className="text-lg font-extrabold text-emerald-400">
+                    {sections.reduce((acc, s) => acc + ((Number(s.numberOfQuestions) || 0) * (Number(s.marksPerQuestion) || 1)), 0)}
+                  </span>
+                </div>
               </div>
             </Card>
           </div>
@@ -1506,11 +1340,28 @@ function AiExamGeneratorForm({ examId, examDetail, existingSectionsCount = 0, in
           <Button variant="ghost" onClick={onBack} className="text-gray-400 hover:text-white h-10 px-5 text-sm font-semibold flex items-center gap-1.5">
             <ArrowLeft className="h-4 w-4" /> Cancel
           </Button>
-          <Button onClick={handleGenerateBlueprint} className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-8 font-bold text-sm shadow-xl shadow-purple-950/40 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <Button onClick={startIntentConversation} className="bg-purple-600 hover:bg-purple-700 text-white h-11 px-8 font-bold text-sm shadow-xl shadow-purple-950/40 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
             Next <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
       )}
+
+      {/* INTENT STAGE BOTTOM ACTION BAR */}
+      {aiStage === "intent" && (
+        <div className="sticky bottom-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-t border-white/10 p-4 rounded-t-2xl shadow-2xl flex items-center justify-between gap-4 -mx-1 mt-10">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              intentVoice.stop();
+              setAiStage("config");
+            }}
+            className="text-gray-400 hover:text-white h-10 px-5 text-sm font-semibold flex items-center gap-1.5"
+          >
+            <ArrowLeft className="h-4 w-4" /> Cancel
+          </Button>
+        </div>
+      )}
+
 
       </div>
   );

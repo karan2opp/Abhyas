@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User, School, Building2, Database } from "lucide-react";
+import { LayoutDashboard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User, School, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,7 +12,6 @@ const sidebarLinks = [
   { name: "Dashboard", href: "/teacher", icon: LayoutDashboard },
   { name: "Classrooms", href: "/teacher/classrooms", icon: School },
   { name: "Organisation", href: "/teacher/organisation", icon: Building2 },
-  { name: "Knowledge", href: "/teacher/knowledge", icon: Database },
   { name: "Profile", href: "/teacher/profile", icon: User },
 ];
 

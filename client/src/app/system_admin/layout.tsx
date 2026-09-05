@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldAlert, User, Building2, Database, CreditCard, BookMarked } from "lucide-react";
+import { Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldAlert, User, Building2, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,8 +12,6 @@ const sidebarLinks = [
   { name: "Organisations", href: "/system_admin/organisations", icon: Building2 },
   { name: "Manage Admins", href: "/system_admin", icon: Users },
   { name: "Plans", href: "/system_admin/plans", icon: CreditCard },
-  { name: "RAG Knowledge Base", href: "/system_admin/knowledge", icon: Database },
-  { name: "Question Bank", href: "/system_admin/question-bank", icon: BookMarked },
   { name: "Profile", href: "/system_admin/profile", icon: User },
 ];
 

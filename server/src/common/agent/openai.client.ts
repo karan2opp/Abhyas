@@ -31,7 +31,10 @@ const getMistral = async () => {
 };
 
 export const getClientForModel = async (model: string) => {
-    if (model.toLowerCase().includes("mistral")) {
+    const name = model.toLowerCase();
+    // "ministral" (Mistral's small-model family, e.g. ministral-14b-2512)
+    // does NOT contain "mistral" as a substring — check both explicitly.
+    if (name.includes("mistral") || name.includes("ministral")) {
         return getMistral();
     }
     return getOpenAI();

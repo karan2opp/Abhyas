@@ -10,7 +10,8 @@
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:8000/api/inngest"
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:8000/api/inngest",
+    "dev:all": "concurrently -n app,inngest -c blue,magenta \"npm:dev\" \"npm:inngest:dev\""
   },
   "author": "",
   "license": "ISC",
@@ -24,6 +25,7 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^25.9.1",
     "@types/pg": "^8.20.0",
+    "concurrently": "^10.0.5",
     "drizzle-kit": "^0.31.10",
     "tsc-watch": "^7.2.0",
     "tsx": "^4.22.4",

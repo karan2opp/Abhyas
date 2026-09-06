@@ -30,6 +30,12 @@ const toRequester = (req: Request): Requester => ({
     organisationId: req.user!.organisationId ?? null,
 });
 
+// Placed BEFORE the agent's own (often long) role prompt — models weight
+// earlier instructions more reliably, and this rule must never get lost in
+// a long system prompt. Kept short and absolute on purpose.
+const ENGLISH_ONLY_DIRECTIVE = `CRITICAL RULE — applies to every single word you say, with no exceptions:
+Speak and respond ONLY in English. Never switch languages, never mix in a word or phrase from another language, and never mirror the language of the teacher's audio — even if the transcription looks like it's in another language, is garbled, or you're not fully sure what was said. Always respond in English regardless. This rule overrides every other instruction below.`;
+
 // This is a live spoken conversation, not a text chat — appended to both
 // agents' existing (text-authored) system prompts rather than duplicating
 // them, so voice and text always share the same underlying rules.
@@ -39,7 +45,7 @@ VOICE DELIVERY
 
 This is a live spoken conversation, not a text chat.
 
-- Always speak and respond in English, regardless of what language the audio seems to be in or how unclear it sounded. Never switch languages mid-conversation.
+- English only, always — every word, no exceptions, no mixing languages. This applies even if you think the teacher spoke another language or the transcription looks non-English.
 - If you couldn't clearly understand what was said, say so in English and ask the teacher to repeat it — never guess and answer a different question than what was likely asked.
 - Keep every response to one or two short sentences, the way a real conversation sounds.
 - Never read out JSON, tool names, field names, or markdown formatting out loud.
@@ -78,7 +84,7 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
             if (!examId) throw ApiError.badRequest("examId is required for the question review agent");
             // Throws forbidden/not-found itself if the requester can't manage this exam.
             const examStructure = await getSectionsWithDetails(examId, toRequester(req));
-            instructions = `${getQuestionReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM STRUCTURE (sections, blocks, and questions — each question has a unique "id"; each section/block has an "id"):\n${JSON.stringify(examStructure)}`;
+            instructions = `${ENGLISH_ONLY_DIRECTIVE}\n\n${getQuestionReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM STRUCTURE (sections, blocks, and questions — each question has a unique "id"; each section/block has an "id"):\n${JSON.stringify(examStructure)}`;
             tools = getQuestionReviewAgentRealtimeTools();
             sessionId = examId;
         } else if (agent === "intent") {
@@ -91,9 +97,9 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
                 if (!session) throw ApiError.notFound("Session not found");
                 if (session.createdBy !== userId) throw ApiError.forbidden("Not your session");
             }
-            instructions = `${getIntentSystemPrompt()}${VOICE_ADDENDUM}`;
+            instructions = `${ENGLISH_ONLY_DIRECTIVE}\n\n${getIntentSystemPrompt()}${VOICE_ADDENDUM}`;
             tools = getIntentAgentRealtimeTools();
-        } else if (agent === "review") {
+        } else {
             if (!sessionId) throw ApiError.badRequest("sessionId is required for the review agent");
             const session = await getSession(sessionId);
             if (!session) throw ApiError.notFound("Session not found");
@@ -101,18 +107,8 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
             if (session.blueprintStatus !== "completed" || !session.blueprint) {
                 throw ApiError.badRequest("Blueprint is not ready yet");
             }
-            instructions = `${getReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM BLUEPRINT (all sections, JSON):\n${JSON.stringify(session.blueprint.sections)}`;
+            instructions = `${ENGLISH_ONLY_DIRECTIVE}\n\n${getReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM BLUEPRINT (all sections, JSON):\n${JSON.stringify(session.blueprint.sections)}`;
             tools = getReviewAgentRealtimeTools();
-        } else {
-            if (!sessionId) throw ApiError.badRequest("sessionId is required for the question review agent");
-            const session = await getSession(sessionId);
-            if (!session) throw ApiError.notFound("Session not found");
-            if (session.createdBy !== userId) throw ApiError.forbidden("Not your session");
-            if (session.questionsStatus !== "completed" || !session.questions) {
-                throw ApiError.badRequest("Questions are not ready yet");
-            }
-            instructions = `${getQuestionReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT QUESTIONS (all sections, JSON — each question has a unique "id"):\n${JSON.stringify(session.questions.sections)}`;
-            tools = getQuestionReviewAgentRealtimeTools();
         }
 
         const apiKey = process.env.OPENAI_API_KEY;
@@ -134,7 +130,10 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
                     audio: {
                         input: {
                             format: { type: "audio/pcm", rate: 24000 },
-                            transcription: { model: "whisper-1" },
+                            // Hints Whisper the input is English — without this it can
+                            // occasionally mis-hear/mis-transcribe speech as another
+                            // language, which then leads the model to answer in kind.
+                            transcription: { model: "whisper-1", language: "en" },
                             turn_detection: { type: "server_vad" },
                         },
                         output: {

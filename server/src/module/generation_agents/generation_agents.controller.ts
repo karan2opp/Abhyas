@@ -16,7 +16,7 @@ import {
     getReviewHistory,
     appendReviewMessage,
 } from "./exam_intent_session.service.js";
-import { inngest } from "./inngest/client.js";
+import { inngest } from "../../common/inngest/client.js";
 import { z } from "zod";
 import { ApiError } from "../../common/utils/ApiError.js";
 

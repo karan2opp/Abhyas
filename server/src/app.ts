@@ -17,8 +17,11 @@ import superadminRouter from "./module/superadmin/superadmin.route.js";
 import feedbackRouter from "./module/feedback/feedback.route.js";
 import jobsRouter from "./module/jobs/jobs.route.js";
 import generationAgentsRouter from "./module/generation_agents/generation_agents.route.js";
-import { inngest } from "./module/generation_agents/inngest/client.js";
+import { inngest } from "./common/inngest/client.js";
 import { generationAgentFunctions } from "./module/generation_agents/inngest/functions.js";
+import pdfLabRouter from "./module/pdf_lab/pdf_lab.route.js";
+import questionBankRouter from "./module/question_bank/question_bank.route.js";
+import { questionBankFunctions } from "./module/question_bank/inngest/functions.js";
 import billingRouter from "./module/billing/billing.route.js";
 import studentProfileRouter from "./module/student-profile/student-profile.route.js";
 import errorHandler from "./common/middleware/error.middleware.js";
@@ -48,7 +51,9 @@ app.use("/api/answers", answersRouter)
 app.use("/api/superadmin", superadminRouter)
 app.use("/api/feedback", feedbackRouter)
 app.use("/api/generation-agents", generationAgentsRouter);
-app.use("/api/inngest", serve({ client: inngest, functions: generationAgentFunctions }));
+app.use("/api/pdf-lab", pdfLabRouter);
+app.use("/api/question-bank", questionBankRouter);
+app.use("/api/inngest", serve({ client: inngest, functions: [...generationAgentFunctions, ...questionBankFunctions] }));
 app.use("/api/jobs", jobsRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/student-profile", studentProfileRouter);

@@ -4,14 +4,15 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "tsc-watch --onSuccess \"node ./dist/src/index.js\"",
+    "dev": "concurrently -n app,inngest -c blue,magenta --kill-others-on-fail \"npm:dev:app\" \"npm:inngest:dev\"",
+    "dev:app": "tsc-watch --onSuccess \"node ./dist/src/index.js\"",
     "build": "tsc",
     "start": "node ./dist/src/index.js",
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:8000/api/inngest",
-    "dev:all": "concurrently -n app,inngest -c blue,magenta \"npm:dev\" \"npm:inngest:dev\""
+    "dev:all": "npm run dev"
   },
   "author": "",
   "license": "ISC",
@@ -37,6 +38,7 @@
     "@langchain/qdrant": "^1.0.3",
     "@openai/agents": "^0.13.2",
     "@paralleldrive/cuid2": "^3.3.0",
+    "@qdrant/js-client-rest": "^1.19.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^6.1.2",
     "cloudinary": "^2.10.0",

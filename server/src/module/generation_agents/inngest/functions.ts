@@ -1,5 +1,5 @@
 import { createId } from "@paralleldrive/cuid2";
-import { inngest } from "./client.js";
+import { inngest } from "../../../common/inngest/client.js";
 import { generateSectionSubtopics } from "../agents/subtopics_agent.js";
 import { generateTopicQuestions } from "../agents/generation_agent.js";
 import { allocateSectionQuestions } from "../allocation.js";

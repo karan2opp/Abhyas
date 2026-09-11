@@ -8,6 +8,8 @@ const envSchema = z.object({
   GUARDRAIL_MODEL: z.string().default("mistral-small-latest"),
   REALTIME_MODEL: z.string().default("gpt-realtime"),
   REALTIME_VOICE: z.string().default("marin"),
+  PDF_VISION_MODEL: z.string().default("gpt-4.1-mini"),
+  EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
 });
 
 function createEnv(env: NodeJS.ProcessEnv) {

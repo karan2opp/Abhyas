@@ -73,11 +73,69 @@ export const uploadToCloudinary = (
   });
 };
 
-export const deleteFromCloudinary = (publicId: string): Promise<any> => {
+/**
+ * Uploads a non-image file (e.g. the original PDF for the question-bank
+ * pipeline) as a raw Cloudinary resource — no image transforms applied.
+ */
+export const uploadRawToCloudinary = (buffer: Buffer, folder: string, filename?: string): Promise<CloudinaryUploadResult> => {
   return new Promise((resolve, reject) => {
-    cloudinary.uploader.destroy(publicId, (error, result) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder,
+        resource_type: "raw",
+        ...(filename ? { public_id: filename } : {}),
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else if (result) {
+          resolve({
+            url: result.secure_url,
+            publicId: result.public_id,
+            width: result.width,
+            height: result.height,
+            format: result.format,
+            bytes: result.bytes,
+          });
+        } else {
+          reject(new Error("Unknown error during upload"));
+        }
+      }
+    );
+    stream.end(buffer);
+  });
+};
+
+export const deleteFromCloudinary = (publicId: string, resourceType: "image" | "raw" = "image"): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.destroy(publicId, { resource_type: resourceType }, (error, result) => {
       if (error) reject(error);
       else resolve(result);
     });
   });
+};
+
+/**
+ * Recovers {publicId, resourceType} from a Cloudinary delivery URL — for
+ * assets uploaded via this file, where only the URL was persisted (not the
+ * publicId). Returns null for anything that doesn't look like a Cloudinary
+ * upload URL, so callers can skip cleanup instead of throwing.
+ */
+export const parseCloudinaryUrl = (url: string): { publicId: string; resourceType: "image" | "raw" } | null => {
+  const match = url.match(/\/(image|raw)\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?$/);
+  if (!match) return null;
+  const [, resourceType, publicId] = match;
+  if (!resourceType || !publicId) return null;
+  return { publicId, resourceType: resourceType as "image" | "raw" };
+};
+
+/** Best-effort delete by URL alone — swallows failures, never throws. */
+export const deleteFromCloudinaryByUrl = async (url: string): Promise<void> => {
+  const ref = parseCloudinaryUrl(url);
+  if (!ref) return;
+  try {
+    await deleteFromCloudinary(ref.publicId, ref.resourceType);
+  } catch (err) {
+    console.warn(`[cloudinary] failed to delete ${ref.publicId}:`, (err as Error)?.message);
+  }
 };

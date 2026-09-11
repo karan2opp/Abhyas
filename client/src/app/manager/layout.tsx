@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, LayoutDashboard, School, Users, User, CreditCard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, FlaskConical } from "lucide-react";
+import { Building2, LayoutDashboard, School, Users, User, CreditCard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, FlaskConical, FileScan, Library, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,9 @@ const sidebarLinks = [
   { name: "Teachers", href: "/manager/teachers", icon: Users },
   { name: "Billing", href: "/manager/billing", icon: CreditCard },
   { name: "Generation Lab", href: "/manager/generation-lab", icon: FlaskConical },
+  { name: "PDF Extraction Lab", href: "/manager/pdf-extraction-lab", icon: FileScan },
+  { name: "Question Bank Lab", href: "/manager/question-bank-lab", icon: Library },
+  { name: "Generate Questions", href: "/manager/generate-questions", icon: Sparkles },
   { name: "Profile", href: "/manager/profile", icon: User },
 ];
 

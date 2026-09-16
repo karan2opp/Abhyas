@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 # Python (pdf_extractor subprocess)
 __pycache__/
 *.pyc
+
+# Python virtual environment (created by the Render build for the PDF extractor)
+.venv/

@@ -204,6 +204,55 @@
       "when": 1788069427760,
       "tag": "0028_drop_difficulty",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788069457760,
+      "tag": "0028_1_existing_feature_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788069487760,
+      "tag": "0029_question_bank_options_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788069547760,
+      "tag": "0030_plan_voice_agent",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788069607760,
+      "tag": "0031_question_review_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788069667760,
+      "tag": "0032_question_content_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788069727760,
+      "tag": "0033_question_position",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788069787760,
+      "tag": "0034_books",
+      "breakpoints": true
     }
   ]
 }

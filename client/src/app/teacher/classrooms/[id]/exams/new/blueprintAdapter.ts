@@ -13,12 +13,14 @@ import type {
   QuestionType,
   ExamBlueprintSection,
   GeneratedExam,
+  GeneratedOption,
 } from "@/services/generationAgents.service";
 
 export interface LegacyBlueprintSubtopic {
   name: string;
   weight?: number;
   allocatedQuestions: number;
+  sourceNodeIds?: string[];
 }
 
 export interface LegacyBlueprintTopic {
@@ -34,6 +36,7 @@ export interface LegacyBlueprintBlock {
   total_marks: number;
   instructions?: string[];
   topics: LegacyBlueprintTopic[];
+  unmatchedTopics?: string[];
 }
 
 export interface LegacyBlueprintSection {
@@ -62,7 +65,8 @@ export interface SectionBlockMapEntry {
 // the mapping table every later step needs.
 export function buildExamInputFromConfig(
   configSections: any[],
-  instructions: string[]
+  instructions: string[],
+  bookId?: string
 ): { examInput: ExamInput; mapping: SectionBlockMapEntry[]; title: string } {
   const mapping: SectionBlockMapEntry[] = [];
   const flatSections: SectionInput[] = [];
@@ -98,7 +102,7 @@ export function buildExamInputFromConfig(
   });
 
   const title = `${(configSections[0]?.subject?.trim() || "Untitled")} Exam`;
-  return { examInput: { title, instructions, sections: flatSections }, mapping, title };
+  return { examInput: { title, instructions, ...(bookId ? { bookId } : {}), sections: flatSections }, mapping, title };
 }
 
 // New backend's flat sections -> old nested tree shape, for
@@ -141,8 +145,14 @@ export function sectionsToLegacyTree(
       topics: flatSection.topics.map((t) => ({
         topic: t.topic,
         weight: t.weight,
-        subtopics: t.subtopics.map((st) => ({ name: st.name, weight: st.weight, allocatedQuestions: st.allocatedQuestions })),
+        subtopics: t.subtopics.map((st) => ({
+          name: st.name,
+          weight: st.weight,
+          allocatedQuestions: st.allocatedQuestions,
+          ...(st.sourceNodeIds ? { sourceNodeIds: st.sourceNodeIds } : {}),
+        })),
       })),
+      ...(flatSection.unmatchedTopics ? { unmatchedTopics: flatSection.unmatchedTopics } : {}),
     });
   });
 
@@ -179,9 +189,11 @@ export function legacyTreeToSections(tree: LegacyBlueprintTree, mapping: Section
               name: st.name,
               weight: subWeightSum > 0 ? (st.weight ?? 0) / subWeightSum : 1 / t.subtopics.length,
               allocatedQuestions: st.allocatedQuestions || 0,
+              ...(st.sourceNodeIds ? { sourceNodeIds: st.sourceNodeIds } : {}),
             })),
           };
         }),
+        ...(block.unmatchedTopics ? { unmatchedTopics: block.unmatchedTopics } : {}),
       });
     }
   }
@@ -203,8 +215,8 @@ export function computeGeneratedCount(generated: GeneratedExam | null): number {
 
 const MCQ_OPTION_LETTERS = ["A", "B", "C", "D"] as const;
 
-function mapMcqOptionsForSave(options: string[], correctOption: string) {
-  return options.map((value, idx) => ({ value, isCorrect: correctOption === MCQ_OPTION_LETTERS[idx] }));
+function mapMcqOptionsForSave(options: GeneratedOption[], correctOption: string) {
+  return options.map((opt, idx) => ({ value: opt.text, isCode: opt.isCode, isCorrect: correctOption === MCQ_OPTION_LETTERS[idx] }));
 }
 
 // Finished GeneratedExam (flat sections) -> the shape `/exams/save-generated`
@@ -229,8 +241,8 @@ export function generatedExamToSaveShape(generatedExam: GeneratedExam, mapping: 
     const questions = flatSection.topics.flatMap((t) =>
       t.questions.map((q) =>
         q.type === "mcq"
-          ? { type: "mcq", description: q.question_text, marks: q.marks, options: mapMcqOptionsForSave(q.options, q.correct_option) }
-          : { type: "descriptive", description: q.question_text, marks: q.marks, rubric: q.rubric }
+          ? { type: "mcq", description: q.question_text, marks: q.marks, options: mapMcqOptionsForSave(q.options, q.correct_option), contentBlocks: q.content_blocks }
+          : { type: "descriptive", description: q.question_text, marks: q.marks, rubric: q.rubric, contentBlocks: q.content_blocks }
       )
     );
 

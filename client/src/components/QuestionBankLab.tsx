@@ -2,15 +2,17 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileUp, Loader2, Search, RefreshCw, Library, CheckCircle2, XCircle, Clock, Pencil, Trash2, Check, X } from "lucide-react";
+import { FileUp, Loader2, Search, RefreshCw, Library, CheckCircle2, XCircle, Clock, Pencil, Trash2, Check, X, Lock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAuthStore } from "@/store/authStore";
 import {
   uploadQuestionBankDocument,
   listQuestionBankDocuments,
   renameQuestionBankDocument,
   deleteQuestionBankDocument,
+  setQuestionBankDocumentVisibility,
   searchQuestionBank,
   QuestionBankDocument,
   QuestionBankSearchResult,
@@ -103,10 +105,12 @@ function ResultCard({ result }: { result: QuestionBankSearchResult }) {
 
 function DocumentRow({
   doc,
+  isOwner,
   onRenamed,
   onDeleted,
 }: {
   doc: QuestionBankDocument;
+  isOwner: boolean;
   onRenamed: (doc: QuestionBankDocument) => void;
   onDeleted: (id: string) => void;
 }) {
@@ -114,6 +118,24 @@ function DocumentRow({
   const [titleDraft, setTitleDraft] = useState(doc.title);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const isShared = doc.visibility === "organisation";
+
+  const toggleVisibility = async () => {
+    const next = isShared ? "private" : "organisation";
+    setIsSharing(true);
+    try {
+      const updated = await setQuestionBankDocumentVisibility(doc.id, next);
+      onRenamed(updated);
+      toast.success(next === "organisation" ? "Shared with your organisation" : "Made private");
+    } catch (err) {
+      const detail = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(detail || "Could not change sharing");
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const saveTitle = async () => {
     const title = titleDraft.trim();
@@ -182,9 +204,16 @@ function DocumentRow({
         ) : (
           <div className="flex items-center gap-1.5">
             <span className="truncate font-medium">{doc.title}</span>
-            <button title="Rename" onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
-              <Pencil className="size-3.5" />
-            </button>
+            {isOwner && (
+              <button title="Rename" onClick={() => setIsEditing(true)} className="text-muted-foreground hover:text-foreground">
+                <Pencil className="size-3.5" />
+              </button>
+            )}
+            {!isOwner && (
+              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                Shared with you
+              </span>
+            )}
           </div>
         )}
         {doc.status === "failed" && doc.error && <span className="text-xs text-red-500">{doc.error}</span>}
@@ -192,15 +221,39 @@ function DocumentRow({
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">{doc.totalChunks} question(s)</span>
         <StatusBadge status={doc.status} />
-        <Button variant="ghost" size="icon-sm" onClick={handleDelete} disabled={isDeleting} title="Delete document">
-          {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5 text-red-500" />}
-        </Button>
+        {/* Only the uploader controls sharing — colleagues may use a shared
+            document, never re-share, rename, or delete it. */}
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleVisibility}
+            disabled={isSharing}
+            title={isShared ? "Shared with your organisation — click to make private" : "Private to you — click to share with your organisation"}
+          >
+            {isSharing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : isShared ? (
+              <Users className="size-3.5 text-emerald-500" />
+            ) : (
+              <Lock className="size-3.5 text-muted-foreground" />
+            )}
+          </Button>
+        )}
+        {isOwner && (
+          <Button variant="ghost" size="icon-sm" onClick={handleDelete} disabled={isDeleting} title="Delete document">
+            {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5 text-red-500" />}
+          </Button>
+        )}
       </div>
     </div>
   );
 }
 
 export default function QuestionBankLab() {
+  // The list now includes documents shared by the organisation, so ownership
+  // decides which per-document controls are shown.
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const [documents, setDocuments] = useState<QuestionBankDocument[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [docName, setDocName] = useState("");
@@ -341,6 +394,7 @@ export default function QuestionBankLab() {
                   <DocumentRow
                     key={doc.id}
                     doc={doc}
+                    isOwner={doc.createdBy === currentUserId}
                     onRenamed={(updated) => setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))}
                     onDeleted={(id) => setDocuments((prev) => prev.filter((d) => d.id !== id))}
                   />

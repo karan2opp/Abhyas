@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Layers, Hash } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronRight, BookOpen, Layers, Hash, AlertTriangle, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export interface BlueprintSubtopic {
   name: string;
   allocatedQuestions: number;
+  sourceNodeIds?: string[];
 }
 
 export interface BlueprintTopic {
@@ -22,6 +23,7 @@ export interface BlueprintBlock {
   total_marks: number;
   instructions?: string[];
   topics: BlueprintTopic[];
+  unmatchedTopics?: string[];
 }
 
 export interface BlueprintSection {
@@ -36,12 +38,21 @@ export interface BlueprintTree {
   sections: BlueprintSection[];
 }
 
+export interface SubtopicSourceInfo {
+  chapter: string;
+  section: string;
+  name: string;
+  pages: [number, number];
+}
+
 interface BlueprintTreeViewerProps {
   blueprint: BlueprintTree;
   onChange: (updatedBlueprint: BlueprintTree) => void;
+  // When the exam is built from a book: subsection id → where it is, to show each subtopic's source.
+  sourceLookup?: Record<string, SubtopicSourceInfo>;
 }
 
-export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewerProps) {
+export function BlueprintTreeViewer({ blueprint, onChange, sourceLookup }: BlueprintTreeViewerProps) {
   const [collapsedSections, setCollapsedSections] = useState<Record<number, boolean>>({});
   const [collapsedBlocks] = useState<Record<string, boolean>>({});
 
@@ -218,6 +229,15 @@ export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewer
                           {/* Topics Container */}
                           {!blockCollapsed && (
                             <div className="p-4 space-y-4">
+                              {sourceLookup && blockObj.unmatchedTopics && blockObj.unmatchedTopics.length > 0 && (
+                                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
+                                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+                                  <span>
+                                    Not found in this book, so no questions were planned for:{" "}
+                                    <span className="font-semibold">{blockObj.unmatchedTopics.join(", ")}</span>
+                                  </span>
+                                </div>
+                              )}
                               {blockObj.topics.length === 0 ? (
                                 <p className="text-xs text-zinc-500 italic text-center py-4">No topics in this block yet.</p>
                               ) : (
@@ -263,7 +283,8 @@ export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewer
                                       {/* Subtopics Rows */}
                                       <div className="space-y-2 pl-4">
                                         {topicObj.subtopics.map((stObj, stIdx) => (
-                                          <div key={stIdx} className="flex items-center justify-between gap-3 bg-[#0b0c10] border border-white/5 rounded-lg px-3.5 py-2 group hover:border-white/20 transition-all">
+                                          <div key={stIdx} className="bg-[#0b0c10] border border-white/5 rounded-lg px-3.5 py-2 group hover:border-white/20 transition-all">
+                                          <div className="flex items-center justify-between gap-3">
                                             <span className="text-orange-400 text-xs font-bold">•</span>
                                             <Input
                                               value={stObj.name}
@@ -293,6 +314,10 @@ export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewer
                                               </button>
                                             </div>
                                           </div>
+                                          {sourceLookup && (
+                                            <SubtopicSource sourceNodeIds={stObj.sourceNodeIds} sourceLookup={sourceLookup} />
+                                          )}
+                                          </div>
                                         ))}
                                       </div>
                                     </div>
@@ -311,6 +336,32 @@ export function BlueprintTreeViewer({ blueprint, onChange }: BlueprintTreeViewer
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function SubtopicSource({ sourceNodeIds, sourceLookup }: { sourceNodeIds?: string[]; sourceLookup: Record<string, SubtopicSourceInfo> }) {
+  const sources = (sourceNodeIds ?? []).map((id) => sourceLookup[id]).filter((s): s is SubtopicSourceInfo => !!s);
+  if (sources.length === 0) {
+    return (
+      <p className="mt-1.5 pl-5 text-[11px] text-zinc-500 italic">
+        No book section linked yet. One is matched when questions are generated.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-1.5 pl-5 space-y-0.5">
+      {sources.map((source, i) => (
+        <p key={i} className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+          <BookMarked className="h-3 w-3 text-emerald-400 shrink-0" />
+          <span className="truncate">
+            {source.chapter} › {source.section === source.name ? source.name : `${source.section} › ${source.name}`}
+          </span>
+          <span className="shrink-0 text-zinc-500">
+            · {source.pages[0] === source.pages[1] ? `p. ${source.pages[0]}` : `pp. ${source.pages[0]}–${source.pages[1]}`}
+          </span>
+        </p>
+      ))}
     </div>
   );
 }

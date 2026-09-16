@@ -2,9 +2,9 @@ import { inArray } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { questionBankChunks } from "./question_bank.schema.js";
 import { distributeQuestionsAtLeastOne } from "../generation_agents/allocation.js";
-import { generateTopicQuestions } from "../generation_agents/agents/generation_agent.js";
 import type { QuestionType, Difficulty } from "../generation_agents/Types/inputExam.js";
-import type { StoredQuestion } from "../generation_agents/Types/outputGeneration.js";
+import { searchQuestionBank } from "./question_bank.service.js";
+import type { QuestionBankAccess } from "./qdrant_client.js";
 
 export type TopicTier = "high" | "mid" | "low";
 
@@ -12,83 +12,143 @@ export type TopicTier = "high" | "mid" | "low";
 // count across topics. High-priority topics get proportionally more.
 const TIER_WEIGHT: Record<TopicTier, number> = { high: 3, mid: 2, low: 1 };
 
-async function getDominantSubject(documentIds: string[]): Promise<string> {
-    const rows = await db
-        .select({ subject: questionBankChunks.subject })
-        .from(questionBankChunks)
-        .where(inArray(questionBankChunks.documentId, documentIds));
-
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-        if (!row.subject) continue;
-        counts.set(row.subject, (counts.get(row.subject) ?? 0) + 1);
-    }
-    let best = "General";
-    let bestCount = 0;
-    for (const [subject, count] of counts) {
-        if (count > bestCount) {
-            best = subject;
-            bestCount = count;
-        }
-    }
-    return best;
-}
-
-// Up to this many excerpts, each truncated to this length, are handed to the
-// model as grounding context per topic — enough to anchor the generation in
-// the source documents' actual content without blowing up the prompt.
-const MAX_EXCERPTS_PER_TOPIC = 5;
-const MAX_EXCERPT_CHARS = 500;
-
-/**
- * Topics here are free-typed by the teacher, not picked from the document's
- * auto-detected tags — so matching can't rely on exact equality. Tries
- * progressively looser matches: exact tag match, then substring-on-tag, then
- * substring on the raw question text itself, stopping at the first level
- * that finds anything.
- */
-async function getTopicExcerpts(documentIds: string[], topic: string): Promise<string[]> {
-    const rows = await db
-        .select({ rawText: questionBankChunks.rawText, topics: questionBankChunks.topics })
-        .from(questionBankChunks)
-        .where(inArray(questionBankChunks.documentId, documentIds));
-
-    const needle = topic.trim().toLowerCase();
-
-    const exact = rows.filter((row) => (row.topics ?? []).some((t) => t.toLowerCase() === needle));
-    const tagSubstring = exact.length
-        ? exact
-        : rows.filter((row) => (row.topics ?? []).some((t) => t.toLowerCase().includes(needle) || needle.includes(t.toLowerCase())));
-    const matched = tagSubstring.length ? tagSubstring : rows.filter((row) => row.rawText.toLowerCase().includes(needle));
-
-    return matched.slice(0, MAX_EXCERPTS_PER_TOPIC).map((row) => row.rawText.slice(0, MAX_EXCERPT_CHARS));
-}
+// The search now narrows by document and question type itself, so everything
+// it returns is already usable. The only reason to ask for any extra is that
+// an earlier topic may have already claimed some of the same questions —
+// hence a small cushion rather than the large one this needed when results
+// were filtered after ranking.
+const RETRIEVAL_OVERFETCH = 2;
 
 export interface GenerateFromDocumentsInput {
     documentIds: string[];
     topics: { high: string[]; mid: string[]; low: string[] };
+    // Accepted for request compatibility but unused: these questions are
+    // returned exactly as they were printed, so there is nothing to set a
+    // difficulty on. Kept so the existing form keeps working.
     difficulty: Difficulty;
     questionCount: number;
     questionType: QuestionType;
     marks: number;
 }
 
-export interface GeneratedTopicGroup {
+export interface RetrievedQuestion {
+    // The chunk's own id — stable, and the Qdrant point id for the same row.
+    id: string;
+    type: QuestionType;
+    topic: string;
+    question_text: string;
+    marks: number;
+    options?: string[];
+    correct_option?: string;
+    // Where this question actually came from, so a teacher can check it
+    // against the original paper.
+    source: {
+        documentId: string;
+        questionNumber: string | null;
+        pageStart: number;
+    };
+}
+
+export interface RetrievedTopicGroup {
     tier: TopicTier;
     topic: string;
     allocatedQuestions: number;
-    questions: StoredQuestion[];
+    questions: RetrievedQuestion[];
+}
+
+type ChunkRow = typeof questionBankChunks.$inferSelect;
+
+const POSITIONAL_LABELS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+/**
+ * Maps one stored chunk onto the response shape. Options are returned as
+ * plain strings in printed order and the answer becomes the POSITIONAL letter
+ * of the correct option, because that is what the UI matches against — a
+ * paper labelled (i)/(ii)/(iii) would otherwise never line up.
+ */
+function toRetrievedQuestion(chunk: ChunkRow, topic: string, marks: number): RetrievedQuestion {
+    const options = chunk.options ?? [];
+    const base = {
+        id: chunk.id,
+        topic,
+        question_text: chunk.questionText || chunk.rawText,
+        marks,
+        source: {
+            documentId: chunk.documentId,
+            questionNumber: chunk.questionNumber,
+            pageStart: chunk.pageStart,
+        },
+    };
+
+    if (options.length === 0) {
+        return { ...base, type: "descriptive" };
+    }
+
+    const answerIndex = chunk.correctOption
+        ? options.findIndex((o) => o.label.toUpperCase() === chunk.correctOption!.toUpperCase())
+        : -1;
+
+    return {
+        ...base,
+        type: "mcq",
+        options: options.map((o) => o.text),
+        ...(answerIndex >= 0 && answerIndex < POSITIONAL_LABELS.length
+            ? { correct_option: POSITIONAL_LABELS[answerIndex]! }
+            : {}),
+    };
 }
 
 /**
- * Generates NEW questions grounded in one or more previously uploaded
- * documents, spread across teacher-assigned priority tiers (high/mid/low get
- * proportionally more/fewer of the total question count — see TIER_WEIGHT).
- * Topics are free-typed by the teacher (not shown from an auto-detected
- * list) — grounding still works by matching each typed topic against the
- * selected documents' extracted content (see getTopicExcerpts).
+ * Retrieves the real questions for one topic: the topic is embedded and
+ * matched against the bank's description vectors, then narrowed to the
+ * selected documents, the requested question type, and anything not already
+ * taken by an earlier topic.
  */
-export async function generateQuestionsFromDocuments(input: GenerateFromDocumentsInput): Promise<GeneratedTopicGroup[]> {
+async function retrieveForTopic(
+    topic: string,
+    count: number,
+    documentIds: string[],
+    questionType: QuestionType,
+    taken: Set<string>,
+    access: QuestionBankAccess
+): Promise<ChunkRow[]> {
+    // Document and type are handed to the search rather than applied to its
+    // results, so a hit can only fail here by having been claimed already.
+    const hits = await searchQuestionBank(topic, access, {
+        documentIds,
+        questionType,
+        limit: count * RETRIEVAL_OVERFETCH,
+    });
+
+    const picked: ChunkRow[] = [];
+    for (const hit of hits) {
+        if (picked.length >= count) break;
+        if (taken.has(hit.chunk.id)) continue;
+        picked.push(hit.chunk);
+        taken.add(hit.chunk.id);
+    }
+
+    return picked;
+}
+
+/**
+ * Returns REAL questions from the selected documents — exactly as they were
+ * extracted, never rewritten — spread across the teacher's priority tiers
+ * (high/mid/low get proportionally more/fewer of the total, see TIER_WEIGHT).
+ *
+ * Topics are free-typed, so matching is semantic rather than literal: each
+ * topic is embedded and compared against the questions' descriptions, which
+ * means "Newton's laws" still finds questions tagged "Laws of Motion". No
+ * model writes anything here; the only model call is embedding the topic.
+ *
+ * A topic can come back short (or empty) when the selected documents simply
+ * don't contain that many matching questions — `allocatedQuestions` is what
+ * was asked for, `questions.length` is what actually existed.
+ */
+export async function generateQuestionsFromDocuments(
+    input: GenerateFromDocumentsInput,
+    access: QuestionBankAccess
+): Promise<RetrievedTopicGroup[]> {
     if (input.documentIds.length === 0) throw new Error("At least one document must be selected");
 
     const tiered = (["high", "mid", "low"] as TopicTier[]).flatMap((tier) =>
@@ -97,41 +157,41 @@ export async function generateQuestionsFromDocuments(input: GenerateFromDocument
     if (tiered.length === 0) throw new Error("At least one topic must be assigned to a priority tier");
 
     const allocations = distributeQuestionsAtLeastOne(tiered, input.questionCount);
-    const subject = await getDominantSubject(input.documentIds);
 
-    const groups = await Promise.all(
-        allocations
-            .filter((a) => a.allocatedQuestions > 0)
-            .map(async (allocation): Promise<GeneratedTopicGroup> => {
-                const excerpts = await getTopicExcerpts(input.documentIds, allocation.topic);
-                const topicInstructions =
-                    excerpts.length > 0
-                        ? [
-                              "Ground these questions in the following excerpts from the source document(s) — use them as reference material and inspiration, but write NEW questions, never copy one verbatim:",
-                              ...excerpts,
-                          ]
-                        : [];
+    // Sequential, not parallel: each topic has to see what earlier topics
+    // already took, or the same question comes back under two topics.
+    const taken = new Set<string>();
+    const groups: RetrievedTopicGroup[] = [];
 
-                const output = await generateTopicQuestions({
-                    subject,
-                    question_type: input.questionType,
-                    marks: input.marks,
-                    difficulty: input.difficulty,
-                    topic: allocation.topic,
-                    subtopics: [{ name: allocation.topic, count: allocation.allocatedQuestions }],
-                    globalInstructions: [],
-                    topicInstructions,
-                });
+    for (const allocation of allocations) {
+        if (allocation.allocatedQuestions <= 0) continue;
 
-                const questions: StoredQuestion[] = output.questions.map((q) => ({
-                    ...q,
-                    id: crypto.randomUUID(),
-                    marks: input.marks,
-                }));
+        const chunks = await retrieveForTopic(
+            allocation.topic,
+            allocation.allocatedQuestions,
+            input.documentIds,
+            input.questionType,
+            taken,
+            access
+        );
 
-                return { tier: allocation.tier, topic: allocation.topic, allocatedQuestions: allocation.allocatedQuestions, questions };
-            })
-    );
+        groups.push({
+            tier: allocation.tier,
+            topic: allocation.topic,
+            allocatedQuestions: allocation.allocatedQuestions,
+            questions: chunks.map((chunk) => toRetrievedQuestion(chunk, allocation.topic, input.marks)),
+        });
+    }
 
     return groups;
+}
+
+/**
+ * Every question in the selected documents, unfiltered — the fallback for a
+ * caller that wants the whole bank rather than a topic-weighted selection.
+ */
+export async function listQuestionsForDocuments(documentIds: string[], marks: number): Promise<RetrievedQuestion[]> {
+    if (documentIds.length === 0) return [];
+    const rows = await db.select().from(questionBankChunks).where(inArray(questionBankChunks.documentId, documentIds));
+    return rows.map((row) => toRetrievedQuestion(row, (row.topics ?? [])[0] ?? "General", marks));
 }

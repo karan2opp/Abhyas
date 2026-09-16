@@ -1,15 +1,17 @@
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, and, or } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { questionBankDocuments, questionBankChunks, type NewQuestionBankChunk } from "./question_bank.schema.js";
 import { getClientForModel } from "../../common/agent/openai.client.js";
 import { env } from "../../env.js";
-import { searchQuestionBankPoints } from "./qdrant_client.js";
+import { searchQuestionBankPoints, setQuestionBankPointsVisibility, type QuestionBankAccess } from "./qdrant_client.js";
+import type { QuestionBankVisibility } from "./question_bank.schema.js";
 
 export async function createDocument(input: {
     title: string;
     fileUrl: string;
     createdBy: string;
     organisationId: string | null;
+    visibility: QuestionBankVisibility;
 }) {
     const [doc] = await db
         .insert(questionBankDocuments)
@@ -18,10 +20,28 @@ export async function createDocument(input: {
             fileUrl: input.fileUrl,
             createdBy: input.createdBy,
             organisationId: input.organisationId,
+            visibility: input.visibility,
             status: "pending",
         })
         .returning();
     return doc!;
+}
+
+/**
+ * Changes a document's sharing and immediately restamps its vectors, so the
+ * index can't keep answering under the old rules. Postgres first: if the
+ * Qdrant update fails, the caller sees the error and can retry rather than
+ * the two stores silently disagreeing.
+ */
+export async function setDocumentVisibility(id: string, visibility: QuestionBankVisibility) {
+    const [doc] = await db
+        .update(questionBankDocuments)
+        .set({ visibility, updatedAt: new Date() })
+        .where(eq(questionBankDocuments.id, id))
+        .returning();
+
+    await setQuestionBankPointsVisibility(id, visibility);
+    return doc ?? null;
 }
 
 export async function getDocument(id: string) {
@@ -34,12 +54,38 @@ export async function getDocumentsByIds(ids: string[]) {
     return db.select().from(questionBankDocuments).where(inArray(questionBankDocuments.id, ids));
 }
 
-export async function listDocumentsByUser(createdBy: string) {
+/**
+ * Every document the caller may use: their own, plus anything their
+ * organisation has shared. Mirrors the Qdrant access filter exactly — if
+ * these two ever disagree, search results and the document list disagree too.
+ */
+export async function listAccessibleDocuments(access: QuestionBankAccess) {
+    const mine = eq(questionBankDocuments.createdBy, access.userId);
+    const shared = access.organisationId
+        ? and(
+            eq(questionBankDocuments.visibility, "organisation"),
+            eq(questionBankDocuments.organisationId, access.organisationId)
+        )
+        : undefined;
+
     return db
         .select()
         .from(questionBankDocuments)
-        .where(eq(questionBankDocuments.createdBy, createdBy))
+        .where(shared ? or(mine, shared) : mine)
         .orderBy(desc(questionBankDocuments.createdAt));
+}
+
+/** The single source of truth for "may this person use this document?". */
+export function canAccessDocument(
+    document: { createdBy: string; organisationId: string | null; visibility: QuestionBankVisibility },
+    access: QuestionBankAccess
+): boolean {
+    if (document.createdBy === access.userId) return true;
+    return (
+        document.visibility === "organisation" &&
+        !!document.organisationId &&
+        document.organisationId === access.organisationId
+    );
 }
 
 export async function markDocumentProcessing(id: string) {
@@ -106,10 +152,17 @@ export interface QuestionBankSearchResult {
  */
 export async function searchQuestionBank(
     queryText: string,
-    options: { organisationId?: string | null; subject?: string; topics?: string[]; limit?: number } = {}
+    access: QuestionBankAccess,
+    options: {
+        subject?: string;
+        topics?: string[];
+        documentIds?: string[];
+        questionType?: "mcq" | "descriptive";
+        limit?: number;
+    } = {}
 ): Promise<QuestionBankSearchResult[]> {
     const vector = await embedText(queryText);
-    const hits = await searchQuestionBankPoints(vector, options);
+    const hits = await searchQuestionBankPoints(vector, access, options);
     if (hits.length === 0) return [];
 
     const rows = await db.select().from(questionBankChunks).where(inArray(questionBankChunks.id, hits.map((h) => h.id)));

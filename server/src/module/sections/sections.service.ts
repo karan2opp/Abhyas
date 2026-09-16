@@ -45,7 +45,13 @@ const getSectionsWithDetails = async (examId: string, requester: Requester) => {
 
             const blocksWithQuestions = await Promise.all(
                 blocksData.map(async (block) => {
-                    const blockQuestions = await db.select().from(questions).where(eq(questions.blockId, block.id));
+                    // Ordered by the explicit position column — this is what
+                    // the UI numbers "Q1, Q2, ..." by (per section) and what
+                    // the review agent's per-section question numbers must
+                    // match exactly. created_at can't serve this: a whole
+                    // generation batch shares one identical transaction
+                    // timestamp, so it isn't actually a deterministic order.
+                    const blockQuestions = await db.select().from(questions).where(eq(questions.blockId, block.id)).orderBy(questions.position);
                     const questionsWithOptions = await Promise.all(
                         blockQuestions.map(async (question) => {
                             const optionsData = await db.select().from(options).where(eq(options.questionId, question.id));
@@ -57,8 +63,10 @@ const getSectionsWithDetails = async (examId: string, requester: Requester) => {
             );
 
             // All questions for the section (flattened, for backward-compatible
-            // readers that still expect sections[].questions).
-            const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id));
+            // readers that still expect sections[].questions). Same ordering
+            // reason as blockQuestions above — this is the array the client
+            // numbers "Q1, Q2, ..." from.
+            const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id)).orderBy(questions.position);
             const allQuestionsWithOptions = await Promise.all(
                 sectionQuestions.map(async (question) => {
                     const optionsData = await db.select().from(options).where(eq(options.questionId, question.id));

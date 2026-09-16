@@ -131,18 +131,18 @@ export const Eval_Medium_OUTPUT = {
                 { name: "Concept Knowledge", score: 1, explanation: "Correctly states both methods return a new array." },
                 { name: "Example", score: 0.5, explanation: "Gives a valid map example ([1,2,3].map(x => x*2)) but does not give a corresponding example for filter." },
                 { name: "Correct Application", score: 0, explanation: "Does not mention that map's output array has the same length as the input array." },
-                { name: "Distinguishing Related Concepts", score: 0.5, explanation: "Implies filter reduces the array by 'picking' elements but doesn't explicitly state the output may be shorter than the input." }
+                { name: "Distinguishing Related Concepts", score: 0.6, explanation: "Correctly implies filter selects elements based on a condition ('picks elements that pass a condition'), which is most of the way there — but never explicitly states the resulting array may be shorter than the input, the category's specific key point." }
             ],
             feedback: "Nice use of a concrete map example. To strengthen this answer: add a filter example too, and explicitly mention that map always keeps the same array length while filter can return a shorter array."
         },
         {
             question_text: "Explain the structure of the CSS Box Model. In your description, detail the spatial order of content, padding, border, and margin from the inside out, and distinguish between padding and margin.",
             category_scores: [
-                { name: "Definition", score: 0.5, explanation: "Lists all four box model components, but names them without stating they together form 'the box model.'" },
+                { name: "Definition", score: 0.7, explanation: "Correctly names all four components — content, border, padding, margin — which is most of what this category asks for, but never explicitly frames them together as 'the box model,' leaving the definition slightly incomplete." },
                 { name: "Concept Knowledge", score: 0, explanation: "States the spatial order incorrectly — border is placed before padding, when the correct order is content, padding, border, margin." },
                 { name: "Example", score: 0, explanation: "No code example is given." },
-                { name: "Correct Application", score: 0, explanation: "Does not correctly explain padding's position — 'inside somewhere' is too vague and doesn't specify it's between content and border." },
-                { name: "Distinguishing Related Concepts", score: 0.5, explanation: "Vaguely notes padding and margin differ by 'inside vs outside' but doesn't clearly anchor this to the border as the dividing line." }
+                { name: "Correct Application", score: 0.2, explanation: "Says padding is 'inside somewhere,' which gestures at the idea but is too vague to demonstrate it's specifically between content and border — a fragment of the right idea, not a real explanation." },
+                { name: "Distinguishing Related Concepts", score: 0.4, explanation: "Correctly senses padding is 'inside' and margin is 'outside,' but never anchors this to the border as the actual dividing line, so the distinction stays imprecise." }
             ],
             feedback: "The spatial order needs correcting — it should be content, padding, border, margin (padding comes before border, not after). Be more specific about where padding and margin sit relative to the border, and include a code example to make this concrete."
         },
@@ -221,7 +221,7 @@ export const Eval_Hard_OUTPUT = {
                 { name: "Concept Knowledge", score: 1, explanation: "Clearly states the inner function keeps a link/reference to the outer function's variables." },
                 { name: "Example", score: 1, explanation: "Gives a valid, correctly structured example of an outer function returning an inner function that accesses 'count'." },
                 { name: "Correct Application", score: 1, explanation: "Correctly describes the inner function using the outer variable across calls." },
-                { name: "Depth of Reasoning", score: 0.5, explanation: "Explains that access persists after the outer function finishes, but does not explicitly connect this to lexical scope as the underlying mechanism." },
+                { name: "Depth of Reasoning", score: 0.6, explanation: "Correctly explains that access persists after the outer function returns because the inner function keeps a reference — capturing much of the 'why' — but never names lexical scope as the actual mechanism, which this category specifically asks for." },
                 { name: "Edge Cases / Real-world Scenario", score: 1, explanation: "Gives a valid practical use case — a counter remembering a value between calls." }
             ],
             feedback: "Strong answer with a clear, correct code example and a good real-world use case. To push this further, explicitly name lexical scope as the mechanism that determines which variables the closure can access, rather than just describing the observed behavior."
@@ -242,7 +242,7 @@ export const Eval_Hard_OUTPUT = {
             question_text: "What is a higher-order function? Explain, with reasoning, how accepting a function as an argument or returning a function enables patterns like function composition or callbacks.",
             category_scores: [
                 { name: "Definition", score: 1, explanation: "Correctly defines a higher-order function." },
-                { name: "Concept Knowledge", score: 0.5, explanation: "Discusses composition in detail but doesn't explicitly mention callbacks as functions passed to be invoked later." },
+                { name: "Concept Knowledge", score: 0.3, explanation: "Shows real conceptual understanding through its discussion of composition, but never uses the word 'callback' or describes a function being passed to be invoked later — the category's specific key point is essentially unaddressed, credited only for adjacent relevance." },
                 { name: "Example", score: 1, explanation: "Gives a valid, well-explained composition example." },
                 { name: "Correct Application", score: 1, explanation: "Correctly describes passing functions as arguments in the context of composition." },
                 { name: "Depth of Reasoning", score: 1, explanation: "Clearly explains how composition works and why it improves reusability and testability." },

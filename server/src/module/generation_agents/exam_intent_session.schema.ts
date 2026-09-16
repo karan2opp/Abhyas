@@ -55,9 +55,23 @@ export const blueprintReviewMessages = pgTable("blueprint_review_messages", {
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Every turn exchanged with the Question Review Agent, in order. Keyed by
+// EXAM id rather than session id — unlike the other two agents, this one
+// operates on a real saved exam and has no generation session behind it, so
+// an exam's review conversation outlives any single pipeline run.
+export const questionReviewMessages = pgTable("question_review_messages", {
+    id: text("id").primaryKey().$defaultFn(() => createId()),
+    examId: text("exam_id").notNull(),
+    role: text("role").$type<"user" | "assistant">().notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type ExamIntentSession = typeof examIntentSessions.$inferSelect;
 export type NewExamIntentSession = typeof examIntentSessions.$inferInsert;
 export type ExamIntentMessage = typeof examIntentMessages.$inferSelect;
 export type NewExamIntentMessage = typeof examIntentMessages.$inferInsert;
 export type BlueprintReviewMessage = typeof blueprintReviewMessages.$inferSelect;
 export type NewBlueprintReviewMessage = typeof blueprintReviewMessages.$inferInsert;
+export type QuestionReviewMessage = typeof questionReviewMessages.$inferSelect;
+export type NewQuestionReviewMessage = typeof questionReviewMessages.$inferInsert;

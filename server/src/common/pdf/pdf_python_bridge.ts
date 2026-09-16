@@ -84,3 +84,80 @@ export async function extractPdf(pdfPath: string, outputDir: string): Promise<Ex
 
     return ExtractPdfResultZodSchema.parse(parsed);
 }
+
+const BookLineZodSchema = z.object({
+    text: z.string(),
+    bbox: z.array(z.number()),
+    size: z.number(),
+    bold: z.boolean(),
+    // Mostly monospace: a line of a code listing.
+    mono: z.boolean().default(false),
+});
+
+const BookImageZodSchema = z.object({
+    xref: z.number(),
+    bbox: z.array(z.number()),
+    path: z.string(),
+    width: z.number().nullable(),
+    height: z.number().nullable(),
+});
+
+const BookTableZodSchema = z.object({
+    bbox: z.array(z.number()),
+    header: z.array(z.string().nullable()).nullable(),
+    rows: z.array(z.array(z.string().nullable())),
+});
+
+const BookPageZodSchema = z.object({
+    page: z.number(),
+    width: z.number(),
+    height: z.number(),
+    hasTextLayer: z.boolean(),
+    lines: z.array(BookLineZodSchema),
+    images: z.array(BookImageZodSchema),
+    tables: z.array(BookTableZodSchema),
+});
+
+const ExtractBookResultZodSchema = z.object({
+    pageCount: z.number(),
+    // [level, title, page] from the PDF's bookmark outline; empty when the PDF has none.
+    toc: z.array(z.tuple([z.number(), z.string(), z.number()])),
+    pages: z.array(BookPageZodSchema),
+});
+
+export type BookLine = z.infer<typeof BookLineZodSchema>;
+export type BookImage = z.infer<typeof BookImageZodSchema>;
+export type BookTable = z.infer<typeof BookTableZodSchema>;
+export type BookPage = z.infer<typeof BookPageZodSchema>;
+export type ExtractBookResult = z.infer<typeof ExtractBookResultZodSchema>;
+
+const BOOK_SCRIPT_PATH = path.join(process.cwd(), "python", "pdf_extractor", "extract_book.py");
+
+/**
+ * Extracts a whole book (lines with font size/boldness, images with position,
+ * tables, bookmark outline). The result is read from a file the script writes
+ * into `outputDir`, since a book's extraction is far larger than stdout should carry.
+ */
+export async function extractBookPdf(pdfPath: string, outputDir: string): Promise<ExtractBookResult> {
+    let stdout: string;
+    try {
+        const result = await execFileAsync(PYTHON_BIN, [BOOK_SCRIPT_PATH, pdfPath, outputDir], {
+            maxBuffer: 1024 * 1024,
+            timeout: 20 * 60_000,
+        });
+        stdout = result.stdout;
+    } catch (err: any) {
+        const stderr = err?.stderr?.toString?.() || "";
+        throw new Error(`Book extraction failed: ${stderr || err.message}`);
+    }
+
+    let outPath: string;
+    try {
+        outPath = JSON.parse(stdout).path;
+    } catch {
+        throw new Error(`Book extraction returned invalid output: ${stdout.slice(0, 500)}`);
+    }
+
+    const { readFile } = await import("node:fs/promises");
+    return ExtractBookResultZodSchema.parse(JSON.parse(await readFile(outPath, "utf-8")));
+}

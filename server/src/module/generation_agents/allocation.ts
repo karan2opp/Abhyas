@@ -116,6 +116,18 @@ export function distributeQuestionsAtLeastOne<T extends Weightable>(
 }
 
 /**
+ * Total questions a finalized blueprint will produce, across every section.
+ * Allocation guarantees this equals the sum of the sections' question_count,
+ * so it's the number to meter generation against before the pipeline runs.
+ */
+export function countBlueprintQuestions(sections: { topics: { allocatedQuestions: number }[] }[]): number {
+    return sections.reduce(
+        (total, section) => total + section.topics.reduce((n, topic) => n + topic.allocatedQuestions, 0),
+        0
+    );
+}
+
+/**
  * Allocates a section's question_count across its topics, then each topic's
  * share across its own subtopics. Both levels use the "at least one" variant:
  * topics because the teacher explicitly typed them into the form (rounding

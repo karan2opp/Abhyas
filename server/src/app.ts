@@ -19,9 +19,10 @@ import jobsRouter from "./module/jobs/jobs.route.js";
 import generationAgentsRouter from "./module/generation_agents/generation_agents.route.js";
 import { inngest } from "./common/inngest/client.js";
 import { generationAgentFunctions } from "./module/generation_agents/inngest/functions.js";
-import pdfLabRouter from "./module/pdf_lab/pdf_lab.route.js";
 import questionBankRouter from "./module/question_bank/question_bank.route.js";
 import { questionBankFunctions } from "./module/question_bank/inngest/functions.js";
+import bookRouter from "./module/books/book.route.js";
+import { bookFunctions } from "./module/books/inngest/functions.js";
 import billingRouter from "./module/billing/billing.route.js";
 import studentProfileRouter from "./module/student-profile/student-profile.route.js";
 import errorHandler from "./common/middleware/error.middleware.js";
@@ -32,6 +33,10 @@ app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
     credentials: true,
 }));
+
+// Inngest sends the results of every completed step with each call, so a long job (a whole book) quickly
+// outgrows the 100 KB default body limit. Registered before the global parser so this limit applies.
+app.use("/api/inngest", express.json({ limit: "50mb" }), serve({ client: inngest, functions: [...generationAgentFunctions, ...questionBankFunctions, ...bookFunctions] }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -51,9 +56,8 @@ app.use("/api/answers", answersRouter)
 app.use("/api/superadmin", superadminRouter)
 app.use("/api/feedback", feedbackRouter)
 app.use("/api/generation-agents", generationAgentsRouter);
-app.use("/api/pdf-lab", pdfLabRouter);
 app.use("/api/question-bank", questionBankRouter);
-app.use("/api/inngest", serve({ client: inngest, functions: [...generationAgentFunctions, ...questionBankFunctions] }));
+app.use("/api/books", bookRouter);
 app.use("/api/jobs", jobsRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/student-profile", studentProfileRouter);

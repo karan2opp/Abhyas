@@ -1,6 +1,6 @@
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { examIntentSessions, examIntentMessages, blueprintReviewMessages } from "./exam_intent_session.schema.js";
+import { examIntentSessions, examIntentMessages, blueprintReviewMessages, questionReviewMessages } from "./exam_intent_session.schema.js";
 import type { IInputExam } from "./Types/inputExam.js";
 import type { ConversationSummary, ConversationTurn } from "./Types/outputConversation.js";
 import type { ExamBlueprint } from "./Types/outputSubtopics.js";
@@ -81,6 +81,28 @@ export const getReviewHistory = async (sessionId: string): Promise<ConversationT
         .where(eq(blueprintReviewMessages.sessionId, sessionId))
         .orderBy(asc(blueprintReviewMessages.createdAt));
     return rows.map((r) => ({ role: r.role, content: r.content }));
+};
+
+// ── Question Review Agent transcript (keyed by exam, not session) ────────────
+// Capped on read: a long-lived exam can accumulate many turns, and the whole
+// transcript is replayed into the model on every turn. The most recent turns
+// are the ones that carry the context ("now make it harder").
+const QUESTION_REVIEW_HISTORY_LIMIT = 20;
+
+export const getQuestionReviewHistory = async (examId: string): Promise<ConversationTurn[]> => {
+    const rows = await db
+        .select()
+        .from(questionReviewMessages)
+        .where(eq(questionReviewMessages.examId, examId))
+        .orderBy(desc(questionReviewMessages.createdAt))
+        .limit(QUESTION_REVIEW_HISTORY_LIMIT);
+    // Newest-first above so the limit keeps the RECENT turns; flipped back to
+    // chronological order here, which is what the model expects.
+    return rows.reverse().map((r) => ({ role: r.role, content: r.content }));
+};
+
+export const appendQuestionReviewMessage = async (examId: string, role: "user" | "assistant", content: string) => {
+    await db.insert(questionReviewMessages).values({ examId, role, content });
 };
 
 export const appendReviewMessage = async (sessionId: string, role: "user" | "assistant", content: string) => {

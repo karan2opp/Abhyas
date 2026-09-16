@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { examIntentAgentTurn } from "./agents/exam_intent_agent.js";
+import { examIntentAgentTurn, SKIP_QUESTION_SIGNAL, SKIP_ALL_SIGNAL, FORCE_CONCLUDE_SIGNAL } from "./agents/exam_intent_agent.js";
 import { blueprintReviewAgentTurn } from "./agents/blueprint_review_agent.js";
 import { IInputExamZodSchema } from "./Types/inputExam.js";
 import { ExamBlueprintZodSchema } from "./Types/outputSubtopics.js";
@@ -15,10 +15,18 @@ import {
     updateBlueprint,
     getReviewHistory,
     appendReviewMessage,
+    getQuestionReviewHistory,
+    appendQuestionReviewMessage,
 } from "./exam_intent_session.service.js";
+import { questionReviewAgentTurn } from "./agents/question_review_agent.js";
+import { buildQuestionReviewContext } from "./question_review_context.util.js";
+import { getSectionsWithDetails } from "../sections/sections.service.js";
 import { inngest } from "../../common/inngest/client.js";
+import { countBlueprintQuestions } from "./allocation.js";
+import { assertQuota } from "../billing/usage.service.js";
 import { z } from "zod";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { getUsableBook } from "../books/book_retrieval.js";
 
 const ConversationTurnRequestZodSchema = z.object({
     // Required to start a new conversation (no sessionId); ignored once a
@@ -28,6 +36,11 @@ const ConversationTurnRequestZodSchema = z.object({
     sessionId: z.string().optional(),
     // Required to continue an existing session — the teacher's reply.
     message: z.string().optional(),
+    // The "Skip Question" / "Skip All Questions" chat buttons, as a control
+    // signal rather than freeform text — mutually exclusive with `message`,
+    // and only meaningful once a session exists (there's nothing to skip
+    // before the first question has been asked).
+    action: z.enum(["skip_question", "skip_all"]).optional(),
 });
 
 export const conversationTurnHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -37,26 +50,58 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
             const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
             throw ApiError.badRequest(`Invalid request body: ${issues}`);
         }
-        const { examInput, sessionId, message } = parsed.data;
+        const { examInput, sessionId, message, action } = parsed.data;
         const userId = req.user!.id;
 
         let session;
+        let effectiveMessage: string | null = null;
         if (!sessionId) {
             if (!examInput) throw ApiError.badRequest("examInput is required to start a conversation");
+            if (action) throw ApiError.badRequest("action is only valid once a conversation has started");
+            if (examInput.bookId) {
+                await getUsableBook(examInput.bookId, { userId, organisationId: req.user?.organisationId ?? null }, req.user!.role === "system_admin");
+            }
             session = await createSession(examInput, userId, req.user?.organisationId);
             console.log(`[generation-agents] started exam intent session ${session.id}`);
         } else {
             session = await getSession(sessionId);
             if (!session) throw ApiError.notFound("Session not found");
             if (session.createdBy !== userId) throw ApiError.forbidden("Not your session");
-            if (!message || !message.trim()) throw ApiError.badRequest("message is required to continue a conversation");
-            await appendMessage(session.id, "user", message.trim());
+
+            if (action === "skip_question") {
+                effectiveMessage = SKIP_QUESTION_SIGNAL;
+            } else if (action === "skip_all") {
+                effectiveMessage = SKIP_ALL_SIGNAL;
+            } else {
+                if (!message || !message.trim()) throw ApiError.badRequest("message is required to continue a conversation");
+                effectiveMessage = message.trim();
+            }
+            await appendMessage(session.id, "user", effectiveMessage);
         }
 
         const history = sessionId ? await getSessionHistory(session.id) : [];
-        console.log(`[generation-agents] exam intent turn (session ${session.id}, history length: ${history.length})`);
+        console.log(`[generation-agents] exam intent turn (session ${session.id}, history length: ${history.length}${action ? `, action: ${action}` : ""})`);
 
-        const result = await examIntentAgentTurn(session.examInput, history, userId);
+        let result = await examIntentAgentTurn(session.examInput, history, userId);
+
+        // "Skip all" must always end the conversation — regardless of whether
+        // the model complies with the instruction on the first try. One
+        // forced retry, then a hard-coded terminal fallback that can never
+        // fail, so the teacher is never stuck unable to move past this stage.
+        if (action === "skip_all" && !result.done) {
+            const retryHistory = [...history, { role: "assistant" as const, content: result.message }, { role: "user" as const, content: FORCE_CONCLUDE_SIGNAL }];
+            result = await examIntentAgentTurn(session.examInput, retryHistory, userId);
+
+            if (!result.done) {
+                console.warn(`[generation-agents] session ${session.id} did not conclude after [[FORCE_CONCLUDE]] — falling back to an empty summary`);
+                result = {
+                    done: true,
+                    message: "Got it — moving on with what you've already shared.",
+                    summary: { globalInstructions: [], topicSpecificInstructions: [] },
+                };
+            }
+        }
+
         await appendMessage(session.id, "assistant", result.message);
 
         if (result.done && result.summary) {
@@ -72,7 +117,8 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
                 sessionId: session.id,
                 turn: sessionId ? "continue" : "start",
                 historyLength: history.length,
-                userMessage: message ?? null,
+                userMessage: effectiveMessage,
+                action: action ?? null,
                 agentMessage: result.message,
                 done: result.done,
                 hasSummary: Boolean(result.summary),
@@ -82,36 +128,6 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
         });
 
         res.status(200).json({ success: true, data: { sessionId: session.id, ...result } });
-    } catch (error) {
-        next(error);
-    }
-};
-
-const QuickStartSessionRequestZodSchema = z.object({
-    examInput: IInputExamZodSchema,
-    globalInstructions: z.array(z.string()).optional(),
-});
-
-// Creates and completes an Exam Intent session in one shot, with no chat
-// turns — for callers (like a legacy one-shot config form) that already have
-// their own instructions/topics UI and have nothing for the agent to ask
-// about. The rest of the pipeline (blueprint generation, review, question
-// generation) works exactly the same from here on as a chat-completed session.
-export const quickStartSessionHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const parsed = QuickStartSessionRequestZodSchema.safeParse(req.body);
-        if (!parsed.success) {
-            const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-            throw ApiError.badRequest(`Invalid request body: ${issues}`);
-        }
-        const { examInput, globalInstructions } = parsed.data;
-        const userId = req.user!.id;
-
-        const session = await createSession(examInput, userId, req.user?.organisationId);
-        await completeSession(session.id, { globalInstructions: globalInstructions || [], topicSpecificInstructions: [] });
-        console.log(`[generation-agents] quick-started session ${session.id} (no intent chat, ${examInput.sections.length} section(s))`);
-
-        res.status(201).json({ success: true, data: { sessionId: session.id } });
     } catch (error) {
         next(error);
     }
@@ -247,6 +263,84 @@ const TriggerQuestionGenerationRequestZodSchema = z.object({
     sections: ExamBlueprintZodSchema.shape.sections.optional(),
 });
 
+const QuestionReviewTurnRequestZodSchema = z.object({
+    examId: z.string(),
+    message: z.string().min(1),
+});
+
+// Text-chat turn for the Question Review Agent — the non-voice path to the
+// same agent. Operates on the real saved exam, so the current structure is
+// re-read each turn rather than carried in a session.
+export const questionReviewTurnHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const parsed = QuestionReviewTurnRequestZodSchema.safeParse(req.body);
+        if (!parsed.success) {
+            const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+            throw ApiError.badRequest(`Invalid request body: ${issues}`);
+        }
+        const { examId, message } = parsed.data;
+
+        const requester = {
+            id: req.user!.id,
+            role: req.user!.role,
+            organisationId: req.user!.organisationId ?? null,
+        };
+
+        // Throws forbidden/not-found itself if the requester can't manage this
+        // exam — the same guard the voice session uses.
+        const examStructure = await getSectionsWithDetails(examId, requester);
+
+        // Loaded before the new message is stored, so the agent sees the
+        // conversation as it stood, then this turn on top — the same ordering
+        // the blueprint review agent uses.
+        const history = await getQuestionReviewHistory(examId);
+        await appendQuestionReviewMessage(examId, "user", message);
+
+        // Trimmed for the MODEL only — the raw structure (returned below as
+        // `sections`) is what the client renders and needs every field for.
+        const result = await questionReviewAgentTurn(buildQuestionReviewContext(examStructure), history, message, requester);
+        await appendQuestionReviewMessage(examId, "assistant", result.message);
+
+        // Re-read after the turn so the client renders what was actually
+        // written, not what it had before the edits.
+        const updatedStructure = await getSectionsWithDetails(examId, requester);
+
+        console.log(`[generation-agents] question review turn (exam ${examId}, ${result.changeLog.length} change(s), done: ${result.done})`);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                examId,
+                message: result.message,
+                done: result.done,
+                changeLog: result.changeLog,
+                sections: updatedStructure,
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Lets the chat panel restore its transcript after a refresh — the agent
+// already remembers, so the UI should too.
+export const getQuestionReviewHistoryHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const examId = String(req.params.examId);
+        // Permission check: same guard as the turn handler.
+        await getSectionsWithDetails(examId, {
+            id: req.user!.id,
+            role: req.user!.role,
+            organisationId: req.user!.organisationId ?? null,
+        });
+
+        const history = await getQuestionReviewHistory(examId);
+        res.status(200).json({ success: true, data: { examId, history } });
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const triggerQuestionGenerationHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         const parsed = TriggerQuestionGenerationRequestZodSchema.safeParse(req.body);
@@ -265,6 +359,15 @@ export const triggerQuestionGenerationHandler = async (req: Request, res: Respon
 
         if (sectionsOverride) {
             await updateBlueprint(session.id, { sections: sectionsOverride });
+        }
+
+        // Quota gate for AI question generation, counted from the blueprint
+        // that is about to be generated. Checked here rather than inside the
+        // pipeline so the teacher is told they're over the limit up front,
+        // instead of the run dying partway through after burning model calls.
+        if (session.organisationId) {
+            const sectionsToGenerate = sectionsOverride ?? session.blueprint.sections;
+            await assertQuota(session.organisationId, "question_generation", countBlueprintQuestions(sectionsToGenerate));
         }
 
         await setQuestionsInProgress(session.id);
@@ -297,19 +400,6 @@ export const getQuestionsStatusHandler = async (req: Request, res: Response, nex
                 questionsError: session.questionsError,
             },
         });
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const triggerTestPipelineHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-        const { ids } = await inngest.send({
-            name: "generation-agent/pipeline.test",
-            data: req.body || {},
-        });
-        console.log("[generation-agents] fired test pipeline event:", ids);
-        res.status(202).json({ success: true, data: { eventIds: ids } });
     } catch (error) {
         next(error);
     }

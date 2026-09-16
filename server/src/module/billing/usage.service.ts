@@ -84,6 +84,23 @@ export const assertQuota = async (organisationId: string, metric: UsageMetric, a
     }
 };
 
+// ── Voice agent entitlement ───────────────────────────────────────────────────
+// An on/off feature rather than a meter, so it gets its own check. Returns
+// false rather than throwing, for callers that just want to know (e.g. telling
+// the UI whether to offer voice at all).
+export const hasVoiceAgentAccess = async (organisationId: string | null): Promise<boolean> => {
+    if (!organisationId) return false;
+    const sub = await getOrganisationSubscription(organisationId);
+    return !!sub && sub.status === "active" && sub.hasVoiceAgent;
+};
+
+// Throwing version for the endpoints that actually start a voice session.
+export const assertVoiceAgentAccess = async (organisationId: string | null) => {
+    if (!(await hasVoiceAgentAccess(organisationId))) {
+        throw new ApiError(402, "Your plan does not include the voice agent. Use the chat agent instead, or upgrade your plan.");
+    }
+};
+
 // ── Count active students across an org's classrooms ─────────────────────────
 export const getActiveStudentCount = async (organisationId: string): Promise<number> => {
     const [result] = await db

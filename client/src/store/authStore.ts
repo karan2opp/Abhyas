@@ -2,7 +2,9 @@ import { create } from "zustand";
 import { getMe, refreshToken, logoutService } from "../app/auth/auth.service";
 
 interface User {
-  _id: string;
+  // The API returns `id` (Postgres/Drizzle). This was typed `_id` from an
+  // earlier Mongo-shaped API and never matched the actual response.
+  id: string;
   name: string;
   email: string;
   role: 'student' | 'teacher' | 'manager' | 'system_admin';

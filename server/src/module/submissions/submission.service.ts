@@ -39,6 +39,19 @@ const hasStaffAccessToExam = async (requester: Requester, exam: typeof exams.$in
     return false;
 };
 
+// ── Whether a requester may see a submission at all ───────────────────────────
+// The student who owns it, or staff with access to its exam. Used by anything
+// that exposes a submission indirectly (e.g. its evaluation job's state).
+export const canAccessSubmission = async (submissionId: string, requester: Requester): Promise<boolean> => {
+    const [submission] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
+    if (!submission) return false;
+    if (submission.userId === requester.id) return true;
+
+    const [exam] = await db.select().from(exams).where(eq(exams.id, submission.examId));
+    if (!exam) return false;
+    return hasStaffAccessToExam(requester, exam);
+};
+
 // ── Assert requester (co-teacher, or manager of the org) can grade/manage this exam's submissions ─
 const assertCanManageExamSubmissions = async (requester: Requester, examId: string) => {
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
@@ -89,6 +102,7 @@ const buildTextAnswersForEvaluation = async (submissionId: string): Promise<Text
             studentAnswer: answer.textAnswer ?? "",
             maxMarks: question.marks,
             questionImages: question.images as any,
+            contentBlocks: question.contentBlocks,
             rubric: question.rubric,
         });
     }
@@ -246,10 +260,40 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
         }
     }
 
-    // --- Set evaluating (descriptive) or submitted (MCQ only), then enqueue AI eval ---
+    // --- Quota gate: decide BEFORE touching the submission's status ---
+    // Enqueuing is the single point where evaluation quota is enforced, so a
+    // submission can only reach "evaluating" with a job actually behind it.
+    // Being out of quota never blocks the student from submitting — it just
+    // leaves their descriptive answers for the teacher to grade manually (or
+    // to re-run with AI later via evaluateSubmissionWithAI). Evaluations
+    // already queued are unaffected and run to completion.
+    let queueEvaluation = hasDescriptive;
+
+    if (hasDescriptive) {
+        const organisationId = await getOrganisationIdForSubmission(submissionId);
+        if (organisationId) {
+            try {
+                await assertQuota(organisationId, "question_evaluation", descriptiveCount);
+            } catch (quotaErr) {
+                // 402 (no plan / metric not included) and 429 (over quota) are
+                // the expected "can't grade right now" answers. Anything else
+                // is a real failure and must not silently disable AI grading.
+                const status = quotaErr instanceof ApiError ? quotaErr.statusCode : null;
+                if (status !== 402 && status !== 429) throw quotaErr;
+
+                queueEvaluation = false;
+                console.warn(
+                    `[Billing] Skipping AI evaluation for submission ${submissionId}: ${(quotaErr as ApiError).message} ` +
+                    `${descriptiveCount} descriptive answer(s) left for manual grading.`
+                );
+            }
+        }
+    }
+
+    // --- Set evaluating (AI grading queued) or submitted (nothing to grade) ---
     const [updated] = await db.update(submissions)
         .set({
-            status: hasDescriptive ? "evaluating" : "submitted",
+            status: queueEvaluation ? "evaluating" : "submitted",
             score: totalScore,
             submittedAt: new Date(),
             updatedAt: new Date(),
@@ -257,11 +301,7 @@ const submitExam = async (submissionId: string, studentId: string, mode: string)
         .where(eq(submissions.id, submissionId))
         .returning();
 
-    if (hasDescriptive) {
-        const organisationId = await getOrganisationIdForSubmission(submissionId);
-        if (organisationId) {
-            await assertQuota(organisationId, "question_evaluation", descriptiveCount);
-        }
+    if (queueEvaluation) {
         await evaluationQueue.add("evaluate-submission", { submissionId, mode }, {
             attempts: 3,
             backoff: { type: "exponential", delay: 5000 },
@@ -535,11 +575,16 @@ const getExamForSubmission = async (submissionId: string, requester: Requester) 
 
     const examSections = await db.select().from(sections).where(eq(sections.examId, exam.id));
 
+    // Hide the answer key only from the student actually sitting the exam.
+    // Staff (checked above) always see the full question, and the student
+    // themselves sees it once they've submitted and are reviewing results.
+    const hideAnswerKey = isOwner && submission.status === "inprogress";
+
     const sectionsWithQuestions = await Promise.all(examSections.map(async (section) => {
-        const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id));
+        const sectionQuestions = await db.select().from(questions).where(eq(questions.sectionId, section.id)).orderBy(questions.position);
 
         const questionsWithOptions = await Promise.all(sectionQuestions.map(async (question) => {
-            const questionOptions = await (submission.status === "inprogress" 
+            const questionOptions = await (hideAnswerKey
                 ? db.select({
                     id: options.id,
                     questionId: options.questionId,
@@ -547,6 +592,15 @@ const getExamForSubmission = async (submissionId: string, requester: Requester) 
                 }).from(options).where(eq(options.questionId, question.id))
                 : db.select().from(options).where(eq(options.questionId, question.id))
             );
+
+            // options.isCorrect is stripped for MCQs above; rubric and
+            // modelAnswer are the descriptive-question equivalent — rubric
+            // key_points spell out exactly what the grader looks for — so
+            // they have to come off the question for the same reason.
+            if (hideAnswerKey) {
+                const { rubric, modelAnswer, ...questionWithoutAnswerKey } = question;
+                return { ...questionWithoutAnswerKey, options: questionOptions };
+            }
 
             return { ...question, options: questionOptions };
         }));

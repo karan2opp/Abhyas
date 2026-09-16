@@ -17,6 +17,8 @@ export interface GenerateTopicQuestionsInput {
     subtopics: { name: string; count: number }[];
     globalInstructions: string[];
     topicInstructions: string[];
+    // Book text per subtopic, for exams built from a book. Questions must be answerable from it.
+    sourceMaterial?: { subtopic: string; text: string }[] | undefined;
 }
 
 /**
@@ -40,6 +42,7 @@ export async function generateTopicQuestions(input: GenerateTopicQuestionsInput)
         subtopics: input.subtopics,
         global_instructions: input.globalInstructions,
         topic_instructions: input.topicInstructions,
+        ...(input.sourceMaterial?.length ? { source_material: input.sourceMaterial } : {}),
     };
 
     const response = await client.chat.completions.create({

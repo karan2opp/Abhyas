@@ -12,6 +12,9 @@ const classifyLine = (raw: string): "code" | "prose" | "blank" => {
   const t = raw.trim();
   if (!t) return "blank";
 
+  // LaTeX maths ($...$ or $$...$$) is prose that renders as an equation, even though it contains "=".
+  if (/\$[^$]+\$/.test(t)) return "prose";
+
   // Strong code openers
   if (CODE_KEYWORD_START.test(t)) return "code";
   if (/\{\s*$/.test(t) || /\}\s*$/.test(t) || /;\s*$/.test(t)) return "code";

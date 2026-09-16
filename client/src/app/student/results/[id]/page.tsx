@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
-import remarkGfm from "remark-gfm";
+import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
+import { ContentBlocksView, OptionValue } from "@/components/QuestionContentBlocks";
 
 export default function ResultsPage() {
   const params = useParams();
@@ -339,7 +340,8 @@ export default function ResultsPage() {
                       </div>
                       <div className="text-base sm:text-lg font-medium text-white leading-relaxed prose prose-invert max-w-none">
                         <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
+                          remarkPlugins={MATH_REMARK_PLUGINS}
+                          rehypePlugins={MATH_REHYPE_PLUGINS}
                           components={{
                             pre: ({ children }) => {
                               const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
@@ -368,6 +370,7 @@ export default function ResultsPage() {
                         >
                           {normalizeCodeBlocks(`**Q${questionIndex + 1}.** ${selectedQuestion.description}`)}
                         </ReactMarkdown>
+                        <ContentBlocksView blocks={selectedQuestion.contentBlocks} size="compact" />
                       </div>
                     </div>
 
@@ -429,7 +432,7 @@ export default function ResultsPage() {
 
                         return (
                           <div key={opt.id} className={`p-4 rounded-xl border flex items-center justify-between ${optBg} transition-colors`}>
-                            <div className="text-gray-200">{opt.value}</div>
+                            <div className="text-gray-200"><OptionValue value={opt.value} isCode={opt.isCode} size="compact" /></div>
                             {icon}
                           </div>
                         );

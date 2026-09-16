@@ -6,6 +6,7 @@ import {
     listDocumentsHandler,
     getDocumentStatusHandler,
     renameDocumentHandler,
+    setDocumentVisibilityHandler,
     deleteDocumentHandler,
     generateFromDocumentsHandler,
     searchQuestionBankHandler,
@@ -49,6 +50,13 @@ router.patch(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     renameDocumentHandler
+);
+
+router.patch(
+    "/documents/:documentId/visibility",
+    authenticate,
+    authorize("system_admin", "teacher", "manager"),
+    setDocumentVisibilityHandler
 );
 
 router.delete(

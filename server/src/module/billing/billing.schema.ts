@@ -15,6 +15,10 @@ export const plans = pgTable("plans", {
   bufferStudents: integer("buffer_students").default(0).notNull(),
   maxQuestionGenerations: integer("max_question_generations").default(0).notNull(),
   maxQuestionEvaluations: integer("max_question_evaluations").default(0).notNull(),
+  // Entitlement, not a meter: the realtime voice agent is either included or
+  // it isn't. Organisations without it fall back to the text chat agents,
+  // which do the same work — every voice flow has a chat equivalent.
+  hasVoiceAgent: boolean("has_voice_agent").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -39,6 +43,10 @@ export const organisationSubscriptions = pgTable("organisation_subscriptions", {
   bufferStudents: integer("buffer_students").default(0).notNull(),
   maxQuestionGenerations: integer("max_question_generations").default(0).notNull(),
   maxQuestionEvaluations: integer("max_question_evaluations").default(0).notNull(),
+  // Snapshotted like the limits above, so the voice check reads one row and
+  // a later change to the plan template can't silently switch it off for an
+  // organisation mid-period.
+  hasVoiceAgent: boolean("has_voice_agent").default(false).notNull(),
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

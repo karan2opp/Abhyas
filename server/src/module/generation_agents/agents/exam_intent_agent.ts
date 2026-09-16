@@ -1,12 +1,21 @@
 import { getClientForModel } from "../../../common/agent/openai.client.js";
 import { env } from "../../../env.js";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { ExamIntentAgentOutputZodSchema, type ConversationTurn, type ConversationSummary } from "../Types/outputConversation.js";
+import { ExamIntentAgentOutputZodSchema, type ConversationTurn, type ConversationSummary, type ExamIntentAgentOutput } from "../Types/outputConversation.js";
 import type { IInputExam } from "../Types/inputExam.js";
 import { searchMemories, addMemories } from "../../../common/utils/mem0.js";
 
 const topicName = (t: IInputExam["sections"][number]["topics"][number]): string =>
   typeof t === "string" ? t : t.topic;
+
+// Fixed strings the "Skip Question" / "Skip All Questions" chat buttons send
+// as the user's turn, instead of freeform text — the system prompt below
+// teaches the model exactly what each one means, so behavior is deterministic
+// rather than depending on how a real teacher might happen to phrase "skip".
+// Exported so the controller sends the exact same text the prompt describes.
+export const SKIP_QUESTION_SIGNAL = "[[SKIP_QUESTION]] The user has no preference for the question you just asked — do not ask it again.";
+export const SKIP_ALL_SIGNAL = "[[SKIP_ALL]] The user wants to stop answering and move on — finalize now using only what has already been discussed.";
+export const FORCE_CONCLUDE_SIGNAL = "[[FORCE_CONCLUDE]] You must set done to true and produce the summary in this reply — this is mandatory.";
 
 // Builds a short query describing this exam so mem0 can surface only the
 // memories relevant to it (not everything this teacher has ever said).
@@ -222,6 +231,18 @@ Ask exactly one question at a time.
 Once all applicable steps have been completed, produce the final summary.
 ---
 
+## CONTROL SIGNALS
+
+A message is sometimes not a real answer from the user but one of these exact bracketed markers instead:
+
+- "[[SKIP_QUESTION]] ..." — the user has no preference for the question you just asked. Do not ask it again in any form or rephrasing. Move directly to the next missing item in the collection order. This is NOT information gathered — leave that aspect out of the final summary entirely, exactly as if it had never been asked.
+- "[[SKIP_ALL]] ..." — the user wants to stop the conversation right now, no matter how much is still missing. Do not ask anything further. Immediately produce the final summary (done: true) using only what has already been established earlier in this conversation. For anything not yet discussed, leave it out — never invent a value or assume a default for it.
+- "[[FORCE_CONCLUDE]] ..." — you must set done to true and produce the summary in THIS reply. You are seeing this only because you did not comply with an earlier [[SKIP_ALL]]; there is no further room to ask another question.
+
+These markers are never something the user actually typed. Never quote them back, never ask the user what they mean, and never treat the bracketed text itself as a topic, preference, or answer.
+
+---
+
 ## SUMMARY RULES
 
 When enough information has been collected, produce the final summary.
@@ -314,17 +335,43 @@ export async function examIntentAgentTurn(
     ...history.map((turn) => ({ role: turn.role, content: turn.content })),
   ];
 
-  const response = await client.chat.completions.create({
-    model: env.GENERATION_MODEL,
-    messages,
-    response_format: zodResponseFormat(
-      ExamIntentAgentOutputZodSchema,
-      "exam_intent_agent_output"
-    ),
-  });
+  // Retried like every other structured-output call in this codebase
+  // (evaluateSingleAnswer, generateTopicQuestions): the model occasionally
+  // returns a malformed/empty object for a turn, and without a retry that
+  // was an unhandled ZodError reaching the teacher as a raw, unreadable
+  // message instead of the conversation just continuing.
+  const MAX_ATTEMPTS = 3;
+  let result: ExamIntentAgentOutput | null = null;
+  let lastError: unknown;
 
-  const content = response.choices[0]?.message.content || "{}";
-  let result = ExamIntentAgentOutputZodSchema.parse(JSON.parse(content));
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await client.chat.completions.create({
+        model: env.GENERATION_MODEL,
+        messages,
+        response_format: zodResponseFormat(
+          ExamIntentAgentOutputZodSchema,
+          "exam_intent_agent_output"
+        ),
+      });
+
+      const content = response.choices[0]?.message.content || "{}";
+      result = ExamIntentAgentOutputZodSchema.parse(JSON.parse(content));
+      break;
+    } catch (err) {
+      lastError = err;
+      console.warn(
+        `[exam-intent-agent] attempt ${attempt + 1}/${MAX_ATTEMPTS} produced an invalid response, ${attempt + 1 < MAX_ATTEMPTS ? "retrying" : "giving up"}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  if (!result) {
+    throw new Error(
+      `The exam intent agent could not produce a valid response after ${MAX_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+    );
+  }
 
   // Hard guarantee, independent of prompt adherence: never let the very
   // first turn conclude with zero questions asked. Memory can make the model

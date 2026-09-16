@@ -3,6 +3,7 @@ import { getClientForModel } from "../../common/agent/openai.client.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { env } from "../../env.js";
 import { getEvaluationPrompt, runGuardrail } from "./agents/evalAgent.js";
+import type { QuestionContentBlock } from "../questions/question.schema.js";
 
 const EvaluationOutputSchema = z.object({
     marksAwarded: z.number().optional(),
@@ -23,6 +24,10 @@ export interface TextAnswer {
     studentAnswer: string;
     maxMarks: number;
     questionImages?: { url: string; publicId: string }[] | null;
+    // Code/table/list the question depends on (e.g. "explain what this code
+    // does") — without this the grader is judging the student's answer
+    // against a question whose actual content it can't see.
+    contentBlocks?: QuestionContentBlock[];
     rubric?: {
         categories: {
             name: string;
@@ -62,7 +67,11 @@ export const calculateMarksFromScores = (
         }
     }
 
-    return Math.min(maxMarks, Math.max(0, Math.round(totalWeightedScore * maxMarks * 2) / 2));
+    // Rounded to the nearest 0.1 rather than 0.5 — category scores are now a
+    // fine-grained 0-1 scale (see evalAgent.ts), so the final mark should be
+    // able to actually reflect that (e.g. 2.3, 3.7) instead of being
+    // quantized back down onto a coarse half-mark grid regardless of input.
+    return Math.min(maxMarks, Math.max(0, Math.round(totalWeightedScore * maxMarks * 10) / 10));
 };
 
 // ── Single rubric-based evaluation round ──────────────────────────────────────
@@ -77,6 +86,9 @@ const evaluateSingleAnswer = async (
 
     const inputObj: any = {
         question: answer.question,
+        // The question's own code/table/list content, if it has any — the
+        // question text may just say "the code below" without repeating it.
+        content_blocks: answer.contentBlocks && answer.contentBlocks.length > 0 ? answer.contentBlocks : null,
         max_marks: answer.maxMarks,
         rubric: answer.rubric || null,
         student_answer: answer.studentAnswer,

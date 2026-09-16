@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import db from "../common/db/index.js";
 import { plans } from "../common/db/schema.js";
 
+// hasVoiceAgent is the only thing separating "pro" from "pro_voice" — every
+// other limit is identical, so the voice agent is the whole upgrade. Plans
+// without it fall back to the chat agents, which cover the same flows.
 const DEFAULT_PLANS = [
   {
     name: "basic",
@@ -13,6 +16,7 @@ const DEFAULT_PLANS = [
     bufferStudents: 20,
     maxQuestionGenerations: 10000,
     maxQuestionEvaluations: 10000,
+    hasVoiceAgent: false,
     isActive: true,
   },
   {
@@ -24,6 +28,19 @@ const DEFAULT_PLANS = [
     bufferStudents: 40,
     maxQuestionGenerations: 25000,
     maxQuestionEvaluations: 25000,
+    hasVoiceAgent: false,
+    isActive: true,
+  },
+  {
+    name: "pro_voice",
+    isCustom: false,
+    period: "monthly",
+    price: 0,
+    baseStudents: 200,
+    bufferStudents: 40,
+    maxQuestionGenerations: 25000,
+    maxQuestionEvaluations: 25000,
+    hasVoiceAgent: true,
     isActive: true,
   },
   {
@@ -35,6 +52,7 @@ const DEFAULT_PLANS = [
     bufferStudents: 0,
     maxQuestionGenerations: 0,
     maxQuestionEvaluations: 0,
+    hasVoiceAgent: false,
     isActive: true,
   },
 ];

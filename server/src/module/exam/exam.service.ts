@@ -1,4 +1,4 @@
-import { eq, and, count, inArray, avg, desc, ilike, gte, or, isNull, lte } from "drizzle-orm";
+import { eq, and, count, inArray, avg, desc, ilike, gte, or, isNull, lte, sql } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { exams, sections, questions, options, groups, classroomStudents, groupStudents, blocks } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
@@ -197,6 +197,26 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                 }
             }
 
+            // Position is scoped per SECTION (spanning every block in it —
+            // matches how the UI numbers "Q1, Q2, ..." per section, and how
+            // the Question Review Agent resolves "question N"), so this one
+            // counter carries across every block/question inserted below,
+            // regardless of which block they land in. Starts after whatever
+            // already exists when appending to an existing section (0 for a
+            // brand-new one).
+            let nextPosition = 0;
+            {
+                const maxRows = await tx
+                    .select({ maxPosition: sql<number | null>`max(${questions.position})` })
+                    .from(questions)
+                    .where(eq(questions.sectionId, sectionIdToUse));
+                // An aggregate with no GROUP BY always returns exactly one
+                // row, even over an empty set — the ?. is only for the type
+                // checker (this codebase's strict noUncheckedIndexedAccess).
+                const maxPosition = maxRows[0]?.maxPosition;
+                if (maxPosition !== null && maxPosition !== undefined) nextPosition = maxPosition + 1;
+            }
+
             const blockList = Array.isArray(secData.blocks) && secData.blocks.length > 0 ? secData.blocks : null;
 
             if (blockList) {
@@ -221,7 +241,9 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                             type: qData.type,
                             description: qData.description,
                             marks: qData.marks,
+                            position: nextPosition++,
                             rubric: qData.rubric || null,
+                            contentBlocks: qData.contentBlocks || qData.content_blocks || [],
                         }).returning();
 
                         if (!question) throw ApiError.internal("Failed to create question");
@@ -232,6 +254,7 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                                     questionId: question.id,
                                     value: opt.value,
                                     isCorrect: opt.isCorrect,
+                                    isCode: opt.isCode ?? opt.is_code ?? false,
                                 }))
                             );
                         }
@@ -245,7 +268,9 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                         type: qData.type,
                         description: qData.description,
                         marks: qData.marks,
+                        position: nextPosition++,
                         rubric: qData.rubric || null,
+                        contentBlocks: qData.contentBlocks || qData.content_blocks || [],
                     }).returning();
 
                     if (!question) throw ApiError.internal("Failed to create question");
@@ -256,6 +281,7 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
                                 questionId: question.id,
                                 value: opt.value,
                                 isCorrect: opt.isCorrect,
+                                isCode: opt.isCode ?? opt.is_code ?? false,
                             }))
                         );
                     }
@@ -271,11 +297,12 @@ const saveGeneratedExam = async (data: any, requester: Requester) => {
 
         const grandTotalMarks = allExamQuestions.reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
 
-        await tx.update(exams)
+        const [savedExam] = await tx.update(exams)
             .set({ totalMarks: grandTotalMarks, updatedAt: new Date() })
-            .where(eq(exams.id, exam.id));
+            .where(eq(exams.id, exam.id))
+            .returning();
 
-        return exam;
+        return savedExam ?? exam;
     });
 };
 

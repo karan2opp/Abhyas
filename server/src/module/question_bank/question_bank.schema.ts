@@ -20,6 +20,23 @@ export interface QuestionBankList {
     items: string[];
 }
 
+// One parsed MCQ choice. `label` is the marker as printed ("A", "ii", "3")
+// and is stripped out of questionText; `text` is the choice itself, which is
+// content, not noise — an MCQ is unanswerable without it. Every `text` here
+// is verified to appear verbatim in the chunk's rawText before it is stored
+// (see question_bank_classifier.ts), so options can never be invented.
+export interface QuestionBankOption {
+    label: string;
+    text: string;
+}
+
+// Who may retrieve a document's questions:
+//   private      — only the teacher who uploaded it
+//   organisation — any teacher/manager/system_admin in the same organisation
+// Students never reach the question bank at all (enforced at the route).
+export const questionBankVisibilityEnum = ["private", "organisation"] as const;
+export type QuestionBankVisibility = (typeof questionBankVisibilityEnum)[number];
+
 // One row per uploaded PYQ PDF. status tracks the async Inngest pipeline
 // (extract -> chunk -> classify -> embed -> upsert) independently of the
 // HTTP request that kicked it off.
@@ -29,6 +46,9 @@ export const questionBankDocuments = pgTable("question_bank_documents", {
     organisationId: text("organisation_id").references(() => organisations.id),
     title: text("title").notNull(),
     fileUrl: text("file_url").notNull(),
+    // Defaults to "private": a teacher's upload is theirs until they choose
+    // to share it with the organisation.
+    visibility: text("visibility").$type<QuestionBankVisibility>().default("private").notNull(),
     status: text("status").$type<"pending" | "processing" | "completed" | "failed">().default("pending").notNull(),
     totalChunks: integer("total_chunks").default(0).notNull(),
     error: text("error"),
@@ -48,7 +68,17 @@ export const questionBankChunks = pgTable("question_bank_chunks", {
     documentId: text("document_id").references(() => questionBankDocuments.id, { onDelete: "cascade" }).notNull(),
     organisationId: text("organisation_id").references(() => organisations.id),
     questionNumber: text("question_number"),
+    // Verbatim extracted text, markers and all — the audit trail. Never
+    // rewritten, never stripped; questionText below is the cleaned view.
     rawText: text("raw_text").notNull(),
+    // The question stem alone: rawText minus the option lines and the answer
+    // line, which are lifted out into `options`/`correctOption` instead.
+    // Falls back to rawText when nothing could be parsed out.
+    questionText: text("question_text"),
+    options: jsonb("options").$type<QuestionBankOption[]>().default([]),
+    // The answer key when the source paper prints one ("Answer: C") — stored
+    // as the option label. Ground truth that can't be recovered any other way.
+    correctOption: text("correct_option"),
     subject: text("subject"),
     topics: text("topics").array(),
     description: text("description"),

@@ -9,6 +9,10 @@ const router = Router();
 // Plans are visible to any authenticated user (needed for purchase UI).
 router.get("/plans", authenticate, controller.listPlans);
 
+// Feature flags for the current user's organisation. Open to any staff role —
+// carries no billing figures, only what is switched on.
+router.get("/entitlements/mine", authenticate, authorize("system_admin", "manager", "teacher"), controller.getMyEntitlements);
+
 // Manager self-service routes MUST come before the parameterized routes below,
 // otherwise "/usage/mine" matches "/usage/:orgId" (system_admin) first and the
 // manager gets 403.

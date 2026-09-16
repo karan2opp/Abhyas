@@ -9,6 +9,7 @@ export interface CustomPlanLimits {
     bufferStudents?: number;
     maxQuestionGenerations?: number;
     maxQuestionEvaluations?: number;
+    hasVoiceAgent?: boolean;
 }
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,12 +32,15 @@ export const assignPlanToOrganisation = async (
             bufferStudents: customLimits?.bufferStudents ?? 0,
             maxQuestionGenerations: customLimits?.maxQuestionGenerations ?? 0,
             maxQuestionEvaluations: customLimits?.maxQuestionEvaluations ?? 0,
+            // Off unless explicitly bought, the same as every other custom limit.
+            hasVoiceAgent: customLimits?.hasVoiceAgent ?? false,
         }
         : {
             baseStudents: plan.baseStudents,
             bufferStudents: plan.bufferStudents,
             maxQuestionGenerations: plan.maxQuestionGenerations,
             maxQuestionEvaluations: plan.maxQuestionEvaluations,
+            hasVoiceAgent: plan.hasVoiceAgent,
         };
 
     const now = new Date();

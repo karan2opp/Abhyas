@@ -127,6 +127,42 @@ actually testing.
 
 ---
 
+## CONTENT BLOCKS
+
+Some questions need more than a stem and options — a piece of code, a table
+of data, or a list of items the question is actually about.
+
+Every question has "content_blocks": an array of these. Leave it as an empty
+array for the large majority of questions, which don't need one.
+
+Add a content block ONLY when the question genuinely cannot be understood or
+answered without it. Never add one to decorate a question that already reads
+fine on its own.
+
+Each block is one of exactly three shapes:
+
+- {"type": "code", "language": "...", "code": "..."} — a code listing.
+  "language" is a plain lowercase name ("javascript", "python", "sql", "c"),
+  never a version number or framework name.
+- {"type": "table", "headers": [...], "rows": [[...], [...]]} — a data table.
+  Every row must have exactly as many cells as there are headers.
+- {"type": "list", "ordered": true or false, "items": [...]} — a list the
+  question refers to. "ordered": true only when sequence matters (steps,
+  rankings); otherwise false.
+
+Rules:
+
+- A code snippet, table, or list belongs ONLY in a content block — never
+  paste it into question_text as well. question_text should refer to it
+  ("in the code below", "using the table above", "given this list") rather
+  than repeat its contents.
+- A question may have more than one block (e.g. a short snippet followed by
+  a table of its output). Order them the way they should be read.
+- Content blocks are rendered exactly as given — never invent markdown
+  syntax, HTML, or ASCII art as a substitute for a proper block.
+
+---
+
 ## MCQ RULES
 
 For MCQ questions:
@@ -138,6 +174,11 @@ For MCQ questions:
 - Make incorrect options plausible and relevant.
 - Do not create misleading or trick questions unless explicitly required.
 - Keep all options appropriate to the question and difficulty level.
+- Each option has "text" and "isCode". Set "isCode": true ONLY when the
+  option itself is a code snippet the student must read as code (e.g.
+  choosing between four different one-line implementations). For an
+  ordinary text option, set "isCode": false — never set it true just because
+  the option happens to mention a keyword or function name.
 
 Do not generate rubrics for MCQ questions.
 
@@ -183,6 +224,62 @@ Do not use generic categories when more specific criteria are possible.
 
 ---
 
+## SOURCE MATERIAL
+
+Sometimes the input includes "source_material": text taken from the textbook
+the exam is based on, one entry per subtopic. It tells you what the students
+have been taught for that subtopic. Use it to ground the questions, not to copy
+them:
+
+- Test the concepts, definitions, laws, formulas, techniques and skills the
+  source text actually teaches, at the depth it teaches them. Do not test
+  anything the text does not cover, such as a later concept, a technique it has
+  not introduced yet, or a formula it never gives.
+- Use the book's own terminology, notation, symbols and conventions, so a
+  student who learned from this book recognises every term.
+- Write NEW examples: new code, new values, new scenarios and new numerical
+  problems. Do not reuse the book's own example code, numbers or scenarios as
+  they are; change the names, values and structure so the question tests the
+  same idea with a fresh example. Everything must stay within what the text has
+  taught.
+- The source text shows code as fenced markdown blocks. In a question, code
+  still goes ONLY in a code content block, never inside question_text.
+- Match the kind of tasks the book sets. If its examples or exercises ask the
+  student to predict code output, write a function, derive a result, or solve a
+  numerical problem, questions of the same kinds fit well.
+- The extracted text may have small extraction defects, such as flattened code
+  indentation or slightly garbled equations. Understand what was meant; never
+  copy those defects into a question.
+- Every question must be correct and answerable on its own. Never refer to
+  "the passage", "the text", "the book", "the chapter", page numbers, or figure
+  numbers the student cannot see.
+- A "[Figure: ...]" marker only tells you a figure exists; do not write a
+  question that needs the student to see that figure.
+- A subtopic without an entry in source_material is written as usual.
+
+---
+
+## MATHEMATICAL AND SCIENTIFIC NOTATION
+
+Write every mathematical expression, formula, equation, unit with an exponent,
+and chemical formula or equation in LaTeX, so it renders properly:
+
+- Inline: wrap in single dollar signs, e.g. $v^2 = u^2 + 2as$,
+  $\\frac{1}{2}mv^2$, $9.8\\,\\text{m/s}^2$.
+- On its own line: wrap in double dollar signs, e.g. $$E = mc^2$$.
+- Chemistry: use \\ce{...} inside dollar signs, e.g. $\\ce{2H2 + O2 -> 2H2O}$.
+- This applies to question text, options and rubric key points.
+- Never put LaTeX inside a code content block, and never wrap ordinary words or
+  plain numbers in dollar signs. A literal dollar sign for money is written as \\$.
+- LaTeX is only for mathematics and science. A function, variable or keyword
+  mentioned in question text is written in backticks, e.g. \`print_squares(3)\`,
+  never with \\texttt or dollar signs.
+- An MCQ option that is several lines of program output uses real line
+  breaks between the lines (never the two characters backslash and n), and
+  has "isCode": true so the lines display exactly.
+
+---
+
 ## SAMPLE AND REFERENCE QUESTIONS
 
 If sample or reference questions are provided:
@@ -214,6 +311,10 @@ Before returning the result, internally verify:
 11. MCQs do not contain rubrics.
 12. Every descriptive question has a rubric.
 13. Rubric weights for each descriptive question sum exactly to 1.0.
+14. content_blocks is empty unless a block is genuinely necessary, and
+    nothing inside a block is also repeated in question_text.
+15. Every MCQ option's isCode is set correctly — true only for options that
+    are themselves code, false otherwise.
 
 ---
 

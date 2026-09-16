@@ -1,4 +1,5 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
+import type { QuestionBankVisibility } from "./question_bank.schema.js";
 
 export const QUESTION_BANK_COLLECTION = "question_bank_chunks";
 // text-embedding-3-small's native output size.
@@ -33,7 +34,7 @@ export async function ensureQuestionBankCollection(): Promise<void> {
         });
     }
 
-    for (const field of ["organisationId", "subject", "topics", "documentId"]) {
+    for (const field of ["organisationId", "subject", "topics", "documentId", "createdBy", "visibility", "questionType"]) {
         try {
             await qdrant.createPayloadIndex(QUESTION_BANK_COLLECTION, {
                 field_name: field,
@@ -50,11 +51,28 @@ export async function ensureQuestionBankCollection(): Promise<void> {
 export interface QuestionBankPointPayload {
     documentId: string;
     organisationId: string | null;
+    // Denormalized from the owning document so access can be decided inside
+    // the vector search itself — Qdrant can't join back to Postgres, and
+    // filtering after the fact would silently shrink the result set below the
+    // requested limit. Kept in sync by setQuestionBankPointsVisibility when a
+    // document's sharing changes.
+    createdBy: string;
+    visibility: QuestionBankVisibility;
     subject: string;
     topics: string[];
     questionNumber: string | null;
+    // Multiple-choice or written-answer. Stored so the search can narrow by
+    // type itself — otherwise the wrong type comes back ranked and has to be
+    // thrown away afterwards, which quietly returns fewer questions than asked.
+    questionType: "mcq" | "descriptive";
     hasImages: boolean;
     hasTables: boolean;
+}
+
+// Who is asking. Access is "mine, plus anything my organisation has shared".
+export interface QuestionBankAccess {
+    userId: string;
+    organisationId: string | null;
 }
 
 export async function upsertQuestionBankPoints(
@@ -66,6 +84,25 @@ export async function upsertQuestionBankPoints(
     await qdrant.upsert(QUESTION_BANK_COLLECTION, {
         wait: true,
         points: points.map((p) => ({ id: p.id, vector: p.vector, payload: p.payload as unknown as Record<string, unknown> })),
+    });
+}
+
+/**
+ * Rewrites the visibility stamped on every point of one document. Must be
+ * called whenever a document's sharing changes — the payload is a denormalized
+ * copy, so without this a document shared (or un-shared) after indexing would
+ * keep answering searches under its old rules.
+ */
+export async function setQuestionBankPointsVisibility(
+    documentId: string,
+    visibility: QuestionBankVisibility
+): Promise<void> {
+    await ensureQuestionBankCollection();
+    const qdrant = getQdrantClient();
+    await qdrant.setPayload(QUESTION_BANK_COLLECTION, {
+        wait: true,
+        payload: { visibility },
+        filter: { must: [{ key: "documentId", match: { value: documentId } }] },
     });
 }
 
@@ -86,21 +123,51 @@ export interface QuestionBankSearchHit {
 
 export async function searchQuestionBankPoints(
     vector: number[],
-    options: { organisationId?: string | null; subject?: string; topics?: string[]; limit?: number } = {}
+    access: QuestionBankAccess,
+    options: {
+        subject?: string;
+        topics?: string[];
+        // Restrict to specific documents (the papers a teacher ticked) and/or
+        // one question type. Both are applied INSIDE the search so every hit
+        // returned is already usable — narrowing afterwards would mean asking
+        // for far more than needed and still coming up short.
+        documentIds?: string[];
+        questionType?: "mcq" | "descriptive";
+        limit?: number;
+    } = {}
 ): Promise<QuestionBankSearchHit[]> {
     await ensureQuestionBankCollection();
     const qdrant = getQdrantClient();
 
-    const must: Record<string, unknown>[] = [];
-    if (options.organisationId) must.push({ key: "organisationId", match: { value: options.organisationId } });
+    // Access is mandatory and non-negotiable: a question is reachable only if
+    // the caller uploaded it, or their organisation shared it. Expressed as a
+    // nested should[] inside must[], so it ANDs with the topical filters
+    // rather than widening them.
+    const accessClauses: Record<string, unknown>[] = [
+        { key: "createdBy", match: { value: access.userId } },
+    ];
+    if (access.organisationId) {
+        accessClauses.push({
+            must: [
+                { key: "visibility", match: { value: "organisation" } },
+                { key: "organisationId", match: { value: access.organisationId } },
+            ],
+        });
+    }
+
+    const must: Record<string, unknown>[] = [{ should: accessClauses }];
     if (options.subject) must.push({ key: "subject", match: { value: options.subject } });
     if (options.topics && options.topics.length > 0) must.push({ key: "topics", match: { any: options.topics } });
+    if (options.documentIds && options.documentIds.length > 0) {
+        must.push({ key: "documentId", match: { any: options.documentIds } });
+    }
+    if (options.questionType) must.push({ key: "questionType", match: { value: options.questionType } });
 
     const result = await qdrant.query(QUESTION_BANK_COLLECTION, {
         query: vector,
         limit: options.limit ?? 10,
         with_payload: true,
-        ...(must.length > 0 ? { filter: { must } } : {}),
+        filter: { must },
     });
 
     return result.points.map((point) => ({

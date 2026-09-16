@@ -5,6 +5,7 @@ export const customLimitsSchema = z.object({
     bufferStudents: z.number().int().min(0).optional(),
     maxQuestionGenerations: z.number().int().min(0).optional(),
     maxQuestionEvaluations: z.number().int().min(0).optional(),
+    hasVoiceAgent: z.boolean().optional(),
 });
 
 export const assignPlanSchema = z.object({

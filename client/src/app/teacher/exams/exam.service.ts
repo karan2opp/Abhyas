@@ -42,11 +42,6 @@ export const createSectionService = async (data: any) => {
   return res.data;
 };
 
-export const getSectionsByExamService = async (examId: string) => {
-  const res = await api.get(`/sections/${examId}`);
-  return res.data;
-};
-
 export const getSectionsWithDetailsService = async (examId: string) => {
   const res = await api.get(`/sections/${examId}/details`);
   return res.data;
@@ -68,39 +63,8 @@ export const createQuestionService = async (data: any) => {
   return res.data;
 };
 
-
 export const saveGeneratedExamService = async (data: any) => {
   const res = await api.post("/exams/save-generated", data);
-  return res.data;
-};
-
-export const generateBlueprintService = async (data: any) => {
-  const res = await api.post("/generation/blueprint", data);
-  return res.data;
-};
-
-export const verifyBlueprintService = async (blueprint: any) => {
-  const res = await api.post("/generation/verify-blueprint", blueprint);
-  return res.data;
-};
-
-export const enqueueGenerateFromBlueprintService = async (blueprint: any) => {
-  const res = await api.post("/generation/generate-from-blueprint/async", blueprint);
-  return res.data;
-};
-
-export const getGenerationJobService = async (jobId: string) => {
-  const res = await api.get(`/jobs/${jobId}`);
-  return res.data;
-};
-
-export const getQuestionsBySectionService = async (sectionId: string) => {
-  const res = await api.get(`/questions/section/${sectionId}`);
-  return res.data;
-};
-
-export const getQuestionByIdService = async (id: string) => {
-  const res = await api.get(`/questions/${id}`);
   return res.data;
 };
 
@@ -111,22 +75,6 @@ export const updateQuestionService = async (id: string, data: any) => {
 
 export const deleteQuestionService = async (id: string) => {
   const res = await api.delete(`/questions/${id}`);
-  return res.data;
-};
-
-// ------------- OPTIONS -------------
-export const createOptionService = async (data: any) => {
-  const res = await api.post("/options", data);
-  return res.data;
-};
-
-export const updateOptionService = async (id: string, data: any) => {
-  const res = await api.patch(`/options/${id}`, data);
-  return res.data;
-};
-
-export const deleteOptionService = async (id: string) => {
-  const res = await api.delete(`/options/${id}`);
   return res.data;
 };
 

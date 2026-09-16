@@ -22,7 +22,10 @@ import {
     updateBlueprint,
 } from "./exam_intent_session.service.js";
 import { getSectionsWithDetails } from "../sections/sections.service.js";
+import { buildQuestionReviewContext } from "./question_review_context.util.js";
 import type { Requester } from "../../common/permissions/index.js";
+import { assertVoiceAgentAccess } from "../billing/usage.service.js";
+import { getUsableBook } from "../books/book_retrieval.js";
 
 const toRequester = (req: Request): Requester => ({
     id: req.user!.id,
@@ -77,6 +80,13 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
         let { sessionId } = parsed.data;
         const userId = req.user!.id;
 
+        // The single gate for voice: this is where the OpenAI realtime key is
+        // minted, so nothing can start a voice session without passing here.
+        // system_admin is exempt — platform staff aren't on a subscription.
+        if (req.user!.role !== "system_admin") {
+            await assertVoiceAgentAccess(req.user!.organisationId ?? null);
+        }
+
         let instructions: string;
         let tools: unknown[];
 
@@ -84,12 +94,15 @@ export const createRealtimeSessionHandler = async (req: Request, res: Response, 
             if (!examId) throw ApiError.badRequest("examId is required for the question review agent");
             // Throws forbidden/not-found itself if the requester can't manage this exam.
             const examStructure = await getSectionsWithDetails(examId, toRequester(req));
-            instructions = `${ENGLISH_ONLY_DIRECTIVE}\n\n${getQuestionReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM STRUCTURE (sections, blocks, and questions — each question has a unique "id"; each section/block has an "id"):\n${JSON.stringify(examStructure)}`;
+            instructions = `${ENGLISH_ONLY_DIRECTIVE}\n\n${getQuestionReviewSystemPrompt()}${VOICE_ADDENDUM}\n\nCURRENT EXAM STRUCTURE (sections, blocks, and questions — each question has a unique "id"; each section/block has an "id"):\n${JSON.stringify(buildQuestionReviewContext(examStructure))}`;
             tools = getQuestionReviewAgentRealtimeTools();
             sessionId = examId;
         } else if (agent === "intent") {
             if (!sessionId) {
                 if (!examInput) throw ApiError.badRequest("examInput is required to start a new intent session");
+                if (examInput.bookId) {
+                    await getUsableBook(examInput.bookId, { userId, organisationId: req.user?.organisationId ?? null }, req.user!.role === "system_admin");
+                }
                 const session = await createSession(examInput, userId, req.user?.organisationId);
                 sessionId = session.id;
             } else {
@@ -281,7 +294,20 @@ export const executeQuestionReviewRealtimeToolHandler = async (req: Request, res
 
         res.status(200).json({
             success: true,
-            data: { done: false, output: { resultText: result.resultText }, sections: examStructure, changeLog: result.changeLog },
+            data: {
+                done: false,
+                output: { resultText: result.resultText },
+                // Full structure for the client to render; a separate
+                // trimmed copy for it to re-inject back into the live voice
+                // conversation. The Realtime API accumulates conversation
+                // history, so unlike a single text-turn request, sending the
+                // full structure here would repeat it — bigger each time —
+                // in the model's context on every single tool call for the
+                // rest of the session.
+                sections: examStructure,
+                reviewContext: buildQuestionReviewContext(examStructure),
+                changeLog: result.changeLog,
+            },
         });
     } catch (error) {
         next(error);

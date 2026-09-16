@@ -3,6 +3,12 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { getClientForModel } from "../../common/agent/openai.client.js";
 import { env } from "../../env.js";
 import type { QuestionBankRawChunk } from "./question_bank_chunker.js";
+import type { QuestionBankOption } from "./question_bank.schema.js";
+
+const ParsedOptionZodSchema = z.object({
+    label: z.string().describe('The option marker exactly as printed, without brackets or punctuation — "A", "b", "iii", "2".'),
+    text: z.string().describe("The option's text copied VERBATIM from the question, with the label marker removed and nothing else changed."),
+});
 
 const ClassifiedChunkZodSchema = z.object({
     index: z.number(),
@@ -11,6 +17,9 @@ const ClassifiedChunkZodSchema = z.object({
     description: z.string(),
     needsCleanup: z.boolean().describe("true ONLY if the original text has a genuine mechanical defect. false in every other case, including text that is merely awkward, terse, or informally worded."),
     cleanedText: z.string().describe("Ignored by the caller unless needsCleanup is true — see needsCleanup."),
+    questionStem: z.string().describe("The question itself with the option lines and any answer line removed. Copied verbatim — never reworded."),
+    options: z.array(ParsedOptionZodSchema).describe("The multiple-choice options, in the order printed. Empty array if this is not a multiple-choice question."),
+    correctOption: z.string().nullable().describe('The answer label if the paper prints one (e.g. "Answer: C" -> "C"). null if the paper does not state the answer — never guess it.'),
 });
 
 const ClassificationBatchZodSchema = z.object({
@@ -25,6 +34,60 @@ export interface ChunkClassification {
     // — never a rewrite. This is what gets stored/returned as the question,
     // replacing the raw chunker output.
     cleanedText: string;
+    // The stem with option/answer lines lifted out. Falls back to cleanedText
+    // whenever the split couldn't be verified (see verifyOptionSplit).
+    questionText: string;
+    options: QuestionBankOption[];
+    correctOption: string | null;
+}
+
+// Whitespace differs constantly between the PDF extraction and anything the
+// model echoes back (line breaks become spaces, runs of spaces collapse), so
+// verbatim checks compare on a whitespace- and case-normalized form.
+const normalize = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * Gate on the model's option split: every option's text must actually appear
+ * in the question as extracted, and the stem must too. If any part fails, the
+ * whole split is rejected and the chunk keeps its unsplit text.
+ *
+ * This is the same principle as the cleanedText guard — the model is trusted
+ * to LOCATE structure, never to author it. An invented or reworded option
+ * can't survive this check, no matter what the prompt did or didn't get
+ * across on a given call.
+ */
+function verifyOptionSplit(
+    original: string,
+    stem: string,
+    options: { label: string; text: string }[],
+    correctOption: string | null
+): { questionText: string; options: QuestionBankOption[]; correctOption: string | null } | null {
+    if (options.length === 0) return null;
+
+    const haystack = normalize(original);
+
+    for (const option of options) {
+        if (!option.text.trim()) return null;
+        if (!haystack.includes(normalize(option.text))) return null;
+    }
+
+    // Labels have to be distinct, or they can't be referenced unambiguously.
+    const labels = options.map((o) => o.label.trim());
+    if (labels.some((l) => !l) || new Set(labels).size !== labels.length) return null;
+
+    const trimmedStem = stem.trim();
+    if (!trimmedStem || !haystack.includes(normalize(trimmedStem))) return null;
+
+    // An answer key pointing at an option that doesn't exist is a misread —
+    // drop the key rather than store a dangling reference.
+    const answer = correctOption?.trim() || null;
+    const verifiedAnswer = answer && labels.includes(answer) ? answer : null;
+
+    return {
+        questionText: trimmedStem,
+        options: options.map((o) => ({ label: o.label.trim(), text: o.text.trim() })),
+        correctOption: verifiedAnswer,
+    };
 }
 
 // How many questions go into one classification call. Batching keeps cost
@@ -53,6 +116,18 @@ For each question you are given, also return:
 - "subject": the single subject it belongs to (e.g. "Physics", "Mathematics").
 - "topics": one or more specific topics/concepts the question tests (e.g. ["Newton's Laws", "Friction"]). A question can genuinely span more than one topic — include all that apply, but do not pad the list with tenuous ones.
 - "description": one or two plain-English sentences describing what the question is actually asking/testing. This is what gets embedded for semantic search, so make it concrete and specific rather than generic — mention the concept, the type of problem, and any numbers/context that matter. If the question references a table or figure, say so explicitly (e.g. "...using the data in the accompanying table" / "...based on the diagram provided").
+
+SPLITTING THE QUESTION FROM ITS OPTIONS
+
+Exam papers print structural markers around the actual content: the question number, option labels like "(A)", "b.", "iii)", and sometimes a printed answer line like "Answer: C" or "Ans. (b)". Separate those markers from the content:
+
+- "questionStem": the question itself, copied verbatim, with the option lines and any answer line removed. Everything that is part of the question — including any "Choose the correct option" style instruction that belongs to it — stays. Do not reword, reorder, summarize, or complete it.
+- "options": one entry per printed choice, IN THE ORDER PRINTED. "label" is the marker with its brackets/punctuation stripped ("A", "b", "iii"). "text" is the choice itself, copied CHARACTER FOR CHARACTER from the question with only the label marker removed.
+- "correctOption": the label the paper states as the answer, if and only if the paper prints one. If it does not, return null. NEVER work out the answer yourself — a wrong key is far worse than no key.
+
+The option text is CONTENT, not a marker — never drop it, shorten it, or tidy it. Only the label marker itself is removed. If the question is not multiple-choice, return an empty "options" array and put the whole question in "questionStem".
+
+Your "options" and "questionStem" are checked against the original text automatically: if any option's text does not appear in the original word for word, the entire split is thrown away and the question is stored unsplit. Copying exactly is the only way your split survives.
 
 Return one classification per question, echoing back the same "index" you were given so the caller can match your output to its input. Do not skip any question.`;
 
@@ -109,11 +184,24 @@ export async function classifyQuestionBankChunks(chunks: QuestionBankRawChunk[])
                 // prevents rewriting, independent of how well the model follows
                 // the prompt on any given call.
                 const original = chunks[item.index]?.rawText ?? "";
+                const cleanedText = item.needsCleanup ? item.cleanedText : original;
+
+                // Verified against the ORIGINAL text, not cleanedText — the
+                // model was shown the original, so that's what its option
+                // strings have to match.
+                const split = verifyOptionSplit(original, item.questionStem, item.options, item.correctOption);
+                if (!split && item.options.length > 0) {
+                    console.warn(`[question-bank] rejected unverifiable option split for chunk ${item.index} — storing question unsplit`);
+                }
+
                 results[item.index] = {
                     subject: item.subject,
                     topics: item.topics,
                     description: item.description,
-                    cleanedText: item.needsCleanup ? item.cleanedText : original,
+                    cleanedText,
+                    questionText: split?.questionText ?? cleanedText,
+                    options: split?.options ?? [],
+                    correctOption: split?.correctOption ?? null,
                 };
             }
         }
@@ -127,5 +215,8 @@ export async function classifyQuestionBankChunks(chunks: QuestionBankRawChunk[])
         topics: [],
         description: (chunks[i]?.rawText ?? "").slice(0, 200),
         cleanedText: chunks[i]?.rawText ?? "",
+        questionText: chunks[i]?.rawText ?? "",
+        options: [],
+        correctOption: null,
     });
 }

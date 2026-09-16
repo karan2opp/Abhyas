@@ -2,7 +2,9 @@ import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+  // Must include the /api prefix — every route is mounted under it server-side
+  // (e.g. /api/auth), and callers pass paths like "/auth/me".
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
   withCredentials: true,
   timeout: 300000, // 5 minutes (increased for long AI generation requests)
 });

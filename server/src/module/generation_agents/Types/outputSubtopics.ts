@@ -27,6 +27,8 @@ export type SectionSubtopicsOutput = z.infer<typeof SectionSubtopicsOutputZodSch
 // right before the blueprint is saved.
 export const AllocatedSubtopicZodSchema = SubtopicZodSchema.extend({
     allocatedQuestions: z.number().int().min(0),
+    // Book subsection node ids this subtopic comes from, for exams built from a book.
+    sourceNodeIds: z.array(z.string()).optional(),
 });
 
 export const AllocatedTopicZodSchema = z.object({
@@ -42,6 +44,8 @@ export const ExamBlueprintSectionZodSchema = z.object({
     name: z.string(),
     subject: z.string(),
     topics: z.array(AllocatedTopicZodSchema),
+    // Teacher topics the book doesn't cover, left out of the plan so no questions are invented for them.
+    unmatchedTopics: z.array(z.string()).optional(),
 });
 
 export const ExamBlueprintZodSchema = z.object({

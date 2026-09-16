@@ -50,6 +50,9 @@ export const IInputExamZodSchema = z.object({
     instructions: z.array(z.string()).optional(),
     difficulty: DifficultyZodEnum.optional(),
     educationLevel: EducationLevelZodSchema.optional(),
+    // The indexed book to build questions from ("From Source" mode). When set, subtopics are the book's own
+    // subsections and questions are written from their text.
+    bookId: z.string().optional(),
     sections: z.array(ISectionZodSchema),
 });
 

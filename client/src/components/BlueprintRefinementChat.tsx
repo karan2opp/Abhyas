@@ -14,6 +14,7 @@ import {
   ReviewRealtimeToolResult,
 } from "@/services/generationAgents.service";
 import { useRealtimeVoiceAgent } from "@/hooks/useRealtimeVoiceAgent";
+import { useEntitlements } from "@/hooks/useEntitlements";
 
 interface BlueprintRefinementChatProps {
   sessionId: string;
@@ -27,6 +28,7 @@ interface BlueprintRefinementChatProps {
 // which editing surface touched it last. Supports both typed and spoken
 // (OpenAI Realtime, WebRTC) turns against the exact same backend tools.
 export default function BlueprintRefinementChat({ sessionId, sections, onSectionsChange }: BlueprintRefinementChatProps) {
+  const { entitlements } = useEntitlements();
   const [history, setHistory] = useState<ConversationTurn[]>([]);
   const [reply, setReply] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -97,26 +99,30 @@ export default function BlueprintRefinementChat({ sessionId, sections, onSection
           <Sparkles className="h-4 w-4 text-orange-500" />
           <h4 className="text-sm font-bold text-white">Refinement Agent</h4>
         </div>
-        <Button
-          onClick={toggleVoice}
-          size="sm"
-          variant="outline"
-          className={`h-7 px-2.5 text-[11px] font-semibold rounded-lg ${
-            isVoiceActive
-              ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
-              : "bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20"
-          }`}
-        >
-          {isVoiceActive ? (
-            <>
-              <MicOff className="h-3 w-3 mr-1" /> {voice.status === "connecting" ? "Connecting..." : "End Call"}
-            </>
-          ) : (
-            <>
-              <Mic className="h-3 w-3 mr-1" /> Talk
-            </>
-          )}
-        </Button>
+        {/* Voice is a paid plan feature. Without it this stays a text chat,
+            which supports the same refinement flow. */}
+        {entitlements.voiceAgent && (
+          <Button
+            onClick={toggleVoice}
+            size="sm"
+            variant="outline"
+            className={`h-7 px-2.5 text-[11px] font-semibold rounded-lg ${
+              isVoiceActive
+                ? "bg-red-500/10 border-red-500/30 text-red-300 hover:bg-red-500/20"
+                : "bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20"
+            }`}
+          >
+            {isVoiceActive ? (
+              <>
+                <MicOff className="h-3 w-3 mr-1" /> {voice.status === "connecting" ? "Connecting..." : "End Call"}
+              </>
+            ) : (
+              <>
+                <Mic className="h-3 w-3 mr-1" /> Talk
+              </>
+            )}
+          </Button>
+        )}
       </div>
       <p className="text-[11px] text-gray-500 mb-3 -mt-1">
         Ask for changes in plain language — e.g. &quot;give Arrays 3 more questions&quot; — by typing or talking.

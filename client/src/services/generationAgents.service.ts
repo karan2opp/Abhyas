@@ -36,6 +36,8 @@ export interface ExamInput {
   instructions?: string[];
   difficulty?: Difficulty;
   educationLevel?: EducationLevel;
+  // Build questions from this indexed book ("From Source" mode).
+  bookId?: string;
   sections: SectionInput[];
 }
 
@@ -81,10 +83,30 @@ export const continueExamIntentConversation = async (
   return res.data.data;
 };
 
+// "Skip Question" — the agent moves on to its next question without this
+// one being answered. Sent as a control signal, not freeform text: the
+// server substitutes its own fixed marker so the agent's behavior doesn't
+// depend on exactly how the button's click is worded.
+export const skipExamIntentQuestion = async (sessionId: string): Promise<ConversationAgentOutput> => {
+  const res = await api.post("/generation-agents/conversation", { sessionId, action: "skip_question" });
+  return res.data.data;
+};
+
+// "Skip All Questions" — ends the conversation immediately. Whatever was
+// already discussed is kept; anything not yet asked is simply left out of
+// the plan rather than guessed at. Always resolves with done: true — the
+// server guarantees this even if the agent itself doesn't comply right away.
+export const skipAllExamIntentQuestions = async (sessionId: string): Promise<ConversationAgentOutput> => {
+  const res = await api.post("/generation-agents/conversation", { sessionId, action: "skip_all" });
+  return res.data.data;
+};
+
 export interface AllocatedSubtopic {
   name: string;
   weight: number;
   allocatedQuestions: number;
+  // Book subsection ids this subtopic comes from, for exams built from a book.
+  sourceNodeIds?: string[];
 }
 
 export interface AllocatedTopic {
@@ -98,6 +120,8 @@ export interface ExamBlueprintSection {
   name: string;
   subject: string;
   topics: AllocatedTopic[];
+  // Teacher topics the selected book doesn't cover.
+  unmatchedTopics?: string[];
 }
 
 export interface ExamBlueprint {
@@ -125,18 +149,6 @@ export const triggerBlueprintGeneration = async (
 
 export const getBlueprintStatus = async (sessionId: string): Promise<BlueprintStatusResponse> => {
   const res = await api.get(`/generation-agents/blueprint/${sessionId}`);
-  return res.data.data;
-};
-
-// Creates and immediately completes an Exam Intent session with no chat —
-// for callers (like a one-shot config form) that already have their own
-// instructions UI and have nothing left for the agent to ask about. From
-// here on the session behaves exactly like a chat-completed one.
-export const quickStartSession = async (
-  examInput: ExamInput,
-  globalInstructions: string[] = []
-): Promise<{ sessionId: string }> => {
-  const res = await api.post("/generation-agents/session/quick-start", { examInput, globalInstructions });
   return res.data.data;
 };
 
@@ -181,15 +193,43 @@ export interface Rubric {
   categories: RubricCategory[];
 }
 
+// Supplementary content shown between the question text and its options —
+// mirrors the server's QuestionContentBlock (question.schema.ts).
+export interface CodeContentBlock {
+  type: "code";
+  language: string;
+  code: string;
+}
+
+export interface TableContentBlock {
+  type: "table";
+  headers: string[];
+  rows: string[][];
+}
+
+export interface ListContentBlock {
+  type: "list";
+  ordered: boolean;
+  items: string[];
+}
+
+export type QuestionContentBlock = CodeContentBlock | TableContentBlock | ListContentBlock;
+
+export interface GeneratedOption {
+  text: string;
+  isCode: boolean;
+}
+
 export interface MCQGeneratedQuestion {
   id: string;
   type: "mcq";
   topic: string;
   subtopic: string;
   question_text: string;
-  options: string[];
+  options: GeneratedOption[];
   correct_option: "A" | "B" | "C" | "D";
   marks: number;
+  content_blocks: QuestionContentBlock[];
 }
 
 export interface DescriptiveGeneratedQuestion {
@@ -200,6 +240,7 @@ export interface DescriptiveGeneratedQuestion {
   question_text: string;
   rubric: Rubric;
   marks: number;
+  content_blocks: QuestionContentBlock[];
 }
 
 export type GeneratedQuestion = MCQGeneratedQuestion | DescriptiveGeneratedQuestion;
@@ -246,13 +287,6 @@ export const getQuestionsStatus = async (sessionId: string): Promise<QuestionsSt
   return res.data.data;
 };
 
-export const triggerTestPipelineService = async (
-  payload: Record<string, unknown>
-): Promise<{ eventIds: string[] }> => {
-  const res = await api.post("/generation-agents/pipeline/test", payload);
-  return res.data.data;
-};
-
 // ── Realtime voice agents ──
 
 export type RealtimeAgentKind = "intent" | "review" | "question_review";
@@ -269,11 +303,39 @@ export interface RealtimeSessionResponse {
 // whose blueprint is already completed. For "question_review", examId must
 // point to a real, already-saved exam — it operates directly on that exam's
 // live questions, not a generation session.
+export interface QuestionReviewTurnResult {
+  examId: string;
+  message: string;
+  done: boolean;
+  changeLog: string[];
+  sections: any[];
+}
+
+// Text counterpart of the question review voice session, for plans without
+// the voice agent. Same agent, same tools, same edits to the saved exam.
+export const sendQuestionReviewTurn = async (
+  examId: string,
+  message: string
+): Promise<QuestionReviewTurnResult> => {
+  const res = await api.post("/generation-agents/question-review/turn", { examId, message });
+  return res.data.data;
+};
+
+export const getQuestionReviewHistory = async (
+  examId: string
+): Promise<{ examId: string; history: ConversationTurn[] }> => {
+  const res = await api.get(`/generation-agents/question-review/${examId}`);
+  return res.data.data;
+};
+
 export const startRealtimeSession = async (
   agent: RealtimeAgentKind,
   opts: { sessionId?: string; examInput?: ExamInput; examId?: string } = {}
 ): Promise<RealtimeSessionResponse> => {
   const res = await api.post("/generation-agents/realtime/session", { agent, ...opts });
+  // NOTE: the server rejects this with 402 when the organisation's plan has no
+  // voice agent. Callers should hide voice controls via useEntitlements()
+  // rather than relying on the error.
   return res.data.data;
 };
 

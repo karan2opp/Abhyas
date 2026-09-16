@@ -161,13 +161,22 @@ export function useRealtimeVoiceAgent({ agent, onToolResult }: UseRealtimeVoiceA
           // reference next.
           if ((agent === "review" || agent === "question_review") && result?.sections) {
             const label = agent === "review" ? "exam blueprint" : "questions";
+            // question_review's server response also includes a trimmed
+            // `reviewContext` — same content, only the fields the model
+            // needs, no duplicated questions or dead timestamp fields. Use
+            // it here since the Realtime API accumulates conversation
+            // history: sending the untrimmed sections would repeat that
+            // full payload, growing every time, for the rest of the
+            // session's context. The full `sections` still goes to
+            // onToolResult above for the UI to render.
+            const forModel = agent === "question_review" && result.reviewContext ? result.reviewContext : result.sections;
             sendEvent({
               type: "conversation.item.create",
               item: {
                 type: "message",
                 role: "user",
                 content: [
-                  { type: "input_text", text: `Updated ${label} (all sections):\n${JSON.stringify(result.sections)}` },
+                  { type: "input_text", text: `Updated ${label} (all sections):\n${JSON.stringify(forModel)}` },
                 ],
               },
             });

@@ -41,6 +41,17 @@ export const purchasePlan = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Plan purchased successfully", result);
 };
 
+// ── Entitlements ─────────────────────────────────────────────────────────────
+// What the caller's organisation can actually use, with no billing figures in
+// it — teachers need to know whether to offer voice, but have no business
+// seeing plan limits or pricing.
+export const getMyEntitlements = async (req: Request, res: Response) => {
+    const voiceAgent =
+        req.user!.role === "system_admin" ||
+        (await usageService.hasVoiceAgentAccess(req.user!.organisationId ?? null));
+    return ApiResponse.ok(res, "Entitlements", { voiceAgent });
+};
+
 // ── Usage ────────────────────────────────────────────────────────────────────
 export const getMyUsage = async (req: Request, res: Response) => {
     const organisationId = req.user!.organisationId;

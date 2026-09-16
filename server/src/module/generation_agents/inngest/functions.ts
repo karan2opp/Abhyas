@@ -1,8 +1,10 @@
 import { createId } from "@paralleldrive/cuid2";
 import { inngest } from "../../../common/inngest/client.js";
 import { generateSectionSubtopics } from "../agents/subtopics_agent.js";
-import { generateTopicQuestions } from "../agents/generation_agent.js";
+import { generateTopicQuestions, type GenerateTopicQuestionsInput } from "../agents/generation_agent.js";
+import { verifyAndRepairTopicQuestions } from "../topic_question_verification.js";
 import { allocateSectionQuestions } from "../allocation.js";
+import { recordUsage } from "../../billing/usage.service.js";
 import {
     getSession,
     saveBlueprint,
@@ -14,37 +16,9 @@ import {
 import type { ExamBlueprintSection, TopicWithSubtopics } from "../Types/outputSubtopics.js";
 import type { GeneratedTopicQuestions } from "../Types/outputGeneration.js";
 import type { TopicInput } from "../Types/inputExam.js";
+import { generateBookSectionSubtopics, loadSourceMaterial, matchSubtopicsToBook } from "../../books/book_retrieval.js";
 
 const topicName = (t: TopicInput): string => (typeof t === "string" ? t : t.topic);
-
-/**
- * Scaffold pipeline function — proves the Inngest wiring (event -> function ->
- * steps -> terminal logs -> dashboard trace) before the real subtopics/batch/
- * generate/review steps are built. Each step.run() call becomes its own
- * inspectable entry in the Inngest dev dashboard (localhost:8288) in addition
- * to the console logs below.
- */
-export const testPipelineFunction = inngest.createFunction(
-    {
-        id: "generation-agent-test-pipeline",
-        triggers: [{ event: "generation-agent/pipeline.test" }],
-    },
-    async ({ event, step }) => {
-        const received = await step.run("receive-input", async () => {
-            console.log("[generation-agent-test-pipeline] receive-input:", event.data);
-            return event.data;
-        });
-
-        const transformed = await step.run("transform", async () => {
-            const result = { ...received, transformedAt: new Date().toISOString() };
-            console.log("[generation-agent-test-pipeline] transform:", result);
-            return result;
-        });
-
-        console.log("[generation-agent-test-pipeline] done:", transformed);
-        return transformed;
-    }
-);
 
 /**
  * Trace-only function for the Exam Intent Agent. The conversation itself stays
@@ -93,13 +67,39 @@ export const generateBlueprintFunction = inngest.createFunction(
 
             const examInput = session.examInput;
             const summary = session.summary!;
-            const sectionResults: { name: string; subject: string; questionCount: number; topics: TopicWithSubtopics[] }[] = [];
+            const sectionResults: { name: string; subject: string; questionCount: number; topics: TopicWithSubtopics[]; unmatchedTopics?: string[] }[] = [];
 
             for (const section of examInput.sections) {
                 const sectionTopicNames = section.topics.map(topicName);
                 const topicInstructions = summary.topicSpecificInstructions.filter((t) =>
                     sectionTopicNames.includes(t.topic)
                 );
+
+                // From-source exams: subtopics are the book's own subsections, chosen per topic.
+                if (examInput.bookId) {
+                    const bookId = examInput.bookId;
+                    const bookResult = await step.run(`book-subtopics-section-${section.name}`, async () => {
+                        const planned = await generateBookSectionSubtopics(section, bookId, {
+                            globalInstructions: summary.globalInstructions,
+                            topicInstructions,
+                            difficulty: examInput.difficulty,
+                            educationLevel: examInput.educationLevel,
+                        });
+                        if (planned.topics.length === 0) {
+                            throw new Error(`None of the topics in "${section.name}" were found in the selected book (${planned.unmatchedTopics.join(", ")}).`);
+                        }
+                        console.log(`[generation-agent-generate-blueprint] section "${section.name}": ${planned.topics.length} topic(s) matched in the book, ${planned.unmatchedTopics.length} not found`);
+                        return planned;
+                    });
+                    sectionResults.push({
+                        name: section.name,
+                        subject: section.subject,
+                        questionCount: section.question_count,
+                        topics: bookResult.topics,
+                        unmatchedTopics: bookResult.unmatchedTopics,
+                    });
+                    continue;
+                }
 
                 const result = await step.run(`subtopics-section-${section.name}`, async () => {
                     console.log(`[generation-agent-generate-blueprint] generating subtopics for section "${section.name}" (${sectionTopicNames.length} topic(s))`);
@@ -124,6 +124,7 @@ export const generateBlueprintFunction = inngest.createFunction(
                     name: sr.name,
                     subject: sr.subject,
                     topics: allocateSectionQuestions(sr.topics, sr.questionCount),
+                    ...(sr.unmatchedTopics ? { unmatchedTopics: sr.unmatchedTopics } : {}),
                 }));
 
                 await saveBlueprint(sessionId, { sections: allocatedSections });
@@ -197,23 +198,39 @@ export const generateQuestionsFunction = inngest.createFunction(
                                     .filter((t) => t.topic === topic.topic)
                                     .flatMap((t) => t.instructions);
 
-                                const output = await generateTopicQuestions({
+                                const activeSubtopics = topic.subtopics.filter((s) => s.allocatedQuestions > 0);
+
+                                let sourceMaterial: { subtopic: string; text: string }[] | undefined;
+                                if (examInput.bookId) {
+                                    // Subtopics added while reviewing the plan have no book source yet; match them now.
+                                    const missing = activeSubtopics.filter((s) => !s.sourceNodeIds?.length).map((s) => s.name);
+                                    const matched = await matchSubtopicsToBook(examInput.bookId, topic.topic, missing);
+                                    sourceMaterial = await loadSourceMaterial(
+                                        activeSubtopics.map((s) => ({
+                                            name: s.name,
+                                            sourceNodeIds: s.sourceNodeIds?.length ? s.sourceNodeIds : matched.get(s.name) ?? [],
+                                        }))
+                                    );
+                                }
+
+                                const generationInput: GenerateTopicQuestionsInput = {
                                     subject: sectionInput.subject,
                                     question_type: sectionInput.question_type,
                                     marks: sectionInput.marks,
                                     difficulty: examInput.difficulty,
                                     educationLevel: examInput.educationLevel,
                                     topic: topic.topic,
-                                    subtopics: topic.subtopics
-                                        .filter((s) => s.allocatedQuestions > 0)
-                                        .map((s) => ({ name: s.name, count: s.allocatedQuestions })),
+                                    subtopics: activeSubtopics.map((s) => ({ name: s.name, count: s.allocatedQuestions })),
                                     globalInstructions: summary.globalInstructions,
                                     topicInstructions,
-                                });
+                                    sourceMaterial,
+                                };
+                                const output = await generateTopicQuestions(generationInput);
+                                const verified = await verifyAndRepairTopicQuestions(generationInput, output.questions);
 
                                 const generatedTopic: GeneratedTopicQuestions = {
                                     topic: topic.topic,
-                                    questions: output.questions.map((q) => ({ ...q, id: createId(), marks: sectionInput.marks })),
+                                    questions: verified.map((q) => ({ ...q, id: createId(), marks: sectionInput.marks })),
                                 };
                                 return generatedTopic;
                             })
@@ -225,6 +242,19 @@ export const generateQuestionsFunction = inngest.createFunction(
                 await step.run(`save-section-questions-${sanitizeStepId(section.name)}`, async () => {
                     const total = generatedTopics.reduce((n, t) => n + t.questions.length, 0);
                     await saveSectionQuestions(sessionId, { name: section.name, subject: section.subject, topics: generatedTopics });
+
+                    // Metered per section, after the save — a run that dies
+                    // halfway bills only the sections that actually landed.
+                    // Never fails the pipeline: the questions are already
+                    // saved, and losing a counter must not lose the work.
+                    if (session.organisationId) {
+                        try {
+                            await recordUsage(session.organisationId, "question_generation", total);
+                        } catch (meterErr) {
+                            console.error(`[Billing] Failed to record generation usage for org ${session.organisationId}:`, meterErr);
+                        }
+                    }
+
                     console.log(`[generation-agent-generate-questions] saved ${total} question(s) for section "${section.name}"`);
                 });
             }
@@ -241,7 +271,6 @@ export const generateQuestionsFunction = inngest.createFunction(
 );
 
 export const generationAgentFunctions = [
-    testPipelineFunction,
     examIntentTurnTraceFunction,
     generateBlueprintFunction,
     generateQuestionsFunction,

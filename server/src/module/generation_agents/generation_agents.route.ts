@@ -1,14 +1,14 @@
 import { Router } from "express";
 import {
     conversationTurnHandler,
-    quickStartSessionHandler,
-    triggerTestPipelineHandler,
     triggerBlueprintGenerationHandler,
     getBlueprintStatusHandler,
     blueprintReviewTurnHandler,
     getBlueprintReviewHistoryHandler,
     triggerQuestionGenerationHandler,
     getQuestionsStatusHandler,
+    questionReviewTurnHandler,
+    getQuestionReviewHistoryHandler,
 } from "./generation_agents.controller.js";
 import {
     createRealtimeSessionHandler,
@@ -27,13 +27,6 @@ router.post(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     conversationTurnHandler
-);
-
-router.post(
-    "/session/quick-start",
-    authenticate,
-    authorize("system_admin", "teacher", "manager"),
-    quickStartSessionHandler
 );
 
 router.post(
@@ -62,6 +55,21 @@ router.get(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     getBlueprintReviewHistoryHandler
+);
+
+// Text counterpart of /realtime/question-review/tool, for plans without voice.
+router.post(
+    "/question-review/turn",
+    authenticate,
+    authorize("system_admin", "teacher", "manager"),
+    questionReviewTurnHandler
+);
+
+router.get(
+    "/question-review/:examId",
+    authenticate,
+    authorize("system_admin", "teacher", "manager"),
+    getQuestionReviewHistoryHandler
 );
 
 router.post(
@@ -118,13 +126,6 @@ router.post(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     logReviewTurnHandler
-);
-
-router.post(
-    "/pipeline/test",
-    authenticate,
-    authorize("system_admin", "teacher", "manager"),
-    triggerTestPipelineHandler
 );
 
 export const generationAgentsRouter = router;

@@ -7,6 +7,7 @@ import { extractPdf } from "../../../common/pdf/pdf_python_bridge.js";
 import { uploadToCloudinary } from "../../../common/config/cloudinary.js";
 import { chunkQuestionBankDocument, type QuestionBankRawChunk } from "../question_bank_chunker.js";
 import { classifyQuestionBankChunks, type ChunkClassification } from "../question_bank_classifier.js";
+import { parseAnswerKey, stripAnswerKeyContent } from "../question_bank_answer_key.js";
 import { getDocument, markDocumentProcessing, markDocumentCompleted, markDocumentFailed, saveChunk, embedText } from "../question_bank.service.js";
 import { upsertQuestionBankPoints } from "../qdrant_client.js";
 import type { QuestionBankImage, QuestionBankTable, QuestionBankList } from "../question_bank.schema.js";
@@ -62,10 +63,35 @@ export const processQuestionBankDocumentFunction = inngest.createFunction(
             tmpDir = dir;
 
             const classifiedChunks = await step.run("chunk-and-classify", async () => {
-                const rawChunks: QuestionBankRawChunk[] = chunkQuestionBankDocument(extracted);
+                // Document-level pass first: an end-of-paper answer key is
+                // invisible to the classifier, which only ever sees one
+                // question at a time.
+                const answerKey = parseAnswerKey(extracted);
+                if (answerKey.size > 0) {
+                    console.log(`[question-bank] found an answer key with ${answerKey.size} entr(ies) for document ${documentId}`);
+                }
+
+                // Strip it before classifying, so the last question doesn't
+                // carry the whole key as its own content.
+                const rawChunks: QuestionBankRawChunk[] = chunkQuestionBankDocument(extracted).map(stripAnswerKeyContent);
                 console.log(`[question-bank] detected ${rawChunks.length} question chunk(s) for document ${documentId}`);
+
                 const classifications: ChunkClassification[] = await classifyQuestionBankChunks(rawChunks);
-                return rawChunks.map((chunk, i) => ({ chunk, classification: classifications[i]! }));
+
+                return rawChunks.map((chunk, i) => {
+                    const classification = classifications[i]!;
+                    // An answer printed inline with the question wins: it sits
+                    // right next to it and can't be mis-numbered. The key is
+                    // the fallback for everything else.
+                    const fromKey = chunk.questionNumber ? answerKey.get(String(parseInt(chunk.questionNumber, 10))) : undefined;
+                    return {
+                        chunk,
+                        classification: {
+                            ...classification,
+                            correctOption: classification.correctOption ?? fromKey ?? null,
+                        },
+                    };
+                });
             });
 
             const totalChunks = await step.run("persist-chunks", async () => {
@@ -96,6 +122,9 @@ export const processQuestionBankDocumentFunction = inngest.createFunction(
                                 organisationId: document.organisationId,
                                 questionNumber: chunk.questionNumber,
                                 rawText: classification.cleanedText,
+                                questionText: classification.questionText,
+                                options: classification.options,
+                                correctOption: classification.correctOption,
                                 subject: classification.subject,
                                 topics: classification.topics,
                                 description: classification.description,
@@ -113,9 +142,15 @@ export const processQuestionBankDocumentFunction = inngest.createFunction(
                                     payload: {
                                         documentId,
                                         organisationId: document.organisationId,
+                                        createdBy: document.createdBy,
+                                        visibility: document.visibility,
                                         subject: classification.subject,
                                         topics: classification.topics,
                                         questionNumber: chunk.questionNumber,
+                                        // Parsed options are what make it a
+                                        // multiple-choice question; without
+                                        // them it's a written answer.
+                                        questionType: classification.options.length > 0 ? "mcq" : "descriptive",
                                         hasImages: images.length > 0,
                                         hasTables: tables.length > 0,
                                     },

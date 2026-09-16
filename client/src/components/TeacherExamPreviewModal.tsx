@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { getExamByIdService, getSectionsWithDetailsService } from "@/app/teacher/exams/exam.service";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
-import remarkGfm from "remark-gfm";
+import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
+import { ContentBlocksView, OptionValue, type ContentBlock } from "@/components/QuestionContentBlocks";
 
 type FlattenedQuestion = {
   id: string;
@@ -18,6 +19,7 @@ type FlattenedQuestion = {
   type: string;
   options: any[];
   images: any[];
+  contentBlocks: ContentBlock[];
 };
 
 export function TeacherExamPreviewModal({
@@ -71,6 +73,7 @@ export function TeacherExamPreviewModal({
             type: q.type,
             options: q.options || [],
             images: q.images || [],
+            contentBlocks: q.contentBlocks || [],
           });
           globalIndex++;
         });
@@ -187,7 +190,8 @@ export function TeacherExamPreviewModal({
             <div>
               <div className="text-xl md:text-2xl font-bold text-white leading-snug whitespace-pre-wrap prose prose-invert max-w-none">
                 <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={MATH_REMARK_PLUGINS}
+                  rehypePlugins={MATH_REHYPE_PLUGINS}
                   components={{
                     pre: ({ children }) => {
                       const lang = String(((children as any)?.props?.className) || "").replace("language-", "") || "code";
@@ -217,6 +221,7 @@ export function TeacherExamPreviewModal({
                   {normalizeCodeBlocks(currentQuestion.description || "No question text provided.")}
                 </ReactMarkdown>
               </div>
+              <ContentBlocksView blocks={currentQuestion.contentBlocks} size="large" />
               {currentQuestion.images && currentQuestion.images.length > 0 && (
                 <div className="mt-6 mb-2">
                   <img src={currentQuestion.images[0].url} alt="Question figure" className="max-h-64 object-contain rounded-lg border border-white/10 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/50" />
@@ -270,7 +275,7 @@ export function TeacherExamPreviewModal({
                         {letter}
                       </div>
 
-                      <span className="text-[15px] leading-relaxed flex-1">{opt.value}</span>
+                      <span className="text-[15px] leading-relaxed flex-1"><OptionValue value={opt.value} isCode={opt.isCode} size="large" /></span>
                     </label>
                   );
                 })}

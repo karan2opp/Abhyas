@@ -98,13 +98,6 @@ class TeacherPermissions {
     }
 }
 
-class StudentPermissions {
-    static async canAttemptExam(studentId: string, examId: string): Promise<boolean> {
-        // TODO: Implement tomorrow when groups and group_exams tables are created
-        throw new Error("Group/Classroom features not yet implemented");
-    }
-}
-
 class ManagerPermissions {
     static async canManageTeacher(managerId: string, teacherId: string): Promise<boolean> {
         const manager = await db.select().from(users).where(eq(users.id, managerId));
@@ -141,7 +134,6 @@ class ManagerPermissions {
 
 export class PermissionService {
     static readonly teacher = TeacherPermissions;
-    static readonly student = StudentPermissions;
     static readonly manager = ManagerPermissions;
 
     // Dispatch on role: managers are checked by organisation, everyone else by id.

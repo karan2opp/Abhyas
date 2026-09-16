@@ -1,4 +1,4 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { questions, options, sections, exams } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -29,6 +29,7 @@ const verifyQuestionAccess = async (questionId: string, requester: Requester) =>
         type: questions.type,
         description: questions.description,
         marks: questions.marks,
+        contentBlocks: questions.contentBlocks,
         createdAt: questions.createdAt,
         updatedAt: questions.updatedAt,
         examId: sections.examId,
@@ -85,14 +86,32 @@ const createQuestion = async (
     }
 
     const result = await db.transaction(async (tx) => {
+        // Next position in this SECTION's list (spanning every block in it,
+        // matching how the UI numbers "Q1, Q2, ..." per section) — read
+        // inside the same transaction as the insert below so a concurrent
+        // add can't compute the same next position twice.
+        const positionRows = await tx
+            .select({ nextPosition: sql<number>`coalesce(max(${questions.position}), -1) + 1` })
+            .from(questions)
+            .where(eq(questions.sectionId, data.sectionId));
+        // An aggregate with no GROUP BY always returns exactly one row, even
+        // over an empty set — this fallback is only for the type checker.
+        const nextPosition = positionRows[0]?.nextPosition ?? 0;
+
         const [question] = await tx.insert(questions).values({
             sectionId: data.sectionId,
             blockId: data.blockId ?? null,
             type: data.type,
             description: data.description,
             marks: data.marks,
+            position: nextPosition,
             images: uploadedImages.length > 0 ? uploadedImages : null,
             rubric: data.rubric ?? null,
+            // Not yet on CreateQuestionDto (the manual editor doesn't send
+            // this — see question.dto.ts), but the Question Review Agent's
+            // generate-questions tool calls this function with it directly,
+            // so it has to be read defensively rather than dropped.
+            contentBlocks: (data as any).contentBlocks ?? [],
         }).returning();
 
         if (!question) throw ApiError.internal("Failed to create question");
@@ -105,6 +124,9 @@ const createQuestion = async (
                     questionId: question.id,
                     value: opt.value,
                     isCorrect: opt.isCorrect,
+                    // Same as contentBlocks above — not on the DTO yet, read
+                    // defensively for the review agent's generate tool.
+                    isCode: (opt as any).isCode ?? false,
                 }))
             ).returning();
         }
@@ -121,7 +143,7 @@ const createQuestion = async (
 const getQuestionsBySection = async (sectionId: string, requester: Requester) => {
     await verifySectionAccess(sectionId, requester);
 
-    const questionsData = await db.select().from(questions).where(eq(questions.sectionId, sectionId));
+    const questionsData = await db.select().from(questions).where(eq(questions.sectionId, sectionId)).orderBy(questions.position);
 
     const questionsWithOptions = await Promise.all(
         questionsData.map(async (question) => {
@@ -162,6 +184,10 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, reque
                 ...(data.marks && { marks: data.marks }),
                 ...(uploadedImages.length > 0 && { images: uploadedImages }),
                 ...(data.rubric !== undefined && { rubric: data.rubric }),
+                // Not on UpdateQuestionDto yet (see contentBlocks in
+                // createQuestion above) — read defensively for the review
+                // agent's update_question_text tool.
+                ...((data as any).contentBlocks !== undefined && { contentBlocks: (data as any).contentBlocks }),
                 updatedAt: new Date(),
             })
             .where(eq(questions.id, questionId))
@@ -194,6 +220,10 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, reque
                         .set({
                             value: opt.value,
                             isCorrect: opt.isCorrect,
+                            // Only touched when the caller actually sent it —
+                            // an edit that doesn't mention isCode must leave
+                            // an existing option's code-flag exactly as it was.
+                            ...("isCode" in opt && (opt as any).isCode !== undefined && { isCode: (opt as any).isCode }),
                             updatedAt: new Date(),
                         })
                         .where(eq(options.id, opt.id as string))
@@ -207,6 +237,7 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, reque
                         questionId,
                         value: opt.value!,
                         isCorrect: opt.isCorrect!,
+                        isCode: (opt as any).isCode ?? false,
                     }))
                 )
             }

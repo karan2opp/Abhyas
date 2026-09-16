@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently -n app,inngest -c blue,magenta --kill-others-on-fail \"npm:dev:app\" \"npm:inngest:dev\"",
     "dev:app": "tsc-watch --onSuccess \"node ./dist/src/index.js\"",
-    "build": "tsc",
+    "build": "tsc --noCheck --declaration false --declarationMap false --sourceMap false",
+    "typecheck": "tsc --noEmit",
     "start": "node ./dist/src/index.js",
     "studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
@@ -45,6 +46,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "inngest": "^4.18.1",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "openai": "^6.44.0",

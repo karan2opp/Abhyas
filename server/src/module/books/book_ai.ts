@@ -4,8 +4,23 @@ import { getClientForModel } from "../../common/agent/openai.client.js";
 import { env } from "../../env.js";
 
 const MAX_ATTEMPTS = 3;
+// Rate-limit responses need real breathing room before a retry has any
+// chance of succeeding; a parse failure doesn't, so it only gets a short
+// pause. Without this, a 429 was retried instantly twice more — which does
+// nothing but resend the same request into the same still-active limit,
+// especially with WINDOW_WAVE_SIZE firing several of these concurrently.
+const RATE_LIMIT_BASE_DELAY_MS = 2000;
+const PARSE_FAILURE_DELAY_MS = 300;
 
-/** One structured-output call, retried when the model returns something that doesn't parse. */
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitError(err: unknown): boolean {
+    return (err as { status?: number })?.status === 429;
+}
+
+/** One structured-output call, retried when the model returns something that doesn't parse or rate-limits. */
 export async function callStructured<T extends z.ZodTypeAny>(
     schema: T,
     name: string,
@@ -32,6 +47,10 @@ export async function callStructured<T extends z.ZodTypeAny>(
         } catch (err) {
             lastError = err;
             console.warn(`[books] ${name} attempt ${attempt} failed: ${(err as Error)?.message}`);
+            if (attempt < MAX_ATTEMPTS) {
+                const delay = isRateLimitError(err) ? RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt : PARSE_FAILURE_DELAY_MS;
+                await sleep(delay);
+            }
         }
     }
     throw new Error(`${name} failed after ${MAX_ATTEMPTS} attempts: ${(lastError as Error)?.message}`);

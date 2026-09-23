@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { examIntentAgentTurn, SKIP_QUESTION_SIGNAL, SKIP_ALL_SIGNAL, FORCE_CONCLUDE_SIGNAL } from "./agents/exam_intent_agent.js";
 import { blueprintReviewAgentTurn } from "./agents/blueprint_review_agent.js";
+import { generateTopicQuestions } from "./agents/generation_agent.js";
 import { IInputExamZodSchema } from "./Types/inputExam.js";
 import { ExamBlueprintZodSchema } from "./Types/outputSubtopics.js";
 import { buildGenerationContextBySection } from "./session_context.util.js";
@@ -400,6 +401,31 @@ export const getQuestionsStatusHandler = async (req: Request, res: Response, nex
                 questionsError: session.questionsError,
             },
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const TopicQuestionGenerationRequestZodSchema = z.object({
+    subject: z.string(),
+    question_type: z.enum(["mcq", "descriptive"]),
+    marks: z.number(),
+    topic: z.string(),
+    subtopics: z.array(z.object({ name: z.string(), count: z.number() })),
+    globalInstructions: z.array(z.string()).optional().default([]),
+    topicInstructions: z.array(z.string()).optional().default([]),
+    difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+});
+
+export const generateTopicQuestionsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const parsed = TopicQuestionGenerationRequestZodSchema.safeParse(req.body);
+        if (!parsed.success) {
+            const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+            throw ApiError.badRequest(`Invalid request body: ${issues}`);
+        }
+        const output = await generateTopicQuestions(parsed.data);
+        res.status(200).json({ success: true, data: output });
     } catch (error) {
         next(error);
     }

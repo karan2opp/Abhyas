@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Layers, Plus, ClipboardList, ClipboardCheck, Settings, Search, ChevronLeft, ChevronRight, Info, Clock } from "lucide-react";
+import { ArrowLeft, Layers, Plus, ClipboardList, ClipboardCheck, Settings, Search, ChevronLeft, ChevronRight, Info, Clock, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -279,29 +279,29 @@ export default function AssignmentsPage() {
   const isCustomSeriesAssignment = !!selectedNewAssignmentSeries && selectedNewAssignmentSeries.type === "custom";
 
   const openCreateAssignment = (seriesId?: string) => {
-    setNewAssignmentSeriesId(seriesId || "");
+    if (!seriesId) {
+      router.push(`/teacher/classrooms/${classroomId}/assignments/new`);
+      return;
+    }
+    setNewAssignmentSeriesId(seriesId);
     setNewAssignmentStartDate("");
     setNewAssignmentDueDate("");
-    if (seriesId) {
-      const selected = series.find((s) => s.id === seriesId);
-      setNewAssignmentGroupId(selected?.groupId || "");
-      setNewAssignmentDayGap("7");
+    const selected = series.find((s) => s.id === seriesId);
+    setNewAssignmentGroupId(selected?.groupId || "");
+    setNewAssignmentDayGap("7");
 
-      if (selected?.type === "custom") {
-        const inSeries = allAssignments.filter((a) => a.seriesId === seriesId);
-        const last = inSeries.reduce<AssignmentEntry | null>(
-          (a, b) => (!a || (b.sequenceOrder ?? 0) > (a.sequenceOrder ?? 0) ? b : a),
-          null
-        );
-        if (last?.dueDate) {
-          const nextStart = new Date(new Date(last.dueDate).getTime() + 24 * 60 * 60 * 1000);
-          const suggestedDue = new Date(nextStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-          setNewAssignmentStartDate(toDatetimeLocal(nextStart.toISOString()));
-          setNewAssignmentDueDate(toDatetimeLocal(suggestedDue.toISOString()));
-        }
+    if (selected?.type === "custom") {
+      const inSeries = allAssignments.filter((a) => a.seriesId === seriesId);
+      const last = inSeries.reduce<AssignmentEntry | null>(
+        (a, b) => (!a || (b.sequenceOrder ?? 0) > (a.sequenceOrder ?? 0) ? b : a),
+        null
+      );
+      if (last?.dueDate) {
+        const nextStart = new Date(new Date(last.dueDate).getTime() + 24 * 60 * 60 * 1000);
+        const suggestedDue = new Date(nextStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+        setNewAssignmentStartDate(toDatetimeLocal(nextStart.toISOString()));
+        setNewAssignmentDueDate(toDatetimeLocal(suggestedDue.toISOString()));
       }
-    } else {
-      setNewAssignmentGroupId("");
     }
     setAssignmentDialogOpen(true);
   };
@@ -420,20 +420,33 @@ export default function AssignmentsPage() {
           )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#18181b]merald-600/10 text-emerald-400 border border-emerald-500/20">
+        <div className="flex items-center justify-between gap-2">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-600/10 text-emerald-400 border border-emerald-500/20">
             {a.totalMarks} marks
           </span>
-          <Button
-            size="lg"
-            className="bg-orange-600 hover:bg-orange-700 text-white px-6"
-            onClick={(e) => {
-              e.stopPropagation();
-              router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}/submissions` + (a.seriesId ? `?seriesId=${a.seriesId}` : ""));
-            }}
-          >
-            <ClipboardCheck className="mr-2 h-4 w-4" /> Submissions
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-transparent border-white/10 text-white hover:bg-white/5"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}` + (a.seriesId ? `?seriesId=${a.seriesId}` : ""));
+              }}
+            >
+              <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+            </Button>
+            <Button
+              size="sm"
+              className="bg-orange-600 hover:bg-orange-700 text-white px-3"
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/teacher/classrooms/${classroomId}/assignments/${a.id}/submissions` + (a.seriesId ? `?seriesId=${a.seriesId}` : ""));
+              }}
+            >
+              <ClipboardCheck className="mr-1 h-3.5 w-3.5" /> Submissions
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

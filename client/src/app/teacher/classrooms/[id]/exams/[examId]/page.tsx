@@ -1,484 +1,373 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Bell, Image as ImageIcon, ChevronRight, UploadCloud, Plus, X, ArrowLeft } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ArrowRight, Bell, Loader2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { getExamByIdService, updateExamService } from "../../../../exams/exam.service";
+import { getMyClassroomsService } from "../../../classroom.service";
+import { listGroupsService } from "../../../group.service";
 import { QuestionBuilder } from "../new/QuestionBuilder";
+import { ExamDetailsForm, ExamDetails, EMPTY_EXAM_DETAILS, scheduledDurationMinutes } from "../new/ExamDetailsForm";
+import { WorkspaceShell, StatTile } from "../new/workspace";
+import QuestionReviewChat from "@/components/QuestionReviewChat";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
+
+type Phase = "details" | "questions" | "publish";
+
+const primaryButton = "bg-purple-600 hover:bg-purple-700 text-white h-10 px-6 font-bold text-sm rounded-xl shadow-lg shadow-purple-950/40";
+const ghostButton = "text-gray-400 hover:text-white h-10 px-4 text-sm font-semibold";
+
+function formatDateTime(value: string) {
+  return value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Not set";
+}
 
 export default function EditExamBuilder() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const classroomId = params.id as string;
   const examId = params.examId as string;
-  const initialStep = searchParams.get("step") ? parseInt(searchParams.get("step") as string) : 1;
-  
-  const { step, setStep, examId: storeExamId, setExamId, isAddingSection, isAiMode, setIsAddingSection, setIsAiMode, resetStore } = useExamBuilderStore();
+  const { resetStore } = useExamBuilderStore();
+
   const [isMounted, setIsMounted] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [phase, setPhase] = useState<Phase>("details");
+
+  const [details, setDetails] = useState<ExamDetails>(EMPTY_EXAM_DETAILS);
+  const [classrooms, setClassrooms] = useState<{ id: string; name: string }[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [joinCode, setJoinCode] = useState("");
+  const [publishTime, setPublishTime] = useState("");
+  const [sections, setSections] = useState<any[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
-    setIsAddingSection(false);
-    setIsAiMode(false);
-    if (storeExamId !== examId) {
-       setExamId(examId);
-       setStep(initialStep as 1 | 2); // Reset step if opening a different exam, or jump to specific step
-    }
-  }, [examId, storeExamId, setExamId, setStep, initialStep, setIsAddingSection, setIsAiMode]);
+    // A leftover AI-mode flag from a previous session would open the wrong
+    // view inside the question builder.
+    resetStore();
+  }, [resetStore]);
 
-  // Form State for Step 1
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState("SCHEDULED");
-  const [duration, setDuration] = useState("60");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [, setTotalMarks] = useState("0");
-  const [instructions, setInstructions] = useState<string[]>([""]);
-  const [joinCode, setJoinCode] = useState("");
-  const [requireFeedback, setRequireFeedback] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [, setIsPublishScheduled] = useState(false);
-  const [publishTime, setPublishTime] = useState("");
+  useEffect(() => {
+    getMyClassroomsService()
+      .then((res) => setClassrooms((res.data || []).map((r: any) => r.classroom)))
+      .catch(() => toast.error("Failed to load classrooms"));
+  }, []);
 
-  const calculatedDuration = React.useMemo(() => {
-    if (startTime && endTime) {
-      const diff = Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000);
-      return diff > 0 ? diff.toString() : "0";
-    }
-    return "0";
-  }, [startTime, endTime]);
+  useEffect(() => {
+    if (!classroomId) return;
+    listGroupsService(classroomId)
+      .then((res) => setGroups(res.data || []))
+      .catch(() => toast.error("Failed to load groups"));
+  }, [classroomId]);
 
   useEffect(() => {
     if (!examId) return;
-    const fetchExam = async () => {
-      try {
-        const res = await getExamByIdService(examId);
+    getExamByIdService(examId)
+      .then((res) => {
         const data = res.data || res;
-        setTitle(data.title || "");
-        if (data.type) setType(data.type);
-        if (data.duration) setDuration(data.duration.toString());
-        setTotalMarks(data.totalMarks?.toString() || "100");
-        if (data.instructions && Array.isArray(data.instructions)) {
-          setInstructions(data.instructions.length > 0 ? data.instructions : [""]);
-        }
-        if (data.requireFeedback !== undefined) setRequireFeedback(data.requireFeedback);
+        const toDatetimeLocal = (value?: string) => {
+          if (!value) return "";
+          const d = new Date(value);
+          return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        };
+        setDetails({
+          title: data.title || "",
+          type: data.type === "ON_DEMAND" ? "ON_DEMAND" : "SCHEDULED",
+          duration: data.duration?.toString() || "60",
+          startTime: toDatetimeLocal(data.startTime),
+          endTime: toDatetimeLocal(data.endTime),
+          instructions: data.instructions?.length > 0 ? data.instructions : [""],
+          requireFeedback: !!data.requireFeedback,
+          allowCoTeacherEdit: !!data.allowCoTeacherEdit,
+          groupId: data.groupId || "",
+        });
         if (data.joinCode) setJoinCode(data.joinCode);
-        
-        if (data.publishTime) {
-          setIsPublishScheduled(true);
-          const date = new Date(data.publishTime);
-          setPublishTime(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16));
+        setPublishTime(toDatetimeLocal(data.publishTime));
+      })
+      .catch((err: any) => {
+        if (err?.response?.status === 403) {
+          setAccessDenied(true);
         } else {
-          setIsPublishScheduled(false);
-          setPublishTime("");
+          toast.error("Failed to load exam details");
         }
-
-        // Format dates for datetime-local input
-        if (data.startTime) {
-          const date = new Date(data.startTime);
-          setStartTime(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16));
-        }
-        if (data.endTime) {
-          const date = new Date(data.endTime);
-          setEndTime(new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0,16));
-        }
-      } catch {
-        toast.error("Failed to load exam details");
-      } finally {
-        setLoadingInitial(false);
-      }
-    };
-    fetchExam();
+      })
+      .finally(() => setLoadingInitial(false));
   }, [examId]);
 
-  const handleProceedToQuestions = async () => {
-    if (!title) {
-      toast.error("Please fill in all required fields");
+  const questionCount = useMemo(() => sections.reduce((n, s) => n + (s.questions?.length || 0), 0), [sections]);
+  const totalMarks = useMemo(
+    () => sections.reduce((sum, s) => sum + (s.questions || []).reduce((m: number, q: any) => m + (Number(q.marks) || 0), 0), 0),
+    [sections]
+  );
+
+  const handleSaveDetails = async () => {
+    if (!details.title.trim()) {
+      toast.error("Please enter an exam title");
       return;
     }
-    
-    if (type === "SCHEDULED" && (!startTime || !endTime)) {
+    if (details.type === "SCHEDULED" && (!details.startTime || !details.endTime)) {
       toast.error("Please provide start and end times for scheduled exams");
       return;
     }
-    
-    if (type === "ON_DEMAND" && !duration) {
-      toast.error("Please provide duration for on-demand exams");
+    if (details.type === "ON_DEMAND" && !details.duration) {
+      toast.error("Please provide a duration for on-demand exams");
       return;
     }
 
-    setIsLoading(true);
+    const payload: any = {
+      title: details.title.trim(),
+      type: details.type,
+      instructions: details.instructions.filter((i) => i.trim() !== ""),
+      requireFeedback: details.requireFeedback,
+      allowCoTeacherEdit: details.allowCoTeacherEdit,
+    };
+    if (details.groupId) payload.groupId = details.groupId;
+    if (details.type === "SCHEDULED") {
+      payload.startTime = new Date(details.startTime).toISOString();
+      payload.endTime = new Date(details.endTime).toISOString();
+    } else {
+      payload.duration = parseInt(details.duration);
+      if (details.startTime) payload.startTime = new Date(details.startTime).toISOString();
+      if (details.endTime) payload.endTime = new Date(details.endTime).toISOString();
+    }
+
+    setIsSaving(true);
     try {
-      const payload: any = {
-        title,
-        type,
-        instructions: instructions.filter(i => i.trim() !== ""),
-        totalMarks: 0,
-        requireFeedback
-      };
-
-      if (type === "SCHEDULED") {
-        payload.startTime = new Date(startTime).toISOString();
-        payload.endTime = new Date(endTime).toISOString();
-      } else {
-        payload.duration = parseInt(duration);
-        if (startTime) payload.startTime = new Date(startTime).toISOString();
-        if (endTime) payload.endTime = new Date(endTime).toISOString();
-      }
-
       await updateExamService(examId, payload);
-      toast.success("Exam details updated successfully");
-      setStep(2);
+      toast.success("Exam details updated");
+      setPhase("questions");
     } catch (err: any) {
-      toast.error(err.message || "Failed to update exam details");
+      toast.error(err?.response?.data?.message || err.message || "Failed to update exam details");
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const handlePublishExam = async () => {
-    if (publishTime) {
-      const pubDate = new Date(publishTime);
-      if (startTime) {
-        const startDate = new Date(startTime);
-        if (pubDate >= startDate) {
-          toast.error("Publish date and time must be before the start date and time of the exam");
-          return;
-        }
-      }
+  const handleSaveExam = async (status?: "PUBLISHED") => {
+    if (status === "PUBLISHED" && publishTime && details.startTime && new Date(publishTime) >= new Date(details.startTime)) {
+      toast.error("Publish date and time must be before the exam's start time");
+      return;
     }
-
-    setIsLoading(true);
+    setIsSaving(true);
     try {
-      const payload = {
-        publishTime: publishTime ? new Date(publishTime).toISOString() : null
-      };
+      const payload: any = { publishTime: publishTime ? new Date(publishTime).toISOString() : null };
+      if (status) payload.status = status;
       await updateExamService(examId, payload);
-      toast.success(publishTime ? "Exam scheduled successfully" : "Exam published successfully");
+      toast.success(status ? "Exam published successfully!" : "Changes saved");
       resetStore();
       router.push(`/teacher/classrooms/${classroomId}/exams`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to publish exam");
+      toast.error(err?.response?.data?.message || err.message || "Failed to save exam");
     } finally {
-      setIsLoading(false);
+      setIsSaving(false);
     }
   };
 
-  if (loadingInitial) return <div className="p-10 text-white text-center">Loading exam...</div>;
+  if (loadingInitial || !isMounted) return <div className="p-10 text-white text-center">Loading exam...</div>;
 
-  if (!isMounted) return null;
+  if (accessDenied) {
+    return (
+      <Dialog open onOpenChange={(open) => !open && router.push(`/teacher/classrooms/${classroomId}/exams`)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-400">
+              <ShieldAlert className="h-5 w-5" /> No permission to edit
+            </DialogTitle>
+            <DialogDescription>
+              This exam was created by another teacher or manager, and they haven&apos;t enabled co-teacher editing for it. You can&apos;t view or edit its questions.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams`)} className={primaryButton}>
+              Back to exams
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const phases: { id: Phase; label: string }[] = [
+    { id: "details", label: "Details" },
+    { id: "questions", label: "Questions" },
+    { id: "publish", label: "Publish" },
+  ];
+  const currentIndex = phases.findIndex((p) => p.id === phase);
+
+  const header = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-bold text-white">Editing exam</div>
+      <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        {phases.map((p, i) => (
+          <li key={p.id} className="flex items-center gap-2">
+            <button
+              onClick={() => setPhase(p.id)}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                i === currentIndex
+                  ? "border-orange-500/60 bg-orange-500/10 text-orange-300"
+                  : i < currentIndex
+                  ? "border-white/15 text-gray-300 hover:text-white"
+                  : "border-white/10 text-gray-500 hover:text-white"
+              }`}
+            >
+              {p.label}
+            </button>
+            {i < phases.length - 1 && <span className="text-gray-600">→</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+
+  let content: React.ReactNode;
+  if (phase === "details") {
+    content = (
+      <WorkspaceShell
+        header={header}
+        left={
+          <ExamDetailsForm
+            values={details}
+            onChange={(patch) => setDetails((prev) => ({ ...prev, ...patch }))}
+            classrooms={classrooms}
+            selectedClassroomId={classroomId}
+            groups={groups}
+          />
+        }
+        right={
+          <div className="rounded-xl border border-white/10 bg-[#0f0f11] p-4 space-y-2">
+            <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider">Join code</h3>
+            <p className="text-sm font-mono text-white">{joinCode || "—"}</p>
+          </div>
+        }
+        footer={
+          <>
+            <span className="text-xs text-gray-500">Changes here are saved when you continue</span>
+            <Button onClick={handleSaveDetails} disabled={isSaving} className={primaryButton}>
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Next: Questions <ArrowRight className="h-4 w-4 ml-2" /></>}
+            </Button>
+          </>
+        }
+      />
+    );
+  } else if (phase === "questions") {
+    content = (
+      <WorkspaceShell
+        header={header}
+        left={<QuestionBuilder examId={examId} sectionsState={{ sections, setSections }} showReviewAgent={false} />}
+        right={<QuestionReviewChat examId={examId} onSectionsChange={setSections} />}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPhase("details")} className={ghostButton}>
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
+            <Button onClick={() => setPhase("publish")} className={primaryButton}>
+              Next: Publish Settings <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </>
+        }
+      />
+    );
+  } else {
+    content = (
+      <WorkspaceShell
+        header={header}
+        left={
+          <div className="space-y-5 max-w-2xl">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Bell className="h-5 w-5 text-purple-400" /> Publish settings
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">Choose when students can see this exam.</p>
+            </div>
+            <div className="space-y-2 p-5 bg-[#0f0f11] border border-white/10 rounded-xl">
+              <label className="text-sm font-semibold text-gray-300">Publish Date & Time</label>
+              <p className="text-xs text-gray-500">Students can&apos;t see the exam before this time. Leave blank to publish immediately.</p>
+              <Input
+                type="datetime-local"
+                value={publishTime}
+                onChange={(e) => setPublishTime(e.target.value)}
+                className="bg-[#14151f] border-white/15 text-white h-11 rounded-lg w-full [color-scheme:dark]"
+              />
+            </div>
+          </div>
+        }
+        right={
+          <div className="space-y-4">
+            <div className="rounded-xl border border-white/10 bg-[#0f0f11] p-4 space-y-2">
+              <h3 className="text-sm font-bold text-white truncate">{details.title}</h3>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
+                <dt className="text-gray-500">Type</dt>
+                <dd className="text-gray-200">{details.type === "SCHEDULED" ? "Scheduled" : "On-demand"}</dd>
+                <dt className="text-gray-500">Starts</dt>
+                <dd className="text-gray-200">{formatDateTime(details.startTime)}</dd>
+                <dt className="text-gray-500">Ends</dt>
+                <dd className="text-gray-200">{formatDateTime(details.endTime)}</dd>
+                <dt className="text-gray-500">Duration</dt>
+                <dd className="text-gray-200">
+                  {details.type === "SCHEDULED" ? scheduledDurationMinutes(details.startTime, details.endTime) : details.duration} min
+                </dd>
+                {joinCode && (
+                  <>
+                    <dt className="text-gray-500">Join code</dt>
+                    <dd className="text-gray-200 font-mono">{joinCode}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <StatTile label="Sections" value={sections.length} />
+              <StatTile label="Questions" value={questionCount} tone="text-purple-300" />
+            </div>
+            <StatTile label="Total marks" value={totalMarks} tone="text-emerald-400" />
+          </div>
+        }
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPhase("questions")} className={ghostButton}>
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => handleSaveExam()}
+                disabled={isSaving}
+                className="bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 h-10 text-sm font-semibold"
+              >
+                Save
+              </Button>
+              <Button onClick={() => handleSaveExam("PUBLISHED")} disabled={isSaving} className="bg-green-600 hover:bg-green-700 text-white h-10 px-6 font-bold text-sm rounded-xl">
+                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : publishTime ? "Schedule & Publish" : "Publish Exam"}
+              </Button>
+            </div>
+          </>
+        }
+      />
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
-      {/* Dynamic Header */}
-      <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-white/5">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams`)}
-            className="flex items-center justify-center p-2 rounded-lg bg-[#18181b] border border-white/10 hover:bg-white/10 hover:text-white transition-colors text-gray-400 mr-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Edit Exam</h2>
-          {joinCode && (
-            <span className="px-2.5 py-1 rounded bg-white/5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border border-white/10">
-              JOIN CODE: {joinCode}
-            </span>
-          )}
-        </div>
-        {step === 2 && !isAddingSection && !isAiMode && (
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setIsAiMode(true)} className="bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-lg shadow-purple-900/50">
-              Create with AI
-            </Button>
-            <Button onClick={() => setIsAddingSection(true)} className="bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg shadow-orange-950/40">
-              <Plus className="h-4 w-4 mr-2" /> Add Section
-            </Button>
-            <Button onClick={() => setStep(3)} className="bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg shadow-green-900/50 ml-2">
-              Proceed to Publish <ChevronRight className="h-4 w-4 ml-1 inline-block" />
-            </Button>
-          </div>
-        )}
-      </header>
-
-      {/* Main Builder Content */}
-      <div className="flex-1 px-6 py-4 sm:px-8 w-full">
-        {/* Stepper */}
-        <div className="flex items-center gap-8 mb-6 pl-2">
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => setStep(1)}>
-            <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
-              step === 1 ? "border-orange-500 text-orange-400 bg-orange-500/10" : "border-white/20 text-white bg-white/5"
-            )}>
-              01
-            </div>
-            <div>
-              <h3 className={cn("font-bold text-sm tracking-wide", step === 1 ? "text-orange-400" : "text-gray-300")}>Exam Details</h3>
-              <p className="text-[13px] text-gray-500">Global configurations</p>
-            </div>
-          </div>
-          
-          <div className="h-[1px] w-8 bg-white/10"></div>
-          
-          <div className={cn("flex items-center gap-4 transition-all duration-300 cursor-pointer", step === 1 ? "opacity-50" : "opacity-100")} onClick={() => { if (examId) setStep(2); }}>
-            <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
-              step === 2 ? "border-orange-500 text-sky-200 bg-orange-500/10" : "border-white/10 text-white/60"
-            )}>
-              02
-            </div>
-            <div>
-              <h3 className={cn("font-bold text-sm tracking-wide", step === 2 ? "text-sky-200" : "text-white/60")}>Question Builder</h3>
-              <p className="text-[13px] text-gray-500">Content & structure</p>
-            </div>
-          </div>
-
-          <div className="h-[1px] w-8 bg-white/10"></div>
-          
-          <div className={cn("flex items-center gap-4 transition-all duration-300 cursor-pointer", step < 2 ? "opacity-50 cursor-not-allowed" : "opacity-100")} onClick={() => { if (examId) setStep(3); }}>
-            <div className={cn("flex items-center justify-center h-11 w-11 rounded-full border-2 text-sm font-bold transition-all duration-300", 
-              step === 3 ? "border-orange-500 text-sky-200 bg-orange-500/10" : "border-white/10 text-white/60"
-            )}>
-              03
-            </div>
-            <div>
-              <h3 className={cn("font-bold text-sm tracking-wide", step === 3 ? "text-sky-200" : "text-white/60")}>Publish</h3>
-              <p className="text-[13px] text-gray-500">Release settings</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Area */}
-        {step === 1 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
-            {/* Left Column: Form */}
-            <Card className="bg-[#0f0f11]/80 border-white/5 shadow-2xl backdrop-blur-xl rounded-xl">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-white tracking-tight">General Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-7">
-                <div className="space-y-2.5">
-                  <label className="text-sm font-semibold text-gray-300">Exam Title</label>
-                  <Input 
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Advanced Fluid Dynamics - Midterm" 
-                    className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 placeholder:text-gray-600 focus-visible:ring-blue-500/50 focus-visible:border-orange-500/50 h-12 rounded-lg"
-                  />
-                </div>
-                
-                <div className="space-y-2.5">
-                  <label className="text-sm font-semibold text-gray-300">Exam Type</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      onClick={() => setType("SCHEDULED")}
-                      className={cn(
-                        "h-12 border-2 transition-all font-bold text-sm rounded-xl flex items-center justify-center gap-2.5", 
-                        type === "SCHEDULED" 
-                          ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-400 shadow-lg shadow-orange-950/60 ring-2 ring-orange-500/40" 
-                          : "bg-[#14151f] border-white/15 text-zinc-400 hover:bg-[#1a1b2a] hover:text-white"
-                      )}
-                    >
-                      <div className={cn("w-2.5 h-2.5 rounded-full transition-all", type === "SCHEDULED" ? "bg-white shadow-sm" : "bg-zinc-600")} />
-                      Scheduled (Fixed Time)
-                    </Button>
-                    <Button 
-                      type="button"
-                      variant="outline" 
-                      onClick={() => setType("ON_DEMAND")}
-                      className={cn(
-                        "h-12 border-2 transition-all font-bold text-sm rounded-xl flex items-center justify-center gap-2.5", 
-                        type === "ON_DEMAND" 
-                          ? "bg-orange-600 hover:bg-orange-700 text-white border-orange-400 shadow-lg shadow-orange-950/60 ring-2 ring-orange-500/40" 
-                          : "bg-[#14151f] border-white/15 text-zinc-400 hover:bg-[#1a1b2a] hover:text-white"
-                      )}
-                    >
-                      <div className={cn("w-2.5 h-2.5 rounded-full transition-all", type === "ON_DEMAND" ? "bg-white shadow-sm" : "bg-zinc-600")} />
-                      On-Demand (Flexible)
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2.5">
-                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "Start Time" : "Window Start"}</label>
-                    <Input 
-                      type="datetime-local"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
-                    />
-                  </div>
-                  <div className="space-y-2.5">
-                    <label className="text-sm font-semibold text-gray-300">{type === "SCHEDULED" ? "End Time" : "Window End"}</label>
-                    <Input 
-                      type="datetime-local"
-                      value={endTime}
-                      onChange={(e) => setEndTime(e.target.value)}
-                      className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-12 rounded-lg focus-visible:ring-blue-500/50 w-full [color-scheme:dark]"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2.5">
-                  <label className="text-sm font-semibold text-gray-300">Duration (Minutes)</label>
-                  {type === "SCHEDULED" ? (
-                    <Input 
-                      type="text"
-                      value={calculatedDuration}
-                      readOnly
-                      className="bg-[#14151f]/50 border border-white/10 text-gray-400 h-12 rounded-lg w-full cursor-not-allowed"
-                    />
-                  ) : (
-                    <Input 
-                      type="number"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      placeholder="60"
-                      className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 h-12 rounded-lg focus-visible:ring-blue-500/50 w-full"
-                    />
-                  )}
-                </div>
-
-                <div className="space-y-2.5">
-                  <label className="text-sm font-semibold text-gray-300">Exam Instructions</label>
-                  <div className="space-y-3">
-                    {instructions.map((inst, idx) => (
-                      <div key={idx} className="flex gap-2">
-                        <Input 
-                          value={inst}
-                          onChange={(e) => {
-                            const newInst = [...instructions];
-                            newInst[idx] = e.target.value;
-                            setInstructions(newInst);
-                          }}
-                          placeholder={`Instruction ${idx + 1}`}
-                          className="bg-[#14151f] border border-white/15 text-white placeholder:text-zinc-400 placeholder:text-gray-600 focus-visible:ring-blue-500/50 h-10 rounded-lg flex-1"
-                        />
-                        {instructions.length > 1 && (
-                          <Button 
-                            variant="outline" 
-                            size="icon" 
-                            onClick={() => setInstructions(instructions.filter((_, i) => i !== idx))}
-                            className="bg-transparent border-white/10 text-red-400 hover:bg-red-500/10 h-10 w-10 shrink-0"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setInstructions([...instructions, ""])}
-                      className="w-full bg-transparent border-dashed border-white/10 text-gray-400 hover:text-white hover:bg-white/5"
-                    >
-                      <Plus className="h-4 w-4 mr-2" /> Add Instruction
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-[#050505] border border-white/10 rounded-lg">
-                  <div className="space-y-0.5">
-                    <label className="text-sm font-semibold text-gray-300">Require Feedback Form</label>
-                    <p className="text-xs text-gray-500">Ask students for feedback after they submit the exam.</p>
-                  </div>
-                  <Switch checked={requireFeedback} onCheckedChange={setRequireFeedback} />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Right Column: Tips & Image */}
-            <div className="space-y-6">
-
-
-              <Card className="bg-[#0f0f11]/80 border-white/5 rounded-xl">
-                <CardContent className="p-6 flex flex-col items-center text-center space-y-5">
-                  <div className="w-full h-36 bg-[#14151f] rounded-lg border border-white/15 flex items-center justify-center overflow-hidden relative group cursor-pointer">
-                    <ImageIcon className="h-10 w-10 text-gray-500" />
-                    <div className="absolute inset-0 bg-[#14151f]/80 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <UploadCloud className="h-8 w-8 text-white" />
-                    </div>
-                  </div>
-                  <p className="text-[12px] text-gray-400 font-medium px-2 leading-relaxed">
-                    Visual context helps students identify the exam theme instantly.
-                  </p>
-                  <Button variant="outline" className="w-full bg-[#14151f] border-white/15 hover:bg-[#1f2030] text-white font-semibold">
-                    Upload Cover Image
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <div className="pt-4 flex flex-col items-end gap-3">
-                <Button 
-                  onClick={handleProceedToQuestions}
-                  disabled={isLoading}
-                  className="bg-orange-600 hover:bg-orange-700 text-white h-12 px-6 font-bold text-[15px] rounded-lg shadow-lg shadow-orange-950/40 transition-all w-full flex items-center justify-center"
-                >
-                  {isLoading ? "Saving..." : "Save & Edit Questions"}
-                  <ChevronRight className="ml-2 h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : step === 2 ? (
-          <QuestionBuilder examId={examId!} />
-        ) : (
-          <div className="w-full max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <Card className="bg-[#0f0f11]/80 border border-white/5 shadow-2xl backdrop-blur-xl rounded-xl p-6">
-              <CardHeader className="px-0 pt-0 pb-4">
-                <CardTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-purple-400" />
-                  Publish Exam Settings
-                </CardTitle>
-                <p className="text-xs text-gray-400 mt-1">Configure when and how students will see the exam.</p>
-              </CardHeader>
-              <CardContent className="px-0 space-y-6">
-                <div className="space-y-4 p-5 bg-[#050505] border border-white/10 rounded-lg">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-300">Publish Date & Time</label>
-                    <p className="text-xs text-gray-500">Before this time, no student is able to see the exam. Leave blank to publish immediately.</p>
-                  </div>
-                  <div className="space-y-2.5 pt-2 border-t border-white/5">
-                    <Input 
-                      type="datetime-local"
-                      value={publishTime}
-                      onChange={(e) => setPublishTime(e.target.value)}
-                      className="bg-[#0f0f11] border-white/10 text-white h-11 rounded-lg focus-visible:ring-blue-500 w-full [color-scheme:dark]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-4 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep(2)}
-                    className="flex-1 bg-transparent border-white/10 text-gray-300 hover:bg-white/5 hover:text-white"
-                  >
-                    Back to Builder
-                  </Button>
-                  <Button
-                    onClick={handlePublishExam}
-                    disabled={isLoading}
-                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-lg shadow-orange-950/40"
-                  >
-                    {isLoading ? "Saving..." : publishTime ? "Schedule Exam" : "Publish Immediately"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+    <div className="flex flex-col gap-3 lg:h-full lg:min-h-0">
+      <div className="flex items-center gap-3 shrink-0">
+        <button
+          onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams`)}
+          className="flex items-center justify-center p-2 rounded-lg bg-[#18181b] border border-white/10 hover:bg-white/10 hover:text-white transition-colors text-gray-400"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <h1 className="text-base font-bold text-white tracking-tight">Edit Exam</h1>
+        {joinCode && (
+          <span className="px-2 py-0.5 rounded bg-white/5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border border-white/10">
+            Join code: {joinCode}
+          </span>
         )}
       </div>
+      <div className="flex-1 lg:min-h-0">{content}</div>
     </div>
   );
 }

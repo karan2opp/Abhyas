@@ -28,6 +28,7 @@ import {
   ExamBlueprintSection,
   GeneratedExam,
   ExamInput,
+  Difficulty,
   startExamIntentConversation,
   continueExamIntentConversation,
   skipExamIntentQuestion,
@@ -875,6 +876,7 @@ export function AiExamGeneratorForm({
   const [intentReply, setIntentReply] = useState("");
   const [isIntentThinking, setIsIntentThinking] = useState(false);
   const [aiStage, setAiStage] = useState<"config" | "intent" | "blueprint">("config");
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [blueprint, setBlueprint] = useState<LegacyBlueprintTree | null>(null);
 
   // generation_agents backend session powering this exam end to end — created
@@ -999,7 +1001,7 @@ export function AiExamGeneratorForm({
       return;
     }
 
-    const { examInput, mapping, title } = buildExamInputFromConfig(sections, [], sourceBook?.id);
+    const { examInput, mapping, title } = buildExamInputFromConfig(sections, [], sourceBook?.id, difficulty);
     mappingRef.current = mapping;
     examTitleRef.current = title;
 
@@ -1466,6 +1468,21 @@ export function AiExamGeneratorForm({
               >
                 <Plus className="h-4 w-4 mr-1.5" /> Add Section
               </Button>
+            </div>
+
+            {/* DIFFICULTY LEVEL */}
+            <div className="space-y-1.5 pb-2">
+              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider block">DIFFICULTY LEVEL</label>
+              <Select value={difficulty} onValueChange={(val) => { if (val) setDifficulty(val as Difficulty); }}>
+                <SelectTrigger className="w-full sm:w-48 bg-[#14151f] border border-white/15 text-white h-9 text-xs font-semibold rounded-lg px-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#14151f] border border-white/15 text-white text-xs">
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* SECTIONS & TOPICS */}

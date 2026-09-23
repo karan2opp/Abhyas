@@ -7,6 +7,7 @@ import {
     getBlueprintReviewHistoryHandler,
     triggerQuestionGenerationHandler,
     getQuestionsStatusHandler,
+    generateTopicQuestionsHandler,
     questionReviewTurnHandler,
     getQuestionReviewHistoryHandler,
 } from "./generation_agents.controller.js";
@@ -84,6 +85,13 @@ router.get(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     getQuestionsStatusHandler
+);
+
+router.post(
+    "/topic/generate",
+    authenticate,
+    authorize("system_admin", "teacher", "manager"),
+    generateTopicQuestionsHandler
 );
 
 router.post(

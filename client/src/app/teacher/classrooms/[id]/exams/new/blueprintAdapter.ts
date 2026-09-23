@@ -11,6 +11,7 @@ import type {
   SectionInput,
   TopicInput,
   QuestionType,
+  Difficulty,
   ExamBlueprintSection,
   GeneratedExam,
   GeneratedOption,
@@ -66,7 +67,8 @@ export interface SectionBlockMapEntry {
 export function buildExamInputFromConfig(
   configSections: any[],
   instructions: string[],
-  bookId?: string
+  bookId?: string,
+  difficulty?: Difficulty
 ): { examInput: ExamInput; mapping: SectionBlockMapEntry[]; title: string } {
   const mapping: SectionBlockMapEntry[] = [];
   const flatSections: SectionInput[] = [];
@@ -102,7 +104,7 @@ export function buildExamInputFromConfig(
   });
 
   const title = `${(configSections[0]?.subject?.trim() || "Untitled")} Exam`;
-  return { examInput: { title, instructions, ...(bookId ? { bookId } : {}), sections: flatSections }, mapping, title };
+  return { examInput: { title, instructions, ...(bookId ? { bookId } : {}), ...(difficulty ? { difficulty } : {}), sections: flatSections }, mapping, title };
 }
 
 // New backend's flat sections -> old nested tree shape, for

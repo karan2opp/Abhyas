@@ -1,6 +1,6 @@
 import { eq, and, count, inArray, avg, desc, ilike, gte, or, isNull, lte, sql } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { exams, sections, questions, options, groups, classroomStudents, groupStudents, blocks } from "../../common/db/schema.js";
+import { exams, sections, questions, options, groups, classroomStudents, groupStudents, blocks, users } from "../../common/db/schema.js";
 import { submissions } from "../submissions/submission.schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import type { CreateExamDto, UpdateExamDto } from "./dto/exam.dto.js";
@@ -371,11 +371,18 @@ const listExamsForClassroom = async (classroomId: string, requester: Requester, 
     const total = Number(totalRow?.value) || 0;
     const offset = (page - 1) * limit;
 
-    const data = await db.select().from(exams)
+    const rows = await db.select({
+        exam: exams,
+        createdByName: users.name,
+        createdByEmail: users.email,
+    }).from(exams)
+        .leftJoin(users, eq(exams.createdBy, users.id))
         .where(and(...conditions))
         .orderBy(desc(exams.createdAt))
         .limit(limit)
         .offset(offset);
+
+    const data = rows.map((r) => ({ ...r.exam, createdByName: r.createdByName, createdByEmail: r.createdByEmail }));
 
     return {
         data,

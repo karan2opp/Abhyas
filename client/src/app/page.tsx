@@ -1,379 +1,274 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import Image from "next/image";
-import { motion, Variants } from "framer-motion";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BookOpen,
+  Check,
+  FileText,
+  GraduationCap,
+  Landmark,
+  Library,
+  MessagesSquare,
+  Play,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ChevronDown, Menu, X, ArrowRight } from "lucide-react";
+import { pipelines } from "@/lib/pipelines";
 
+const features = [
+  {
+    icon: Sparkles,
+    title: "AI Question Generation",
+    desc: "Describe the exam, talk through your preferences, review a topic-by-topic plan, and get questions whose MCQ answers are checked before they're saved.",
+  },
+  {
+    icon: Library,
+    title: "Past Paper Question Bank",
+    desc: "Upload previous-year papers. Questions come back word for word, with their options, answer keys and page numbers.",
+  },
+  {
+    icon: BookOpen,
+    title: "Questions From Your Textbook",
+    desc: "Index a book once. Topics are matched to its chapters, and new questions are written from that exact text.",
+  },
+  {
+    icon: MessagesSquare,
+    title: "Edit By Chatting",
+    desc: '"Give Arrays three more questions", "make question 4 harder" — refinement and review agents make the change for you.',
+  },
+];
 
+const stats = [
+  { icon: GraduationCap, value: "10K+", label: "Students Assessed" },
+  { icon: Landmark, value: "100+", label: "Institutions" },
+  { icon: FileText, value: "1M+", label: "Questions Generated" },
+  { icon: Star, value: "4.8/5", label: "Educator Satisfaction" },
+];
 
-// Accordion Component
-const FAQItem = ({ question, answer }: { question: string, answer: string }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="border-b border-zinc-200 dark:border-zinc-800 py-4">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between text-left focus:outline-none"
-      >
-        <h4 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">{question}</h4>
-        <ChevronDown className={`w-5 h-5 text-zinc-500 dark:text-zinc-400 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-      <motion.div
-        initial={false}
-        animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-        className="overflow-hidden"
-      >
-        <p className="pt-4 text-zinc-600 dark:text-zinc-300">{answer}</p>
-      </motion.div>
-    </div>
-  );
-};
+const checklist = ["Easy to use", "Saves hours of work", "Trusted by educators"];
 
 export default function LandingPage() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const features = [
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/ai_generation.png" alt="AI Exam Generation" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Effortless Content Creation", 
-      desc: "Instantly generate questions for any subject using our advanced AI generation feature.",
-      gradient: "from-blue-600/50 to-blue-900/10",
-      borderGlow: "from-blue-500/50 via-blue-500/10 to-transparent"
-    },
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/ai_evaluation.png" alt="Smart Auto Evaluation" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Smart AI Evaluations", 
-      desc: "Save hours of grading. Our AI automatically evaluates and scores descriptive student answers.",
-      gradient: "from-blue-600/50 to-blue-900/10",
-      borderGlow: "from-blue-500/50 via-blue-500/10 to-transparent"
-    },
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/leaderboard.png" alt="Competitive Leaderboard" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Competitive Leaderboard", 
-      desc: "Motivate students with real-time rankings, performance metrics, and gamified scoring.",
-      gradient: "from-pink-600/50 to-pink-900/10",
-      borderGlow: "from-pink-500/50 via-pink-500/10 to-transparent"
-    },
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/student_feedback.png" alt="Personalized Student Feedback" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Personalized Student Feedback", 
-      desc: "Students receive instant, personalized feedback and can rate their exam experience.",
-      gradient: "from-emerald-600/50 to-emerald-900/10",
-      borderGlow: "from-emerald-500/50 via-emerald-500/10 to-transparent"
-    },
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/question_formats.png" alt="Diverse Question Formats" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Diverse Question Formats", 
-      desc: "Support for MCQs, short answers, essays, and coding questions.",
-      gradient: "from-orange-600/50 to-orange-900/10",
-      borderGlow: "from-orange-500/50 via-orange-500/10 to-transparent"
-    },
-    { 
-      mockup: (
-        <div className="w-full h-40 relative rounded-xl overflow-hidden border border-zinc-800">
-          <Image src="/teacher_dashboard.png" alt="Actionable Teacher Dashboard" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover object-top" />
-        </div>
-      ),
-      title: "Actionable Teacher Dashboard", 
-      desc: "Actionable insights into student performance, identifying areas of improvement.",
-      gradient: "from-red-600/50 to-red-900/10",
-      borderGlow: "from-red-500/50 via-red-500/10 to-transparent"
-    },
-  ];
-
-  const faqs = [
-    { q: "What topics can I create exams on?", a: "Abhyas AI is versatile. You can create exams for programming languages, computer science fundamentals, or any specialized IT training topics." },
-    { q: "How does AI evaluation work?", a: "Our AI compares student answers against standard rubrics and expected concepts, grading intelligently for meaning rather than exact word matching." },
-    { q: "Can teachers customize questions?", a: "Absolutely! AI generates the base questions, but teachers have full control to edit, remove, or add their own questions manually." },
-    { q: "How is scoring done for text answers?", a: "The AI evaluates the semantic accuracy, key points covered, and awards partial marks if a student gets part of the concept correct." },
-    { q: "Is it free to try?", a: "Yes, we offer a free tier for institutes to test out the platform before committing to a larger plan." }
-  ];
-
-  const fadeInUp: Variants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
-  };
-
-  const staggerContainer: Variants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.2 } }
-  };
-
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        @keyframes draw {
-          to {
-            stroke-dashoffset: 0;
-          }
-        }
-        .path-draw {
-          stroke-dasharray: 500;
-          stroke-dashoffset: 500;
-          animation: draw 2s ease forwards;
-          animation-delay: 0.5s;
-        }
-      `}} />
-
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            <div className="flex-shrink-0 flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 bg-zinc-900 rounded-md text-white font-bold text-xl shadow-sm">
-                A
-              </div>
-              <span className="font-heading font-bold text-2xl tracking-tight text-zinc-900 dark:text-zinc-50">Abhyas</span>
+    <div className="min-h-screen bg-white dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans transition-colors duration-200">
+      {/* Navigation */}
+      <nav className="fixed top-0 w-full z-50 bg-white/90 dark:bg-black/90 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-20">
+          <div className="flex items-center gap-3">
+            <img src="/Abhyas.png" alt="Abhyas" className="h-9 w-9 md:h-10 md:w-10 object-contain shrink-0" />
+            <div className="leading-tight">
+              <span className="font-heading font-extrabold text-2xl tracking-tight text-zinc-900 dark:text-white block">
+                Abhyas
+              </span>
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium hidden sm:block">
+                Practice Today. Perform Tomorrow.
+              </span>
             </div>
-
-            {/* Desktop Nav */}
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-8">
-                <a href="#features" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">Features</a>
-                <a href="#how-it-works" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">How it works</a>
-                <a href="#faq" className="text-zinc-600 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-orange-400 transition-colors px-3 py-2 text-sm font-medium">FAQ</a>
-              </div>
-            </div>
-
-            <div className="hidden md:flex items-center space-x-4">
-              <ThemeToggle />
-              <Link href="/auth/login" className="text-zinc-600 dark:text-zinc-300 hover:text-orange-500 font-medium text-sm transition-colors">
-                Login
-              </Link>
-              <Link href="/auth/login" className="bg-orange-600 text-white hover:bg-orange-700 px-5 py-2.5 rounded-full text-sm font-semibold transition-all shadow-md hover:shadow-lg">
-                Get Started
-              </Link>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
-              <ThemeToggle />
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white p-2">
-                {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
+          </div>
+          <div className="hidden md:flex items-baseline space-x-8">
+            <a
+              href="#features"
+              className="text-zinc-600 dark:text-zinc-300 hover:text-orange-600 dark:hover:text-orange-500 transition-colors px-3 py-2 text-sm font-medium"
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="text-zinc-600 dark:text-zinc-300 hover:text-orange-600 dark:hover:text-orange-500 transition-colors px-3 py-2 text-sm font-medium"
+            >
+              How it works
+            </a>
+            <a
+              href="https://github.com/karan2opp/AbhyasLM"
+              target="_blank"
+              rel="noreferrer"
+              className="text-zinc-600 dark:text-zinc-300 hover:text-orange-600 dark:hover:text-orange-500 transition-colors px-3 py-2 text-sm font-medium"
+            >
+              Contact
+            </a>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <ThemeToggle />
+            <Link
+              href="/auth/login"
+              className="text-zinc-600 dark:text-zinc-300 hover:text-orange-600 dark:hover:text-orange-500 font-medium text-sm transition-colors hidden sm:block"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/auth/login"
+              className="bg-orange-600 text-white hover:bg-orange-700 px-4 sm:px-5 py-2.5 rounded-full text-sm font-semibold transition-all shadow-md flex items-center gap-1.5"
+            >
+              Get Started <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
-
-        {/* Mobile Nav */}
-        {isMenuOpen && (
-          <div className="md:hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 shadow-lg">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-              <a href="#features" onClick={() => setIsMenuOpen(false)} className="text-zinc-600 hover:text-blue-600 block px-3 py-2 text-base font-medium">Features</a>
-              <a href="#how-it-works" onClick={() => setIsMenuOpen(false)} className="text-zinc-600 hover:text-blue-600 block px-3 py-2 text-base font-medium">How it works</a>
-              <a href="#faq" onClick={() => setIsMenuOpen(false)} className="text-zinc-600 hover:text-blue-600 block px-3 py-2 text-base font-medium">FAQ</a>
-              <Link href="/auth/login" className="text-zinc-600 hover:text-blue-600 block px-3 py-2 text-base font-medium">Login</Link>
-              <Link href="/auth/login" className="text-blue-600 block px-3 py-2 text-base font-medium">Get Started Free</Link>
-            </div>
-          </div>
-        )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="pt-32 pb-20 md:pt-48 md:pb-32 px-4 relative overflow-hidden bg-white dark:bg-zinc-950">
-        {/* Simple Background */}
-
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-12 lg:gap-8">
-          <motion.div
-            initial="hidden" animate="visible" variants={fadeInUp}
-            className="flex-1 text-center lg:text-left"
-          >
-
-            <h1 className="text-5xl md:text-7xl font-bold font-heading leading-[1.1] tracking-tight mb-6 text-zinc-900 dark:text-zinc-50">
-              Practice Smarter, <br className="hidden md:block" />
-              <span className="text-orange-500">Grow Faster</span>
+      {/* Hero */}
+      <section className="relative pt-32 md:pt-40 pb-28 md:pb-36 px-4 overflow-hidden bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-orange-950/30 dark:via-black dark:to-orange-950/30">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold font-heading leading-[1.1] tracking-tight mb-6 text-zinc-900 dark:text-white">
+              Create, Conduct, and Evaluate <span className="text-orange-600 dark:text-orange-500">Smarter Exams</span> with AI.
             </h1>
-            <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-300 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-              AI-powered exam preparation for any subject. Automatically generate questions, evaluate descriptive answers, and give instant feedback to help your students excel.
+            <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 max-w-xl leading-relaxed">
+              Everything you need to create, deliver, and evaluate exams — powered by AI. Save time, ensure quality, and focus on what matters most: learning.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <Link href="/auth/login" className="w-full sm:w-auto px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white rounded-full font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-orange-950/40">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
+              <Link
+                href="/auth/login"
+                className="w-full sm:w-auto px-7 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-full font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20"
+              >
                 Get Started Free <ArrowRight className="w-4 h-4" />
               </Link>
-              <a href="#how-it-works" className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-200 rounded-full font-semibold transition-all flex items-center justify-center shadow-sm hover:shadow-md">
-                See How it Works
+              <a
+                href="#how-it-works"
+                className="w-full sm:w-auto px-7 py-3.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-full font-semibold transition-all flex items-center justify-center gap-2"
+              >
+                <Play className="w-4 h-4 fill-current" /> Watch Demo
               </a>
             </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8, delay: 0.2 }}
-            className="flex-1 w-full max-w-xl lg:max-w-none relative"
-          >
-            <div className="rounded-2xl border border-zinc-100 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] relative overflow-hidden group">
-              <img
-                src="/abhyas_logo.png"
-                alt="Student using Abhyas platform"
-                className="w-full h-auto object-cover transform group-hover:scale-105 transition-transform duration-700 ease-in-out"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {checklist.map((item) => (
+                <span key={item} className="inline-flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300 font-medium">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-white shrink-0">
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                  </span>
+                  {item}
+                </span>
+              ))}
             </div>
-          </motion.div>
+          </div>
+
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+            <img
+              src="/AI icon.png"
+              alt="Abhyas AI: generate questions with AI, use your past papers, create from your textbook, auto evaluate and give feedback"
+              className="w-full h-auto"
+            />
+          </div>
         </div>
-      </section>
 
-
-
-      {/* Features Section */}
-      <section id="features" className="py-24 px-4 relative bg-zinc-50 dark:bg-zinc-950">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-5xl font-bold font-heading mb-4 text-zinc-900 dark:text-zinc-50">Everything you need to teach better</h2>
-            <p className="text-zinc-600 dark:text-zinc-300 text-lg max-w-2xl mx-auto">Our AI platform handles the heavy lifting of content creation and evaluation so teachers can focus on guiding students.</p>
-          </motion.div>
-
-          <motion.div
-            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {features.map((f, i) => (
-              <motion.div key={i} variants={fadeInUp} className="relative group">
-                {/* Border Glow */}
-                <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${f.borderGlow} opacity-30 group-hover:opacity-100 transition-opacity blur-md`}></div>
-                
-                {/* Inner Card */}
-                <div className={`relative h-full bg-zinc-950 rounded-3xl p-8 flex flex-col justify-between overflow-hidden border border-zinc-800/50`}>
-                  
-                  {/* Subtle Background Gradient */}
-                  <div className={`absolute inset-0 bg-gradient-to-br ${f.gradient} opacity-10 group-hover:opacity-30 transition-opacity`}></div>
-                  
-                  {/* Content */}
-                  <div className="relative z-10 flex flex-col h-full">
-                    <h3 className="text-xl font-bold mb-4 text-zinc-100 tracking-wide">{f.title}</h3>
-                    
-                    <div className="flex-1 flex items-center justify-center py-6 px-4">
-                      <div className="w-full transform group-hover:scale-[1.03] group-hover:-translate-y-1 transition-all duration-500 ease-out">
-                        {f.mockup}
-                      </div>
-                    </div>
-                    
-                    <p className="text-zinc-400 leading-relaxed text-sm md:text-base">{f.desc}</p>
+        {/* Stats bar */}
+        <div className="max-w-6xl mx-auto mt-16 md:mt-20">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-xl shadow-orange-950/5 dark:shadow-orange-950/20 p-6 md:p-8 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-4">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 shrink-0">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-xl md:text-2xl font-extrabold text-zinc-900 dark:text-white">{stat.value}</p>
+                    <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400">{stat.label}</p>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </motion.div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* How it works Section */}
-      <section id="how-it-works" className="py-24 px-4 bg-white dark:bg-zinc-950">
+      {/* Pipeline showcase */}
+      <section id="how-it-works" className="py-24 px-4 scroll-mt-20 bg-white dark:bg-black">
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-5xl font-bold font-heading mb-4 text-zinc-900 dark:text-zinc-50">How Abhyas Works</h2>
-            <p className="text-zinc-600 dark:text-zinc-300 text-lg max-w-2xl mx-auto">A seamless workflow from exam creation to detailed student feedback.</p>
-          </motion.div>
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-5xl font-bold font-heading mb-4 text-zinc-900 dark:text-white">
+              Four pipelines, one platform
+            </h2>
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg max-w-2xl mx-auto">
+              Generate from your own material, reuse past papers, write from a textbook, or grade automatically.
+            </p>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="w-full max-w-5xl mx-auto rounded-2xl overflow-hidden shadow-2xl border border-zinc-200 dark:border-zinc-800"
-          >
-            <img 
-              src="/workflow.png" 
-              alt="Abhyas Workflow" 
-              className="w-full h-auto object-cover"
-            />
-          </motion.div>
+          <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4">
+            {pipelines.map((p) => {
+              const Icon = p.icon;
+              return (
+                <div
+                  key={p.slug}
+                  className="group relative flex flex-col overflow-hidden rounded-3xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 shadow-sm hover:border-orange-300 dark:hover:border-orange-500/50 transition-colors"
+                >
+                  <div className="h-40 md:h-44 flex items-center justify-center overflow-hidden bg-orange-50 dark:bg-zinc-950">
+                    <img src={p.src} alt={p.alt} className="max-w-full max-h-full object-contain" />
+                  </div>
+                  <div className="p-6 flex-1 flex flex-col gap-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-xl bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center shrink-0">
+                        <Icon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{p.codename}</h3>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60 rounded-full px-2 py-0.5">
+                            {p.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 italic">{p.meaning}</p>
+                      </div>
+                    </div>
+                    <p className="text-base text-zinc-600 dark:text-zinc-400 leading-relaxed">{p.intro}</p>
+                  </div>
+                  <span className="absolute top-5 right-5 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 dark:bg-zinc-800/95 text-zinc-600 dark:text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity shadow-md">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Centered Brand Badge */}
+            <div className="hidden lg:flex absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 h-28 w-28 flex-col items-center justify-center gap-1 rounded-full border border-orange-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xl">
+              <img src="/Abhyas.png" alt="Abhyas" className="h-9 w-9 object-contain" />
+              <span className="font-heading font-extrabold text-sm text-zinc-900 dark:text-white">Abhyas</span>
+            </div>
+          </div>
         </div>
       </section>
 
-
-
-
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-24 px-4 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-5xl font-bold font-heading mb-4 text-zinc-900 dark:text-zinc-50">Frequently Asked Questions</h2>
-            <p className="text-zinc-600 dark:text-zinc-300">Everything you need to know about the product and billing.</p>
+      {/* Features */}
+      <section id="features" className="py-24 px-4 scroll-mt-20 bg-orange-50/40 dark:bg-zinc-950/60">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold font-heading mb-4 text-zinc-900 dark:text-white">
+              Everything you need to set a good exam
+            </h2>
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg max-w-2xl mx-auto">
+              The AI does the heavy lifting of writing questions, so you can focus on what to assess.
+            </p>
           </div>
-
-          <div className="space-y-2 bg-white dark:bg-zinc-950 p-6 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800">
-            {faqs.map((faq, i) => (
-              <FAQItem key={i} question={faq.q} answer={faq.a} />
-            ))}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div
+                  key={f.title}
+                  className="bg-white dark:bg-zinc-900 rounded-3xl p-8 border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg transition-shadow flex flex-col gap-4"
+                >
+                  <div className="h-12 w-12 rounded-xl bg-orange-100 dark:bg-orange-950/50 flex items-center justify-center">
+                    <Icon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white tracking-wide">{f.title}</h3>
+                  <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm md:text-base">{f.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
-
-
 
       {/* Footer */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 pt-16 pb-8 px-4 bg-white dark:bg-zinc-950">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div className="col-span-1 md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="flex items-center justify-center w-8 h-8 bg-zinc-400 rounded-md text-white font-bold text-xl shadow-sm">
-                  A
-                </div>
-                <span className="font-heading font-bold text-2xl tracking-tight text-zinc-500">Abhyas</span>
-              </div>
-              <p className="text-zinc-500 max-w-sm">
-                The AI-powered mock exam platform designed to help computer training institutes scale their evaluation process.
-              </p>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4 text-zinc-900 dark:text-zinc-50">Product</h4>
-              <ul className="space-y-3">
-                <li><a href="#features" className="text-zinc-500 hover:text-blue-600 transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="text-zinc-500 hover:text-blue-600 transition-colors">How it Works</a></li>
-                <li><Link href="/auth/login" className="text-zinc-500 hover:text-blue-600 transition-colors">Login</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-semibold mb-4 text-zinc-900 dark:text-zinc-50">Legal</h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-zinc-500 hover:text-blue-600 transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-zinc-500 hover:text-blue-600 transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="text-zinc-500 hover:text-blue-600 transition-colors">Contact Us</a></li>
-              </ul>
-            </div>
+      <footer className="border-t border-zinc-100 dark:border-zinc-800 py-8 px-4 bg-white dark:bg-black">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-zinc-500 dark:text-zinc-400 text-sm">
+          <div className="flex items-center gap-2">
+            <img src="/Abhyas.png" alt="Abhyas" className="h-5 w-5 object-contain" />
+            <span className="font-heading font-bold text-zinc-700 dark:text-zinc-300">Abhyas</span>
           </div>
-
-          <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-zinc-400 dark:text-zinc-500 text-sm">
-            <p>&copy; 2026 Abhyas. All rights reserved.</p>
-            <div className="mt-4 md:mt-0 font-medium">
-              Designed for Education.
-            </div>
-          </div>
+          <p>Made with ❤️ by Karan</p>
         </div>
       </footer>
     </div>

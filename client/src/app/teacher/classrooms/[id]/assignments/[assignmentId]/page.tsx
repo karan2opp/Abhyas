@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Plus, Pencil, ListChecks, X, Check, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, ListChecks, X, Check, Eye, Sparkles, FileText, Loader2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -20,6 +20,13 @@ import {
   getQuestionsService,
 } from "../../../../assignments/assignment.service";
 import { formatDateTime } from "@/lib/date";
+import {
+  listQuestionBankDocuments,
+  generateQuestionsFromDocuments,
+  QuestionBankDocument,
+} from "@/services/questionBank.service";
+import { listBooks, BookSummary as Book } from "@/services/books.service";
+import { generateTopicQuestions } from "@/services/generationAgents.service";
 
 interface Assignment {
   id: string;
@@ -85,6 +92,24 @@ export default function AssignmentDetailPage() {
   const [extendCascade, setExtendCascade] = useState(true);
   const [extending, setExtending] = useState(false);
 
+  // ── AI Generation Pipelines Modal States ────────────────────────────────────
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiPipeline, setAiPipeline] = useState<"srijan" | "smriti" | "gyan">("srijan");
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiType, setAiType] = useState<"mcq" | "descriptive">("mcq");
+  const [aiCount, setAiCount] = useState("3");
+  const [aiMarks, setAiMarks] = useState("5");
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+
+  // Smriti (Past Papers) states
+  const [documents, setDocuments] = useState<QuestionBankDocument[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState("");
+
+  // Gyan (Textbook) states
+  const [books, setBooks] = useState<Book[]>([]);
+  const [selectedBookId, setSelectedBookId] = useState("");
+
   const loadAll = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
@@ -102,8 +127,19 @@ export default function AssignmentDetailPage() {
   };
 
   useEffect(() => {
+    if (assignmentId === "new") {
+      router.replace(`/teacher/classrooms/${classroomId}/assignments/new`);
+      return;
+    }
     if (assignmentId) loadAll();
-  }, [assignmentId]);
+  }, [assignmentId, classroomId, router]);
+
+  useEffect(() => {
+    if (aiDialogOpen) {
+      listQuestionBankDocuments().then(setDocuments).catch(() => {});
+      listBooks().then((res) => setBooks(res || [])).catch(() => {});
+    }
+  }, [aiDialogOpen]);
 
   const resetQuestionForm = () => {
     setEditingQuestion(null);
@@ -186,6 +222,87 @@ export default function AssignmentDetailPage() {
     }
   };
 
+  const handleGenerateAiQuestions = async () => {
+    if (!aiTopic.trim()) {
+      toast.error("Topic / Subject is required");
+      return;
+    }
+    const count = parseInt(aiCount);
+    const marks = parseFloat(aiMarks);
+    if (!count || count < 1 || count > 10) {
+      toast.error("Question count must be between 1 and 10");
+      return;
+    }
+
+    setIsGeneratingAi(true);
+    try {
+      if (aiPipeline === "srijan" || aiPipeline === "gyan") {
+        const output = await generateTopicQuestions({
+          subject: assignment?.title || aiTopic.trim(),
+          question_type: aiType,
+          marks,
+          topic: aiTopic.trim(),
+          subtopics: [{ name: aiTopic.trim(), count }],
+          globalInstructions: aiInstructions.trim() ? [aiInstructions.trim()] : [],
+          topicInstructions: [],
+        });
+
+        for (const q of output.questions) {
+          const MCQ_LETTERS = ["A", "B", "C", "D"];
+          await createQuestionService({
+            assignmentId,
+            type: q.type,
+            description: q.question_text,
+            marks: q.marks || marks,
+            options: q.type === "mcq" && q.options
+              ? q.options.map((opt, i) => ({ value: opt.text, isCorrect: MCQ_LETTERS[i] === q.correct_option }))
+              : undefined,
+          });
+        }
+        toast.success(`Generated ${output.questions.length} question(s) with AI`);
+      } else if (aiPipeline === "smriti") {
+        if (!selectedDocId) {
+          toast.error("Please select a past paper document");
+          setIsGeneratingAi(false);
+          return;
+        }
+        const groups = await generateQuestionsFromDocuments({
+          documentIds: [selectedDocId],
+          topics: { high: [aiTopic.trim()], mid: [], low: [] },
+          difficulty: "medium",
+          questionCount: count,
+          questionType: aiType,
+          marks,
+        });
+
+        const MCQ_LETTERS = ["A", "B", "C", "D"];
+        let addedCount = 0;
+        for (const group of groups) {
+          for (const q of group.questions) {
+            await createQuestionService({
+              assignmentId,
+              type: q.type,
+              description: q.question_text,
+              marks: q.marks || marks,
+              options: q.type === "mcq" && q.options
+                ? q.options.map((opt, i) => ({ value: opt, isCorrect: MCQ_LETTERS[i] === q.correct_option }))
+                : undefined,
+            });
+            addedCount++;
+          }
+        }
+        toast.success(`Imported ${addedCount} question(s) from past paper`);
+      }
+
+      setAiDialogOpen(false);
+      await loadAll(false);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || err.message || "Failed to generate questions");
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
   const handleDeleteQuestion = async (questionId: string) => {
     if (!confirm("Delete this question? Any existing student answers to it will also be removed.")) return;
     try {
@@ -218,13 +335,9 @@ export default function AssignmentDetailPage() {
       toast.error("Title must be at least 3 characters");
       return;
     }
-    // totalMarks is dynamically calculated on Postgres, so we don't send or check it here.
     setSavingAssignment(true);
     try {
       const payload: any = { title: editTitle.trim() };
-      // Weekly series assignments have their schedule computed/chained from dayGap —
-      // must use Extend for those. Standalone and custom-series assignments store
-      // fixed dates directly and can be edited here.
       if (!assignment?.seriesId || assignment.dayGap === null) {
         payload.startDate = editStartDate ? new Date(editStartDate).toISOString() : null;
         payload.dueDate = editDueDate ? new Date(editDueDate).toISOString() : null;
@@ -266,7 +379,7 @@ export default function AssignmentDetailPage() {
     <div>
       <button
         onClick={() => {
-          const backTarget = seriesId 
+          const backTarget = seriesId
             ? `/teacher/classrooms/${classroomId}/assignments?seriesId=${seriesId}`
             : `/teacher/classrooms/${classroomId}/assignments`;
           router.push(backTarget);
@@ -309,6 +422,9 @@ export default function AssignmentDetailPage() {
       </div>
 
       <div className="flex justify-end gap-2 mb-4">
+        <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => router.push(`/teacher/classrooms/${classroomId}/assignments/new`)}>
+          <Sparkles className="mr-2 h-4 w-4" /> Generate with AI
+        </Button>
         <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={openCreateQuestion}>
           <Plus className="mr-2 h-4 w-4" /> Add Question
         </Button>
@@ -337,7 +453,7 @@ export default function AssignmentDetailPage() {
                     {q.type === "mcq" && (
                       <div className="mt-2 flex flex-col gap-1">
                         {q.options.map((o, i) => (
-                          <div key={o.id || i} className={`text-xs px-2 py-1 rounded ${o.isCorrect ? "bg-[#18181b]merald-500/15 text-emerald-200 border border-emerald-500/30" : "bg-zinc-800 text-white/70 border border-zinc-700"}`}>
+                          <div key={o.id || i} className={`text-xs px-2 py-1 rounded ${o.isCorrect ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30" : "bg-zinc-800 text-white/70 border border-zinc-700"}`}>
                             {o.isCorrect && <Check className="inline h-3 w-3 mr-1" />}
                             {o.value}
                           </div>
@@ -435,7 +551,7 @@ export default function AssignmentDetailPage() {
                     <button
                       type="button"
                       onClick={() => handleOptionChange(idx, "isCorrect", !opt.isCorrect)}
-                      className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-all ${opt.isCorrect ? "bg-[#18181b]merald-600 border-emerald-500 text-white" : "bg-[#18181b] border-white/10 text-white/60"}`}
+                      className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center transition-all ${opt.isCorrect ? "bg-emerald-600 border-emerald-500 text-white" : "bg-[#18181b] border-white/10 text-white/60"}`}
                     >
                       <Check className="h-4 w-4" />
                     </button>
@@ -490,7 +606,6 @@ export default function AssignmentDetailPage() {
                 className="w-full bg-[#18181b] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-1 focus:ring-white/30 transition-all text-sm"
               />
             </div>
-
 
             {assignment.seriesId && assignment.dayGap !== null ? (
               <p className="text-xs text-gray-500 p-3 bg-[#18181b] border border-white/10 rounded-lg">

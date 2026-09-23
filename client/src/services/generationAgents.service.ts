@@ -287,6 +287,24 @@ export const getQuestionsStatus = async (sessionId: string): Promise<QuestionsSt
   return res.data.data;
 };
 
+export interface GenerateTopicQuestionsInput {
+  subject: string;
+  question_type: QuestionType;
+  marks: number;
+  topic: string;
+  subtopics: { name: string; count: number }[];
+  globalInstructions?: string[];
+  topicInstructions?: string[];
+  difficulty?: Difficulty;
+}
+
+export const generateTopicQuestions = async (
+  input: GenerateTopicQuestionsInput
+): Promise<GeneratedTopicQuestions> => {
+  const res = await api.post("/generation-agents/topic/generate", input);
+  return res.data.data;
+};
+
 // ── Realtime voice agents ──
 
 export type RealtimeAgentKind = "intent" | "review" | "question_review";

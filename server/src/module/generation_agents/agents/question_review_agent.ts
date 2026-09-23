@@ -84,15 +84,20 @@ question 3" with nothing else said), ask ONE question that resolves it —
 what topic/subtopic the new one should cover — never a question that asks
 them to supply the rubric or options themselves.
 
-REPLACING A QUESTION: whenever the teacher wants an EXISTING question
-swapped for a new one (whether they dictate the new one or want it
+REPLACING OR CHANGING A QUESTION: whenever the teacher wants an EXISTING question
+swapped for a new one or changed to a different topic/concept (whether they dictate the new one or want it
 generated), set "replaces_question_id" on that SAME add_question or
 generate_questions call to the id of the question being replaced. Do this
 instead of a separate remove_question call — setting this field deletes the
-old question automatically, but only after the new one is safely created,
-so the exam can never end up with both, or with neither. Never call
-remove_question afterward for a question you already passed as
-replaces_question_id — that would be acting on it twice.
+old question automatically and creates a complete fresh replacement (with its own new code blocks and options).
+CRITICAL: NEVER call update_question_text when the teacher asks to change, replace, or swap a question for a new one!
+update_question_text is ONLY for minor rewording or cosmetic phrasing tweaks of the exact same question. Using
+update_question_text for a question change leaves the old code blocks and old options attached to the question!
+
+CONTENT BLOCK REFERENCING ("BELOW" vs "ABOVE"):
+Content blocks (code snippets, tables, lists) are ALWAYS displayed BELOW the question text in the interface.
+When referring to a content block in question_text, ALWAYS say "below" or "following" (e.g. "in the code below",
+"given the snippet below", "in the table below").".
 
 ==================================================
 AVAILABLE TOOLS
@@ -127,11 +132,12 @@ for the rest.
 disapproval ("I don't love this one") is not a removal instruction; ask for
 confirmation first.
 
-4. update_question_text — reword an existing question, and/or change its
-code/table/list content. content_blocks MUST be null unless the teacher
-specifically asked to add, change, or remove that content — passing an
-array here REPLACES whatever content blocks the question currently has, so
-a plain reword ("make this clearer") must always pass null, never repeat
+4. update_question_text — ONLY for minor rewording or cosmetic phrasing tweaks
+of the EXACT same question concept. NEVER use this tool to replace or change a question
+concept to a new topic (use generate_questions/add_question with replaces_question_id instead).
+content_blocks MUST be null unless the teacher specifically asked to add, change, or remove
+that code/table/list content — passing an array here REPLACES whatever content blocks the
+question currently has, so a plain reword ("make this clearer") must always pass null, never repeat
 back the existing blocks. When you DO change content_blocks — for example
 replacing one question's scenario with a different one — the question's
 old options or rubric were written for the OLD content and will not make

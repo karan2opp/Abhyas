@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 
-import { registerService, verifyOtpService, resendOtpService } from '../auth.service';
+import { registerService, verifyOtpService, resendOtpService, loginService } from '../auth.service';
+import { useAuthStore } from '@/store/authStore';
 
 const registerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -27,9 +28,11 @@ type VerifyFormValues = z.infer<typeof verifySchema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const setUser = useAuthStore(state => state.setUser);
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'REGISTER' | 'VERIFY'>('REGISTER');
   const [registeredEmail, setRegisteredEmail] = useState('');
+  const [registeredPassword, setRegisteredPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -75,6 +78,7 @@ export default function RegisterPage() {
     try {
       await registerService(data);
       setRegisteredEmail(data.email);
+      setRegisteredPassword(data.password);
       setStep('VERIFY');
       toast.success("Registration successful! We've sent a 6-digit code to your email.", { duration: 5000 });
     } catch (error: any) {
@@ -88,8 +92,17 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await verifyOtpService({ email: registeredEmail, otp: data.otp });
-      toast.success("Email verified successfully! You can now log in.");
-      router.push('/auth/login');
+
+      // Verification just confirmed this is really their email/password —
+      // sign them in immediately with the credentials from step 1 instead of
+      // sending them back to the login page to retype what they just entered.
+      const response = await loginService({ email: registeredEmail, password: registeredPassword });
+      const userData = response.data?.user || response.data;
+      const token = response.data?.accessToken || response.accessToken;
+      setUser(userData, token);
+
+      toast.success("Email verified — you're all set!");
+      router.push('/student');
     } catch (error: any) {
       toast.error(error.message || "Verification failed. Please check your code.");
     } finally {

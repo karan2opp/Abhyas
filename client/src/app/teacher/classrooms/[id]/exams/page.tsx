@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { FileText, Plus, Search, Clock, Eye } from "lucide-react";
+import { FileText, Plus, Search, Clock, Eye, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { listExamsForClassroomService, deleteExamService, updateExamService } fr
 import { formatDateTime } from "@/lib/date";
 import { TeacherExamPreviewModal } from "@/components/TeacherExamPreviewModal";
 import { Pagination } from "@/components/Pagination";
+import { useAuthStore } from "@/store/authStore";
 
 interface ExamEntry {
   id: string;
@@ -25,12 +26,16 @@ interface ExamEntry {
   duration: number;
   createdAt: string;
   subject?: string;
+  createdBy?: string;
+  createdByName?: string | null;
+  createdByEmail?: string | null;
 }
 
 export default function ExamsPage() {
   const params = useParams();
   const router = useRouter();
   const classroomId = params.id as string;
+  const currentUserId = useAuthStore((state) => state.user?.id);
 
   const [exams, setExams] = useState<ExamEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,9 +221,24 @@ export default function ExamsPage() {
                 </div>
 
                 {/* Main Title */}
-                <h3 className="text-2xl font-extrabold text-white tracking-tight mb-4 leading-snug" title={e.title}>
+                <h3 className="text-2xl font-extrabold text-white tracking-tight mb-1.5 leading-snug" title={e.title}>
                   {e.title}
                 </h3>
+
+                {/* Creator */}
+                {e.createdByName && (
+                  <p className="flex items-center gap-1.5 text-xs text-zinc-500 mb-4">
+                    <UserIcon className="h-3.5 w-3.5 shrink-0" />
+                    {e.createdBy === currentUserId ? (
+                      <span className="text-zinc-400 font-medium">Created by you</span>
+                    ) : (
+                      <span>
+                        Created by <span className="text-zinc-400 font-medium">{e.createdByName}</span>
+                        {e.createdByEmail ? ` (${e.createdByEmail})` : ""}
+                      </span>
+                    )}
+                  </p>
+                )}
 
                 {/* Timeline Section */}
                 <div className="space-y-2.5 mb-6 text-sm bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/40 p-4 rounded-xl border border-white/5">

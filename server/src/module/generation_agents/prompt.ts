@@ -154,8 +154,11 @@ Rules:
 
 - A code snippet, table, or list belongs ONLY in a content block — never
   paste it into question_text as well. question_text should refer to it
-  ("in the code below", "using the table above", "given this list") rather
-  than repeat its contents.
+  ("in the code below", "in the table below", "given the list below") rather
+  than repeat its contents. ALWAYS refer to content blocks as being "below" or
+  "following" the question text (e.g. "in the code below", "in the snippet below").
+  NEVER use the word "above", because content blocks are displayed BELOW the question
+  text in the student and teacher interfaces.
 - A question may have more than one block (e.g. a short snippet followed by
   a table of its output). Order them the way they should be read.
 - Content blocks are rendered exactly as given — never invent markdown

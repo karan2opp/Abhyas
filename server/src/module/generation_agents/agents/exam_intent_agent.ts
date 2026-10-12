@@ -1,22 +1,26 @@
 import { getClientForModel } from "../../../common/agent/openai.client.js";
 import { env } from "../../../env.js";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { ExamIntentAgentOutputZodSchema, type ConversationTurn, type ConversationSummary, type ExamIntentAgentOutput } from "../Types/outputConversation.js";
+import type { z } from "zod";
+import {
+  ExamIntentAgentOutputZodSchema,
+  ConversationSummaryZodSchema,
+  type ConversationTurn,
+  type ConversationSummary,
+  type ExamIntentAgentOutput,
+} from "../Types/outputConversation.js";
 import type { IInputExam } from "../Types/inputExam.js";
 import { searchMemories, addMemories } from "../../../common/utils/mem0.js";
-import { getExamIntentSystemPrompt } from "../../../prompts/exam_intent_agent.prompt.js";
+import { getExamIntentSystemPrompt, getExamIntentConcludeInstruction } from "../../../prompts/exam_intent_agent.prompt.js";
 
 const topicName = (t: IInputExam["sections"][number]["topics"][number]): string =>
   typeof t === "string" ? t : t.topic;
 
-// Fixed strings the "Skip Question" / "Skip All Questions" chat buttons send
-// as the user's turn, instead of freeform text — the system prompt below
-// teaches the model exactly what each one means, so behavior is deterministic
-// rather than depending on how a real teacher might happen to phrase "skip".
-// Exported so the controller sends the exact same text the prompt describes.
+// Fixed string the "Skip Question" chat button sends as the user's turn, so the
+// model sees exactly the marker its system prompt describes.
 export const SKIP_QUESTION_SIGNAL = "[[SKIP_QUESTION]] The user has no preference for the question you just asked — do not ask it again.";
-export const SKIP_ALL_SIGNAL = "[[SKIP_ALL]] The user wants to stop answering and move on — finalize now using only what has already been discussed.";
-export const FORCE_CONCLUDE_SIGNAL = "[[FORCE_CONCLUDE]] You must set done to true and produce the summary in this reply — this is mandatory.";
+
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
 // Builds a short query describing this exam so mem0 can surface only the
 // memories relevant to it (not everything this teacher has ever said).
@@ -52,18 +56,12 @@ export function persistIntentMemories(summary: ConversationSummary, examTitle: s
   });
 }
 
-export async function examIntentAgentTurn(
-  examInput: IInputExam,
-  history: ConversationTurn[],
-  userId?: string | null
-) {
-  const client = await getClientForModel(env.GENERATION_MODEL);
-
+async function buildMessages(examInput: IInputExam, history: ConversationTurn[], userId?: string | null): Promise<ChatMessage[]> {
   // Pull in only the memories relevant to this exam (not this teacher's
   // entire history) — no-op (empty array) if mem0 isn't configured.
   const memories = userId ? await searchMemories(buildMemoryQuery(examInput), userId, 5) : [];
 
-  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+  return [
     { role: "system", content: getExamIntentSystemPrompt() },
     { role: "user", content: `Exam skeleton:\n${JSON.stringify(examInput)}` },
     ...(memories.length > 0
@@ -74,14 +72,15 @@ export async function examIntentAgentTurn(
       : []),
     ...history.map((turn) => ({ role: turn.role, content: turn.content })),
   ];
+}
 
-  // Retried like every other structured-output call in this codebase
-  // (evaluateSingleAnswer, generateTopicQuestions): the model occasionally
-  // returns a malformed/empty object for a turn, and without a retry that
-  // was an unhandled ZodError reaching the teacher as a raw, unreadable
-  // message instead of the conversation just continuing.
+// Retried like every other structured-output call in this codebase
+// (evaluateSingleAnswer, generateTopicQuestions): the model occasionally
+// returns a malformed/empty object, and without a retry that was an
+// unhandled ZodError reaching the teacher as a raw, unreadable message.
+async function callStructured<T extends z.ZodTypeAny>(messages: ChatMessage[], schema: T, name: string): Promise<z.infer<T>> {
+  const client = await getClientForModel(env.GENERATION_MODEL);
   const MAX_ATTEMPTS = 3;
-  let result: ExamIntentAgentOutput | null = null;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -89,15 +88,10 @@ export async function examIntentAgentTurn(
       const response = await client.chat.completions.create({
         model: env.GENERATION_MODEL,
         messages,
-        response_format: zodResponseFormat(
-          ExamIntentAgentOutputZodSchema,
-          "exam_intent_agent_output"
-        ),
+        response_format: zodResponseFormat(schema, name),
       });
-
       const content = response.choices[0]?.message.content || "{}";
-      result = ExamIntentAgentOutputZodSchema.parse(JSON.parse(content));
-      break;
+      return schema.parse(JSON.parse(content));
     } catch (err) {
       lastError = err;
       console.warn(
@@ -107,11 +101,35 @@ export async function examIntentAgentTurn(
     }
   }
 
-  if (!result) {
-    throw new Error(
-      `The exam intent agent could not produce a valid response after ${MAX_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`
-    );
-  }
+  throw new Error(
+    `The exam intent agent could not produce a valid response after ${MAX_ATTEMPTS} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+  );
+}
+
+/**
+ * "Skip All": writes the final summary from the conversation so far in one call. The reply format only
+ * allows a summary, so unlike a normal turn the model cannot ask another question.
+ */
+export async function concludeExamIntent(
+  examInput: IInputExam,
+  history: ConversationTurn[],
+  userId?: string | null
+): Promise<ConversationSummary> {
+  const messages = await buildMessages(examInput, history, userId);
+  messages.push({ role: "system", content: getExamIntentConcludeInstruction() });
+
+  const summary = await callStructured(messages, ConversationSummaryZodSchema, "exam_intent_summary");
+  if (userId) persistIntentMemories(summary, examInput.title, userId);
+  return summary;
+}
+
+export async function examIntentAgentTurn(
+  examInput: IInputExam,
+  history: ConversationTurn[],
+  userId?: string | null
+) {
+  const messages = await buildMessages(examInput, history, userId);
+  let result: ExamIntentAgentOutput = await callStructured(messages, ExamIntentAgentOutputZodSchema, "exam_intent_agent_output");
 
   // Hard guarantee, independent of prompt adherence: never let the very
   // first turn conclude with zero questions asked. Memory can make the model

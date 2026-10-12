@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { examIntentAgentTurn, SKIP_QUESTION_SIGNAL, SKIP_ALL_SIGNAL, FORCE_CONCLUDE_SIGNAL } from "./agents/exam_intent_agent.js";
+import { examIntentAgentTurn, concludeExamIntent, SKIP_QUESTION_SIGNAL } from "./agents/exam_intent_agent.js";
 import { blueprintReviewAgentTurn } from "./agents/blueprint_review_agent.js";
 import { generateTopicQuestions } from "./agents/generation_agent.js";
 import { IInputExamZodSchema } from "./Types/inputExam.js";
@@ -72,7 +72,7 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
             if (action === "skip_question") {
                 effectiveMessage = SKIP_QUESTION_SIGNAL;
             } else if (action === "skip_all") {
-                effectiveMessage = SKIP_ALL_SIGNAL;
+                effectiveMessage = "(Skipped all remaining questions)";
             } else {
                 if (!message || !message.trim()) throw ApiError.badRequest("message is required to continue a conversation");
                 effectiveMessage = message.trim();
@@ -83,24 +83,20 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
         const history = sessionId ? await getSessionHistory(session.id) : [];
         console.log(`[generation-agents] exam intent turn (session ${session.id}, history length: ${history.length}${action ? `, action: ${action}` : ""})`);
 
-        let result = await examIntentAgentTurn(session.examInput, history, userId);
-
-        // "Skip all" must always end the conversation — regardless of whether
-        // the model complies with the instruction on the first try. One
-        // forced retry, then a hard-coded terminal fallback that can never
-        // fail, so the teacher is never stuck unable to move past this stage.
-        if (action === "skip_all" && !result.done) {
-            const retryHistory = [...history, { role: "assistant" as const, content: result.message }, { role: "user" as const, content: FORCE_CONCLUDE_SIGNAL }];
-            result = await examIntentAgentTurn(session.examInput, retryHistory, userId);
-
-            if (!result.done) {
-                console.warn(`[generation-agents] session ${session.id} did not conclude after [[FORCE_CONCLUDE]] — falling back to an empty summary`);
-                result = {
-                    done: true,
-                    message: "Got it — moving on with what you've already shared.",
-                    summary: { globalInstructions: [], topicSpecificInstructions: [] },
-                };
+        let result;
+        if (action === "skip_all") {
+            // Always ends the conversation: the summary-only call can't ask another question, and if it
+            // fails outright the teacher still moves on (with an empty summary) instead of being stuck.
+            let summary;
+            try {
+                summary = await concludeExamIntent(session.examInput, history, userId);
+            } catch (err) {
+                console.warn(`[generation-agents] session ${session.id} could not summarize after skip-all — falling back to an empty summary:`, err instanceof Error ? err.message : err);
+                summary = { globalInstructions: [], topicSpecificInstructions: [] };
             }
+            result = { done: true, message: "Got it — moving on with what you've already shared.", summary };
+        } else {
+            result = await examIntentAgentTurn(session.examInput, history, userId);
         }
 
         await appendMessage(session.id, "assistant", result.message);

@@ -2,7 +2,7 @@ import { getClientForModel } from "../../../common/agent/openai.client.js";
 import { env } from "../../../env.js";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { GeneratedQuestionsOutputZodSchema, type GeneratedQuestionsOutput } from "../Types/outputGeneration.js";
-import { getGenerationSystemPrompt } from "../prompt.js";
+import { getGenerationSystemPrompt } from "../../../prompts/generation_agent.prompt.js";
 import type { QuestionType, Difficulty, EducationLevel } from "../Types/inputExam.js";
 
 export interface GenerateTopicQuestionsInput {

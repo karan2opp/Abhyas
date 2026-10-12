@@ -2,7 +2,8 @@ import { z } from "zod";
 import { getClientForModel } from "../../common/agent/openai.client.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { env } from "../../env.js";
-import { getEvaluationPrompt, runGuardrail } from "./agents/evalAgent.js";
+import { runGuardrail } from "./agents/evalAgent.js";
+import { getEvaluationPrompt } from "../../prompts/evaluation_agent.prompt.js";
 import type { QuestionContentBlock } from "../questions/question.schema.js";
 
 const EvaluationOutputSchema = z.object({

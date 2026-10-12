@@ -4,9 +4,13 @@ import { env } from "../../env.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { IInputExamZodSchema } from "./Types/inputExam.js";
 import { ConversationSummaryZodSchema } from "./Types/outputConversation.js";
-import { getSystemPrompt as getIntentSystemPrompt, persistIntentMemories } from "./agents/exam_intent_agent.js";
-import { getSystemPrompt as getReviewSystemPrompt, executeTool as executeReviewTool } from "./agents/blueprint_review_agent.js";
-import { getSystemPrompt as getQuestionReviewSystemPrompt, executeTool as executeQuestionReviewTool } from "./agents/question_review_agent.js";
+import { persistIntentMemories } from "./agents/exam_intent_agent.js";
+import { executeTool as executeReviewTool } from "./agents/blueprint_review_agent.js";
+import { executeTool as executeQuestionReviewTool } from "./agents/question_review_agent.js";
+import { getExamIntentSystemPrompt as getIntentSystemPrompt } from "../../prompts/exam_intent_agent.prompt.js";
+import { getBlueprintReviewSystemPrompt as getReviewSystemPrompt } from "../../prompts/blueprint_review_agent.prompt.js";
+import { getQuestionReviewSystemPrompt } from "../../prompts/question_review_agent.prompt.js";
+import { ENGLISH_ONLY_DIRECTIVE, VOICE_ADDENDUM } from "../../prompts/realtime_voice.prompt.js";
 import {
     getIntentAgentRealtimeTools,
     getReviewAgentRealtimeTools,
@@ -32,30 +36,6 @@ const toRequester = (req: Request): Requester => ({
     role: req.user!.role,
     organisationId: req.user!.organisationId ?? null,
 });
-
-// Placed BEFORE the agent's own (often long) role prompt — models weight
-// earlier instructions more reliably, and this rule must never get lost in
-// a long system prompt. Kept short and absolute on purpose.
-const ENGLISH_ONLY_DIRECTIVE = `CRITICAL RULE — applies to every single word you say, with no exceptions:
-Speak and respond ONLY in English. Never switch languages, never mix in a word or phrase from another language, and never mirror the language of the teacher's audio — even if the transcription looks like it's in another language, is garbled, or you're not fully sure what was said. Always respond in English regardless. This rule overrides every other instruction below.`;
-
-// This is a live spoken conversation, not a text chat — appended to both
-// agents' existing (text-authored) system prompts rather than duplicating
-// them, so voice and text always share the same underlying rules.
-const VOICE_ADDENDUM = `
----
-VOICE DELIVERY
-
-This is a live spoken conversation, not a text chat.
-
-- English only, always — every word, no exceptions, no mixing languages. This applies even if you think the teacher spoke another language or the transcription looks non-English.
-- If you couldn't clearly understand what was said, say so in English and ask the teacher to repeat it — never guess and answer a different question than what was likely asked.
-- Keep every response to one or two short sentences, the way a real conversation sounds.
-- Never read out JSON, tool names, field names, or markdown formatting out loud.
-- Never narrate that you are calling a tool ("let me update that now") — just speak naturally about the result once it's done.
-- Ask exactly one thing at a time, and wait for the answer before moving on.
-- Start the conversation yourself with a brief greeting and your first question — don't wait for the teacher to speak first.
-`;
 
 const CreateRealtimeSessionRequestZodSchema = z.object({
     agent: z.enum(["intent", "review", "question_review"]),

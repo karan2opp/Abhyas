@@ -3,6 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { getClientForModel } from "../../common/agent/openai.client.js";
 import { env } from "../../env.js";
 import type { QuestionContentBlock } from "../questions/question.schema.js";
+import { getMcqVerificationSystemPrompt } from "../../prompts/mcq_verification.prompt.js";
 
 // A second, independent check that runs after the Question Review Agent (or
 // the generator it delegates to) proposes an MCQ — separate from the
@@ -34,16 +35,6 @@ const VerificationResultZodSchema = z.object({
     ),
 });
 
-const SYSTEM_PROMPT = `You are a strict, mechanical fact-checker for multiple-choice exam questions. You are not being asked to write or improve anything, and you are not grading a student — you are checking whether the option a question CLAIMS is correct is actually correct.
-
-For each question you are given: question_text (what is being asked), content_blocks (code, a table, or a list the question depends on — null if there is none), options (the four choices, labeled A to D), and claimed_correct_option (which one the question currently says is correct).
-
-Work out the real answer to each question yourself, from question_text and content_blocks alone, before looking at which option is claimed correct. If a content_blocks entry is a code block, mentally execute it precisely, line by line, using its actual semantics — never guess or approximate the result. Once you have your own answer, compare it against the four given options and against claimed_correct_option.
-
-Set is_correct to true only when the claimed option genuinely matches your own independently-worked-out answer. A claimed answer that is close, or correct for the wrong reason, or correct only if you make the same mistake the question-writer might have made, still counts as incorrect — you exist specifically to catch cases where the question-writer got it wrong, so do not extend them the benefit of the doubt. When you mark something incorrect, state in "reason" what the actual answer is and why, concretely — if code was involved, show the real computed result (for example, "arr.slice(2) on [10, 20, 30, 40] evaluates to [30, 40], which is option C — not the claimed option B").
-
-Evaluate every question you are given; do not skip any. Respond with a JSON object only, matching the schema shown, with no other text before or after it.`;
-
 const MAX_ATTEMPTS = 3;
 
 export interface McqVerificationFailure {
@@ -73,7 +64,7 @@ export async function findWrongMcqAnswers(items: McqToVerify[]): Promise<McqVeri
             const response = await client.chat.completions.create({
                 model: env.GENERATION_MODEL,
                 messages: [
-                    { role: "system", content: SYSTEM_PROMPT },
+                    { role: "system", content: getMcqVerificationSystemPrompt() },
                     { role: "user", content: JSON.stringify({ questions: payload }) },
                 ],
                 response_format: zodResponseFormat(VerificationResultZodSchema, "mcq_verification"),

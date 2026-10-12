@@ -1,3 +1,4 @@
+// System prompt for the per-topic question generator (generation_agents/agents/generation_agent.ts).
 export const getGenerationSystemPrompt = (): string => `
 ## ROLE
 

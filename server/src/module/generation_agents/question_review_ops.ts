@@ -6,7 +6,7 @@ import type {
     AddQuestionArgs,
     GenerateQuestionsArgs,
     RemoveQuestionArgs,
-    UpdateQuestionTextArgs,
+    UpdateQuestionArgs,
     UpdateQuestionOptionsArgs,
 } from "./Types/outputQuestionReview.js";
 
@@ -14,6 +14,30 @@ const OPTION_LETTERS = ["A", "B", "C", "D"] as const;
 
 export interface QuestionReviewResult {
     changeLog: string[];
+}
+
+type RubricCategory = { name: string; weight: number; key_points: string[] };
+
+// Grading multiplies each category's score by its weight, so weights that
+// don't sum to 1 would silently scale every student's mark up or down.
+function normalizeRubric(categories: RubricCategory[]): RubricCategory[] {
+    const sum = categories.reduce((s, c) => s + Math.max(0, c.weight), 0);
+    return categories.map((c) => ({
+        ...c,
+        weight: Math.round((sum > 0 ? Math.max(0, c.weight) / sum : 1 / categories.length) * 1000) / 1000,
+    }));
+}
+
+// Where a new question goes. A replacement takes the old question's exact
+// section, block, and position, so it stays at the same number on screen.
+// Looking the old question up first also means a wrong id fails before
+// anything is created, instead of leaving an extra question behind.
+async function placementFor(args: { section_id: string; block_id: string | null; replaces_question_id: string | null }, requester: Requester) {
+    if (!args.replaces_question_id) {
+        return { sectionId: args.section_id, blockId: args.block_id ?? undefined, position: undefined };
+    }
+    const old = await getQuestionById(args.replaces_question_id, requester);
+    return { sectionId: old.sectionId, blockId: old.blockId ?? undefined, position: old.position };
 }
 
 // Operates directly on the real, already-saved exam — questions/options
@@ -29,6 +53,8 @@ export interface QuestionReviewResult {
 // same turn, exactly like the structural checks below it.
 
 export async function applyAddQuestion(args: AddQuestionArgs, requester: Requester): Promise<QuestionReviewResult> {
+    const placement = await placementFor(args, requester);
+
     if (args.type === "mcq") {
         if (!args.options || args.options.length !== 4 || !args.correct_option) {
             throw new Error("An MCQ question needs exactly 4 options and a correct_option.");
@@ -47,8 +73,7 @@ export async function applyAddQuestion(args: AddQuestionArgs, requester: Request
 
     await createQuestion(
         {
-            sectionId: args.section_id,
-            blockId: args.block_id ?? undefined,
+            ...placement,
             type: args.type,
             description: args.question_text,
             marks: args.marks,
@@ -57,7 +82,7 @@ export async function applyAddQuestion(args: AddQuestionArgs, requester: Request
                 args.type === "mcq"
                     ? args.options!.map((opt, i) => ({ value: opt.text, isCode: opt.isCode, isCorrect: OPTION_LETTERS[i] === args.correct_option }))
                     : undefined,
-            rubric: args.type === "descriptive" ? { categories: args.rubric_categories! } : undefined,
+            rubric: args.type === "descriptive" ? { categories: normalizeRubric(args.rubric_categories!) } : undefined,
         } as any,
         requester
     );
@@ -81,6 +106,7 @@ export async function applyGenerateQuestions(args: GenerateQuestionsArgs, reques
         throw new Error("replaces_question_id only makes sense with count 1 — replacing one question with several has no single target. Generate the replacement alone first, then handle any extra questions as a separate addition.");
     }
 
+    const placement = await placementFor(args, requester);
     const output = await generateTopicQuestions({
         subject: args.subject,
         question_type: args.question_type,
@@ -106,8 +132,7 @@ export async function applyGenerateQuestions(args: GenerateQuestionsArgs, reques
     for (const q of output.questions) {
         await createQuestion(
             {
-                sectionId: args.section_id,
-                blockId: args.block_id ?? undefined,
+                ...placement,
                 type: q.type,
                 description: q.question_text,
                 marks: args.marks,
@@ -115,7 +140,7 @@ export async function applyGenerateQuestions(args: GenerateQuestionsArgs, reques
                 options: q.type === "mcq"
                     ? q.options.map((opt, i) => ({ value: opt.text, isCode: opt.isCode, isCorrect: OPTION_LETTERS[i] === q.correct_option }))
                     : undefined,
-                rubric: q.type === "descriptive" ? q.rubric : undefined,
+                rubric: q.type === "descriptive" ? { categories: normalizeRubric(q.rubric.categories) } : undefined,
             } as any,
             requester
         );
@@ -136,55 +161,46 @@ export async function applyRemoveQuestion(args: RemoveQuestionArgs, requester: R
     return { changeLog: ["Removed a question."] };
 }
 
-export async function applyUpdateQuestionText(args: UpdateQuestionTextArgs, requester: Requester): Promise<QuestionReviewResult> {
-    const changingContent = args.content_blocks !== null;
+// Saves the complete edited question in one go: text, content blocks, and
+// options (MCQ, fact-checked) or rubric (descriptive) always together.
+export async function applyUpdateQuestion(args: UpdateQuestionArgs, requester: Requester): Promise<QuestionReviewResult> {
+    const existing = await getQuestionById(args.question_id, requester);
 
-    if (changingContent) {
-        const existing = await getQuestionById(args.question_id, requester);
-
-        // The bug this guards against: content_blocks changes (a new code
-        // snippet, a new scenario) while the OLD options or rubric — written
-        // for the OLD content — are silently left in place. Require the
-        // matching half of the question to be resupplied in the same call
-        // rather than trusting a separate, later call to remember to do it.
-        if (existing.type === "mcq") {
-            if (!args.options || args.options.length !== 4 || !args.correct_option) {
-                throw new Error(
-                    "Changing this question's content_blocks requires also providing the matching 4 options and correct_option in the same call — the old options were written for the old content and almost certainly don't apply to the new one."
-                );
-            }
-            await assertMcqAnswersAreCorrect([
-                {
-                    questionText: args.question_text,
-                    contentBlocks: args.content_blocks!,
-                    options: args.options.map((opt, i) => ({ label: OPTION_LETTERS[i]!, text: opt.text })),
-                    claimedCorrectOption: args.correct_option,
-                },
-            ]);
-        } else if (existing.type === "descriptive") {
-            if (!args.rubric_categories || args.rubric_categories.length === 0) {
-                throw new Error(
-                    "Changing this question's content_blocks requires also providing a matching rubric_categories in the same call — the old rubric was written for the old content and may no longer fit."
-                );
-            }
+    if (existing.type === "mcq") {
+        if (!args.options || args.options.length !== 4 || !args.correct_option) {
+            throw new Error("Updating an MCQ needs all 4 options and correct_option, matching the new text and content.");
         }
+        await assertMcqAnswersAreCorrect([
+            {
+                questionText: args.question_text,
+                contentBlocks: args.content_blocks,
+                options: args.options.map((opt, i) => ({ label: OPTION_LETTERS[i]!, text: opt.text })),
+                claimedCorrectOption: args.correct_option,
+            },
+        ]);
+    } else if (!args.rubric_categories || args.rubric_categories.length === 0) {
+        throw new Error("Updating a descriptive question needs its full rubric_categories, matching the new text and content.");
     }
 
     await updateQuestion(
         args.question_id,
         {
             description: args.question_text,
-            ...(changingContent && { contentBlocks: args.content_blocks }),
-            ...(args.options && {
-                options: args.options.map((opt, i) => ({ value: opt.text, isCode: opt.isCode, isCorrect: OPTION_LETTERS[i] === args.correct_option })),
-            }),
-            ...(args.rubric_categories && { rubric: { categories: args.rubric_categories } }),
+            contentBlocks: args.content_blocks,
+            ...(existing.type === "mcq"
+                ? { options: args.options!.map((opt, i) => ({ value: opt.text, isCode: opt.isCode, isCorrect: OPTION_LETTERS[i] === args.correct_option })) }
+                : { rubric: { categories: normalizeRubric(args.rubric_categories!) } }),
         } as any,
         requester
     );
 
-    const changed = changingContent ? "wording and content" : "wording";
-    return { changeLog: [`Updated the ${changed} of a question.`] };
+    // Every update re-sends the content blocks, so say plainly whether they
+    // actually changed — an unintended change to a code snippet then shows up.
+    const contentChanged = JSON.stringify(existing.contentBlocks ?? []) !== JSON.stringify(args.content_blocks);
+    const parts = existing.type === "mcq" ? "wording and options" : "wording and rubric";
+    return {
+        changeLog: [`Updated the ${parts} of a question; its code/table/list content ${contentChanged ? "CHANGED" : "is unchanged"}.`],
+    };
 }
 
 export async function applyUpdateQuestionOptions(args: UpdateQuestionOptionsArgs, requester: Requester): Promise<QuestionReviewResult> {

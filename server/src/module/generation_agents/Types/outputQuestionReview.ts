@@ -81,34 +81,24 @@ export const RemoveQuestionArgsZodSchema = z.object({
     question_id: z.string().describe("The id of the question to remove, from the current question list"),
 });
 
-export const UpdateQuestionTextArgsZodSchema = z.object({
-    question_id: z.string().describe("The id of the question to reword"),
-    question_text: z.string().describe("The new question text"),
+// Always the COMPLETE edited question — text, content blocks, and options or
+// rubric together — so the parts can never drift out of sync, and an MCQ's
+// whole new version is fact-checked before it's saved.
+export const UpdateQuestionArgsZodSchema = z.object({
+    question_id: z.string().describe("The id of the question to update"),
+    question_text: z.string().describe("The question's full new text"),
     content_blocks: z
         .array(ContentBlockInputZodSchema)
-        .nullable()
-        .describe("null to leave this question's code/table/list content exactly as it is. An array (possibly empty, to remove them) ONLY when the teacher specifically asked to add, change, or remove that content."),
-    // Whenever content_blocks is non-null (being changed) on an MCQ question,
-    // its old options were written for the OLD content and almost certainly
-    // no longer make sense — options/correct_option MUST be supplied together
-    // with the new content_blocks in that case (never left as the stale set).
-    // null only when content_blocks is also null, or the question is
-    // descriptive.
+        .describe("The question's complete code/table/list content after the edit. Copy unchanged blocks back exactly, character for character. Empty array if it has none."),
     options: z
         .array(OptionInputZodSchema)
         .nullable()
-        .describe("Required (non-null, exactly 4) whenever content_blocks is also being changed on an MCQ question. null otherwise."),
-    correct_option: z
-        .enum(["A", "B", "C", "D"])
-        .nullable()
-        .describe("Required (non-null) whenever options is provided. null otherwise."),
-    // Same requirement, mirrored for descriptive questions: if the content a
-    // rubric was written against changes, the rubric's key_points may no
-    // longer match what the question is actually asking about.
+        .describe("MCQ: all 4 options after the edit, unchanged ones copied back exactly. null for a descriptive question."),
+    correct_option: z.enum(["A", "B", "C", "D"]).nullable().describe("MCQ: the correct option after the edit. null for a descriptive question."),
     rubric_categories: z
         .array(RubricCategoryInputZodSchema)
         .nullable()
-        .describe("Required (non-null) whenever content_blocks is also being changed on a descriptive question. null otherwise."),
+        .describe("Descriptive: the full rubric after the edit, matching the new wording. null for an MCQ."),
 });
 
 export const UpdateQuestionOptionsArgsZodSchema = z.object({
@@ -120,5 +110,5 @@ export const UpdateQuestionOptionsArgsZodSchema = z.object({
 export type AddQuestionArgs = z.infer<typeof AddQuestionArgsZodSchema>;
 export type GenerateQuestionsArgs = z.infer<typeof GenerateQuestionsArgsZodSchema>;
 export type RemoveQuestionArgs = z.infer<typeof RemoveQuestionArgsZodSchema>;
-export type UpdateQuestionTextArgs = z.infer<typeof UpdateQuestionTextArgsZodSchema>;
+export type UpdateQuestionArgs = z.infer<typeof UpdateQuestionArgsZodSchema>;
 export type UpdateQuestionOptionsArgs = z.infer<typeof UpdateQuestionOptionsArgsZodSchema>;

@@ -26,6 +26,8 @@ const verifyQuestionAccess = async (questionId: string, requester: Requester) =>
     const [question] = await db.select({
         id: questions.id,
         sectionId: questions.sectionId,
+        blockId: questions.blockId,
+        position: questions.position,
         type: questions.type,
         description: questions.description,
         marks: questions.marks,
@@ -104,7 +106,9 @@ const createQuestion = async (
             type: data.type,
             description: data.description,
             marks: data.marks,
-            position: nextPosition,
+            // The review agent passes the replaced question's position so a
+            // replacement keeps its place; every other caller appends.
+            position: typeof (data as any).position === "number" ? (data as any).position : nextPosition,
             images: uploadedImages.length > 0 ? uploadedImages : null,
             rubric: data.rubric ?? null,
             // Not yet on CreateQuestionDto (the manual editor doesn't send
@@ -186,7 +190,7 @@ const updateQuestion = async (questionId: string, data: UpdateQuestionDto, reque
                 ...(data.rubric !== undefined && { rubric: data.rubric }),
                 // Not on UpdateQuestionDto yet (see contentBlocks in
                 // createQuestion above) — read defensively for the review
-                // agent's update_question_text tool.
+                // agent's update_question tool.
                 ...((data as any).contentBlocks !== undefined && { contentBlocks: (data as any).contentBlocks }),
                 updatedAt: new Date(),
             })

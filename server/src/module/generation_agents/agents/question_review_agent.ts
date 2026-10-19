@@ -4,14 +4,14 @@ import {
     AddQuestionArgsZodSchema,
     GenerateQuestionsArgsZodSchema,
     RemoveQuestionArgsZodSchema,
-    UpdateQuestionTextArgsZodSchema,
+    UpdateQuestionArgsZodSchema,
     UpdateQuestionOptionsArgsZodSchema,
 } from "../Types/outputQuestionReview.js";
 import {
     applyAddQuestion,
     applyGenerateQuestions,
     applyRemoveQuestion,
-    applyUpdateQuestionText,
+    applyUpdateQuestion,
     applyUpdateQuestionOptions,
 } from "../question_review_ops.js";
 import type { Requester } from "../../../common/permissions/index.js";
@@ -33,9 +33,9 @@ export const tools = [
     }),
     zodFunction({ name: "remove_question", parameters: RemoveQuestionArgsZodSchema, description: "Remove one question by id." }),
     zodFunction({
-        name: "update_question_text",
-        parameters: UpdateQuestionTextArgsZodSchema,
-        description: "Change the wording of one existing question.",
+        name: "update_question",
+        parameters: UpdateQuestionArgsZodSchema,
+        description: "Update one existing question: send its complete new version (text, content blocks, and all options + correct answer for an MCQ, or the full rubric for a descriptive question).",
     }),
     zodFunction({
         name: "update_question_options",
@@ -69,8 +69,8 @@ export async function executeTool(
                 const r = await applyRemoveQuestion(RemoveQuestionArgsZodSchema.parse(args), requester);
                 return { resultText: r.changeLog.join(" "), changeLog: r.changeLog };
             }
-            case "update_question_text": {
-                const r = await applyUpdateQuestionText(UpdateQuestionTextArgsZodSchema.parse(args), requester);
+            case "update_question": {
+                const r = await applyUpdateQuestion(UpdateQuestionArgsZodSchema.parse(args), requester);
                 return { resultText: r.changeLog.join(" "), changeLog: r.changeLog };
             }
             case "update_question_options": {

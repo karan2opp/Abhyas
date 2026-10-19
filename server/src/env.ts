@@ -5,9 +5,9 @@ const envSchema = z.object({
   // collided with the client whenever PORT wasn't set explicitly.
   PORT: z.string().default("8000").transform((val) => parseInt(val, 10)),
   REDIS_URL: z.string().default("redis://localhost:6379"),
-  GENERATION_MODEL: z.string().default("mistral-small-latest"),
-  EVALUATION_MODEL: z.string().default("mistral-small-latest"),
-  GUARDRAIL_MODEL: z.string().default("mistral-small-latest"),
+  GENERATION_MODEL: z.string().default("gpt-5.6-luna"),
+  EVALUATION_MODEL: z.string().default("gpt-4.1-mini"),
+  GUARDRAIL_MODEL: z.string().default("gpt-4.1-mini"),
   REALTIME_MODEL: z.string().default("gpt-realtime"),
   REALTIME_VOICE: z.string().default("marin"),
   PDF_VISION_MODEL: z.string().default("gpt-4.1-mini"),

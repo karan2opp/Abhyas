@@ -19,7 +19,9 @@ import {
     applyAddTopic,
     applyDeleteTopic,
     applyIncreaseTotalQuestionCount,
-    type AddTopicGenerationContext,
+    sectionTotal,
+    type SectionContext,
+    type EditResult,
 } from "../blueprint_edit_ops.js";
 import type { ExamBlueprintSection } from "../Types/outputSubtopics.js";
 import type { ConversationTurn } from "../Types/outputConversation.js";
@@ -48,56 +50,47 @@ function replaceSection(sections: ExamBlueprintSection[], updated: ExamBlueprint
     return sections.map((s) => (s.name === updated.name ? updated : s));
 }
 
+async function applyTool(section: ExamBlueprintSection, name: string, args: unknown, context: SectionContext): Promise<EditResult | null> {
+    switch (name) {
+        case "set_subtopic_count":
+            return applySetSubtopicCount(section, SetSubtopicCountArgsZodSchema.parse(args));
+        case "set_topic_count":
+            return applySetTopicCount(section, SetTopicCountArgsZodSchema.parse(args));
+        case "add_subtopic":
+            return applyAddSubtopic(section, AddSubtopicArgsZodSchema.parse(args));
+        case "delete_subtopic":
+            return applyDeleteSubtopic(section, DeleteSubtopicArgsZodSchema.parse(args));
+        case "add_topic":
+            return applyAddTopic(section, AddTopicArgsZodSchema.parse(args), context);
+        case "delete_topic":
+            return applyDeleteTopic(section, DeleteTopicArgsZodSchema.parse(args));
+        case "increase_total_question_count":
+            return applyIncreaseTotalQuestionCount(section, IncreaseTotalQuestionCountArgsZodSchema.parse(args));
+        default:
+            return null;
+    }
+}
+
 export async function executeTool(
     sections: ExamBlueprintSection[],
     name: string,
     argsRaw: string,
-    generationContextBySection: Record<string, AddTopicGenerationContext>
+    contextBySection: Record<string, SectionContext>
 ): Promise<{ sections: ExamBlueprintSection[]; resultText: string; changeLog: string[] }> {
     try {
         const args = JSON.parse(argsRaw || "{}");
-        const sectionName: string | undefined = args.section;
-        const section = sectionName ? sections.find((s) => s.name === sectionName) : undefined;
-        if (!section) {
-            return { sections, resultText: `Error: section "${sectionName || ""}" not found in this exam.`, changeLog: [] };
+        const section = sections.find((s) => s.name === args.section);
+        const context = section ? contextBySection[section.name] : undefined;
+        if (!section || !context) {
+            return { sections, resultText: `Error: section "${args.section || ""}" not found in this exam.`, changeLog: [] };
         }
 
-        switch (name) {
-            case "set_subtopic_count": {
-                const r = applySetSubtopicCount(section, SetSubtopicCountArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "set_topic_count": {
-                const r = applySetTopicCount(section, SetTopicCountArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "add_subtopic": {
-                const r = applyAddSubtopic(section, AddSubtopicArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "delete_subtopic": {
-                const r = applyDeleteSubtopic(section, DeleteSubtopicArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "add_topic": {
-                const generationContext = generationContextBySection[section.name];
-                if (!generationContext) {
-                    return { sections, resultText: `Error: missing generation context for section "${section.name}".`, changeLog: [] };
-                }
-                const r = await applyAddTopic(section, AddTopicArgsZodSchema.parse(args), generationContext);
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "delete_topic": {
-                const r = applyDeleteTopic(section, DeleteTopicArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            case "increase_total_question_count": {
-                const r = applyIncreaseTotalQuestionCount(section, IncreaseTotalQuestionCountArgsZodSchema.parse(args));
-                return { sections: replaceSection(sections, r.section), resultText: r.changeLog.join(" "), changeLog: r.changeLog };
-            }
-            default:
-                return { sections, resultText: `Unknown tool "${name}".`, changeLog: [] };
-        }
+        const r = await applyTool(section, name, args, context);
+        if (!r) return { sections, resultText: `Unknown tool "${name}".`, changeLog: [] };
+
+        // Tells the model the outcome directly, so the full blueprint doesn't have to be re-sent after every tool call.
+        const totals = `Section "${section.name}" now has ${sectionTotal(r.section)} question(s); the exam was set to ${context.targetQuestionCount}.`;
+        return { sections: replaceSection(sections, r.section), resultText: [...r.changeLog, totals].join(" "), changeLog: r.changeLog };
     } catch (err: any) {
         return { sections, resultText: `Error: ${err?.message || "the change could not be applied"}`, changeLog: [] };
     }
@@ -114,7 +107,7 @@ const MAX_TOOL_ROUNDS = 5;
 
 export async function blueprintReviewAgentTurn(
     sections: ExamBlueprintSection[],
-    generationContextBySection: Record<string, AddTopicGenerationContext>,
+    generationContextBySection: Record<string, SectionContext>,
     history: ConversationTurn[],
     userMessage: string
 ): Promise<BlueprintReviewResult> {
@@ -176,9 +169,6 @@ export async function blueprintReviewAgentTurn(
             allChangeLog.push(...result.changeLog);
             messages.push({ role: "tool", tool_call_id: call.id, content: result.resultText || "Done." });
         }
-
-        // Keep the model's view of the blueprint current for its next reasoning step.
-        messages.push({ role: "user", content: `Updated exam blueprint (all sections):\n${JSON.stringify(currentSections)}` });
     }
 
     return {

@@ -60,6 +60,8 @@ export interface SectionBlockMapEntry {
   blockName: string;
   questionType: string;
   marksPerQuestion: number;
+  // The question count set on the exam form, checked against the plan's total before generating.
+  questionCount: number;
 }
 
 // Config form's local `sections` state -> new backend's flat examInput, plus
@@ -91,6 +93,7 @@ export function buildExamInputFromConfig(
       blockName: "Main",
       questionType,
       marksPerQuestion,
+      questionCount: qCount,
     });
 
     flatSections.push({

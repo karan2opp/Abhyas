@@ -24,6 +24,7 @@ import { buildQuestionReviewContext } from "./question_review_context.util.js";
 import { getSectionsWithDetails } from "../sections/sections.service.js";
 import { inngest } from "../../common/inngest/client.js";
 import { countBlueprintQuestions } from "./allocation.js";
+import { rescaleSection, sectionTotal } from "./blueprint_edit_ops.js";
 import { assertQuota } from "../billing/usage.service.js";
 import { z } from "zod";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -247,6 +248,49 @@ export const getBlueprintReviewHistoryHandler = async (req: Request, res: Respon
             success: true,
             data: { sessionId, history, blueprint: session.blueprint },
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const RebalanceBlueprintRequestZodSchema = z.object({
+    sessionId: z.string(),
+    // The plan as currently shown, including manual edits that aren't saved yet.
+    sections: ExamBlueprintZodSchema.shape.sections,
+});
+
+// "Auto-balance" from the proceed check: rescales every section whose total no
+// longer matches the count the teacher set on the exam form, keeping each
+// section's current proportions. Plain code, no AI calls.
+export const rebalanceBlueprintHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+        const parsed = RebalanceBlueprintRequestZodSchema.safeParse(req.body);
+        if (!parsed.success) {
+            const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+            throw ApiError.badRequest(`Invalid request body: ${issues}`);
+        }
+        const { sessionId, sections } = parsed.data;
+
+        const session = await getSession(sessionId);
+        if (!session) throw ApiError.notFound("Session not found");
+        if (session.createdBy !== req.user!.id) throw ApiError.forbidden("Not your session");
+        if (session.blueprintStatus !== "completed" || !session.blueprint) {
+            throw ApiError.badRequest("Blueprint is not ready yet");
+        }
+
+        const targets = new Map(session.examInput.sections.map((s) => [s.name, s.question_count]));
+        const changes: { section: string; from: number; to: number; changeLog: string[] }[] = [];
+        const rebalanced = sections.map((section) => {
+            const target = targets.get(section.name);
+            const total = sectionTotal(section);
+            if (target === undefined || total === target) return section;
+            const r = rescaleSection(section, target);
+            changes.push({ section: section.name, from: total, to: target, changeLog: r.changeLog });
+            return r.section;
+        });
+
+        await updateBlueprint(sessionId, { sections: rebalanced });
+        res.status(200).json({ success: true, data: { sections: rebalanced, changes } });
     } catch (error) {
         next(error);
     }

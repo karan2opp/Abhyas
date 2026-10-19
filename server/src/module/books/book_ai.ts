@@ -34,7 +34,6 @@ export async function callStructured<T extends z.ZodTypeAny>(
         try {
             const response = await client.chat.completions.create({
                 model: env.GENERATION_MODEL,
-                temperature: 0.2,
                 messages: [
                     { role: "system", content: system },
                     { role: "user", content: user },

@@ -181,6 +181,23 @@ export const getBlueprintReviewHistory = async (
   return res.data.data;
 };
 
+export interface BlueprintRebalanceChange {
+  section: string;
+  from: number;
+  to: number;
+  changeLog: string[];
+}
+
+// "Auto-balance": rescales every section whose total no longer matches the
+// count set on the exam form, keeping its current proportions. Saved server-side.
+export const rebalanceBlueprint = async (
+  sessionId: string,
+  sections: ExamBlueprintSection[]
+): Promise<{ sections: ExamBlueprintSection[]; changes: BlueprintRebalanceChange[] }> => {
+  const res = await api.post("/generation-agents/blueprint/rebalance", { sessionId, sections });
+  return res.data.data;
+};
+
 // ── Question generation ──
 
 export interface RubricCategory {

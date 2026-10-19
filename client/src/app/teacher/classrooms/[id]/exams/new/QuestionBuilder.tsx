@@ -33,6 +33,7 @@ import {
   continueExamIntentConversation,
   skipExamIntentQuestion,
   skipAllExamIntentQuestions,
+  rebalanceBlueprint,
 } from "@/services/generationAgents.service";
 import { useRealtimeVoiceAgent } from "@/hooks/useRealtimeVoiceAgent";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -878,6 +879,9 @@ export function AiExamGeneratorForm({
   const [aiStage, setAiStage] = useState<"config" | "intent" | "blueprint">("config");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [blueprint, setBlueprint] = useState<LegacyBlueprintTree | null>(null);
+  // Sections whose plan total differs from the count set on the form, shown in the dialog before generating.
+  const [countMismatches, setCountMismatches] = useState<{ section: string; total: number; target: number; subtopics: number }[] | null>(null);
+  const [isRebalancing, setIsRebalancing] = useState(false);
 
   // generation_agents backend session powering this exam end to end — created
   // by the Exam Intent Agent voice call below, then reused by blueprint
@@ -1145,9 +1149,46 @@ export function AiExamGeneratorForm({
   };
   proceedToBlueprintGenerationRef.current = proceedToBlueprintGeneration;
 
-  // Verification step is intentionally skipped — go straight to question generation.
+  // Review edits change counts freely, so before generating, check each section's
+  // total against the count set on the form and let the teacher decide.
   const handleVerifyAndProceed = async () => {
     if (!blueprint) return;
+    const mismatches = legacyTreeToSections(blueprint, mappingRef.current).flatMap((section, i) => {
+      const entry = mappingRef.current[i];
+      const total = computeTotalQuestions([section]);
+      if (!entry || total === entry.questionCount) return [];
+      const subtopics = section.topics.reduce((n, t) => n + t.subtopics.length, 0);
+      return [{ section: entry.sectionName, total, target: entry.questionCount, subtopics }];
+    });
+    if (mismatches.length > 0) {
+      setCountMismatches(mismatches);
+      return;
+    }
+    await executeFinalGeneration(blueprint);
+  };
+
+  // Rescales mismatched sections back to the form's counts, then leaves the
+  // teacher on the plan to look it over before generating.
+  const handleAutoBalance = async () => {
+    if (!blueprint || !sessionId) return;
+    setIsRebalancing(true);
+    try {
+      const { sections: balanced, changes } = await rebalanceBlueprint(sessionId, legacyTreeToSections(blueprint, mappingRef.current));
+      setBlueprint(sectionsToLegacyTree(balanced, mappingRef.current, blueprint.title, blueprint.instructions || []));
+      setCountMismatches(null);
+      toast.success("Question counts balanced. Check the plan, then generate.");
+      const removed = changes.flatMap((c) => c.changeLog.filter((line) => line.includes("were removed")));
+      if (removed.length > 0) toast.warning(removed.join(" "), { duration: 8000 });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Could not balance the question counts");
+    } finally {
+      setIsRebalancing(false);
+    }
+  };
+
+  const handleContinueWithNewCount = async () => {
+    if (!blueprint) return;
+    setCountMismatches(null);
     await executeFinalGeneration(blueprint);
   };
 
@@ -1273,6 +1314,39 @@ export function AiExamGeneratorForm({
       >
         <Sparkles className="h-4 w-4 mr-2 text-purple-200" /> Generate Questions
       </Button>
+
+      <Dialog open={countMismatches !== null} onOpenChange={(open) => !open && !isRebalancing && setCountMismatches(null)}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Question count changed</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-gray-300">
+            {countMismatches?.map((m) => (
+              <div key={m.section}>
+                <p>
+                  <span className="font-semibold text-white">{m.section}</span> now has {m.total} question{m.total === 1 ? "" : "s"}, but you set {m.target}.
+                </p>
+                {m.target < m.subtopics && (
+                  <p className="text-xs text-amber-300">
+                    Auto-balance can&apos;t give all {m.subtopics} subtopics a question, so some will be removed.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCountMismatches(null)} disabled={isRebalancing}>
+              Go back and adjust
+            </Button>
+            <Button variant="outline" onClick={handleContinueWithNewCount} disabled={isRebalancing}>
+              Continue with new count
+            </Button>
+            <Button onClick={handleAutoBalance} disabled={isRebalancing} className="bg-purple-600 hover:bg-purple-700 text-white">
+              {isRebalancing ? "Balancing..." : "Auto-balance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 

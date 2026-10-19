@@ -5,6 +5,7 @@ import {
     getBlueprintStatusHandler,
     blueprintReviewTurnHandler,
     getBlueprintReviewHistoryHandler,
+    rebalanceBlueprintHandler,
     triggerQuestionGenerationHandler,
     getQuestionsStatusHandler,
     generateTopicQuestionsHandler,
@@ -35,6 +36,13 @@ router.post(
     authenticate,
     authorize("system_admin", "teacher", "manager"),
     triggerBlueprintGenerationHandler
+);
+
+router.post(
+    "/blueprint/rebalance",
+    authenticate,
+    authorize("system_admin", "teacher", "manager"),
+    rebalanceBlueprintHandler
 );
 
 router.get(

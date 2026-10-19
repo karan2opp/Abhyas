@@ -25,59 +25,10 @@ export function renormalizeWeights<T extends Weightable>(items: T[]): T[] {
 }
 
 /**
- * Adds a new item to a weighted set that already sums to ~1, giving the new
- * item a fair 1/(n+1) share and proportionally shrinking the existing items
- * to make room — rather than the new item entering at weight 0 and staying
- * there forever (plain renormalizeWeights can't fix that: 0/sum is always 0,
- * no matter what sum is).
- */
-export function addItemWithFairShare<T extends Weightable>(existing: T[], newItem: T): T[] {
-    const n = existing.length;
-    if (n === 0) return [{ ...newItem, weight: 1 }];
-
-    const newShare = 1 / (n + 1);
-    const existingSum = existing.reduce((s, i) => s + i.weight, 0) || n;
-    const rescaledExisting = existing.map((i) => ({ ...i, weight: round3((i.weight / existingSum) * (1 - newShare)) }));
-
-    return [...rescaledExisting, { ...newItem, weight: round3(newShare) }];
-}
-
-/**
- * Largest-remainder distribution: allocates totalQuestions proportional to
- * weight, then hands out whatever's left over one at a time to the items
- * with the largest fractional remainder. Scale-invariant (only weight/total
- * matters), so it works the same whether weights are raw scores or already
- * normalized to sum to 1. Always allocates exactly totalQuestions — no
- * rounding drift.
- */
-export function distributeQuestions<T extends Weightable>(
-    values: T[],
-    totalQuestions: number
-): QuestionAllocation<T>[] {
-    if (values.length === 0) return [];
-
-    const totalWeight = values.reduce((sum, v) => sum + v.weight, 0);
-    if (totalWeight <= 0) throw new Error("Total weight must be greater than zero.");
-
-    const allocations = values.map((value, index) => {
-        const exact = (value.weight / totalWeight) * totalQuestions;
-        return { index, value, allocatedQuestions: Math.floor(exact), remainder: exact - Math.floor(exact) };
-    });
-
-    const remaining = totalQuestions - allocations.reduce((sum, a) => sum + a.allocatedQuestions, 0);
-
-    allocations.sort((a, b) => (b.remainder !== a.remainder ? b.remainder - a.remainder : b.value.weight - a.value.weight));
-    for (let i = 0; i < remaining; i++) allocations[i]!.allocatedQuestions++;
-
-    allocations.sort((a, b) => a.index - b.index);
-    return allocations.map((a) => ({ ...a.value, allocatedQuestions: a.allocatedQuestions }));
-}
-
-/**
- * Same idea as distributeQuestions, but guarantees every item gets at least
- * one question when there's room. When there are more items than questions,
- * keeps only the highest-weight items (rather than silently zeroing others
- * out via rounding).
+ * Allocates totalQuestions proportional to weight (largest-remainder, so it
+ * always adds up exactly), guaranteeing every item at least one question when
+ * there's room. When there are more items than questions, keeps only the
+ * highest-weight items (rather than silently zeroing others out via rounding).
  */
 export function distributeQuestionsAtLeastOne<T extends Weightable>(
     values: T[],
@@ -110,6 +61,42 @@ export function distributeQuestionsAtLeastOne<T extends Weightable>(
         counts[order[k % order.length]!.i]!++;
         used++;
         k++;
+    }
+
+    return values.map((value, i) => ({ ...value, allocatedQuestions: counts[i]! }));
+}
+
+/**
+ * Rescaling variant: splits totalQuestions in proportion to weight first
+ * (largest-remainder, so it adds up exactly), and only then lifts any item
+ * that rounded to 0 up to 1 by taking from the largest item. Unlike
+ * distributeQuestionsAtLeastOne it doesn't reserve a question per item up
+ * front, so large items keep their true share. When there are more items than
+ * questions, only the highest-weight items are kept.
+ */
+export function distributeQuestionsProportionally<T extends Weightable>(
+    values: T[],
+    totalQuestions: number
+): QuestionAllocation<T>[] {
+    if (values.length === 0 || totalQuestions <= 0) return [];
+    if (values.length > totalQuestions) return distributeQuestionsAtLeastOne(values, totalQuestions);
+
+    const weightSum = values.reduce((sum, v) => sum + v.weight, 0);
+    const exact = values.map((v) => (weightSum > 0 ? v.weight / weightSum : 1 / values.length) * totalQuestions);
+    const counts = exact.map(Math.floor);
+
+    const byRemainder = exact.map((e, i) => ({ i, r: e - (counts[i] ?? 0) })).sort((a, b) => b.r - a.r);
+    let leftover = totalQuestions - counts.reduce((s, c) => s + c, 0);
+    for (let k = 0; leftover > 0; k++, leftover--) counts[byRemainder[k % byRemainder.length]!.i]!++;
+
+    for (let i = 0; i < counts.length; i++) {
+        if (counts[i]! > 0) continue;
+        let largest = 0;
+        counts.forEach((c, j) => {
+            if (c > counts[largest]!) largest = j;
+        });
+        counts[largest]!--;
+        counts[i] = 1;
     }
 
     return values.map((value, i) => ({ ...value, allocatedQuestions: counts[i]! }));

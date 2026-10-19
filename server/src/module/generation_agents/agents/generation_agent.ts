@@ -48,7 +48,7 @@ export async function generateTopicQuestions(input: GenerateTopicQuestionsInput)
     const response = await client.chat.completions.create({
         model: env.GENERATION_MODEL,
         messages: [
-            { role: "system", content: getGenerationSystemPrompt() },
+            { role: "system", content: getGenerationSystemPrompt(!!input.sourceMaterial?.length) },
             { role: "user", content: JSON.stringify(payload) },
         ],
         response_format: zodResponseFormat(GeneratedQuestionsOutputZodSchema, "generated_questions_output"),

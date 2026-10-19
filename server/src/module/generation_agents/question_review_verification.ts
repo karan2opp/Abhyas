@@ -29,7 +29,7 @@ const VerificationResultZodSchema = z.object({
     results: z.array(
         z.object({
             index: z.number().int(),
-            is_correct: z.boolean().describe("true only if the claimed correct option is actually correct — judged independently, not taken on trust"),
+            is_correct: z.boolean().describe("true only if the claimed correct option is actually correct AND no other option is also correct — judged independently, not taken on trust"),
             reason: z.string().describe("One or two sentences. If a code block was involved, state the actual computed result explicitly."),
         })
     ),

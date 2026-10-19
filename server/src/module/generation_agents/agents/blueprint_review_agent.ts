@@ -1,4 +1,5 @@
-import { getClientForModel } from "../../../common/agent/openai.client.js";
+import { getClientForModel, toolCallParams } from "../../../common/agent/openai.client.js";
+import { restoreNullBackslashes } from "../question_cleanup.util.js";
 import { env } from "../../../env.js";
 import { zodFunction } from "openai/helpers/zod";
 import { z } from "zod";
@@ -78,7 +79,7 @@ export async function executeTool(
     contextBySection: Record<string, SectionContext>
 ): Promise<{ sections: ExamBlueprintSection[]; resultText: string; changeLog: string[] }> {
     try {
-        const args = JSON.parse(argsRaw || "{}");
+        const args = restoreNullBackslashes(JSON.parse(argsRaw || "{}"));
         const section = sections.find((s) => s.name === args.section);
         const context = section ? contextBySection[section.name] : undefined;
         if (!section || !context) {
@@ -130,6 +131,7 @@ export async function blueprintReviewAgentTurn(
             messages,
             tools,
             tool_choice: "auto",
+            ...toolCallParams(env.GENERATION_MODEL),
         });
 
         const choice = response.choices[0]?.message;

@@ -4,6 +4,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { GeneratedQuestionsOutputZodSchema, type GeneratedQuestionsOutput } from "../Types/outputGeneration.js";
 import { getGenerationSystemPrompt } from "../../../prompts/generation_agent.prompt.js";
 import type { QuestionType, Difficulty, EducationLevel } from "../Types/inputExam.js";
+import { restoreNullBackslashes, shuffleMcqOptions } from "../question_cleanup.util.js";
 
 export interface GenerateTopicQuestionsInput {
     subject: string;
@@ -63,5 +64,5 @@ export async function generateTopicQuestions(input: GenerateTopicQuestionsInput)
         );
     }
 
-    return parsed;
+    return { questions: restoreNullBackslashes(parsed.questions).map(shuffleMcqOptions) };
 }

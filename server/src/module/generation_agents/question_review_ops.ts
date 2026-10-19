@@ -18,6 +18,13 @@ export interface QuestionReviewResult {
 
 type RubricCategory = { name: string; weight: number; key_points: string[] };
 
+// PostgreSQL's jsonb reorders object keys, so stored content blocks have to be
+// compared with keys sorted, or every code block would look "changed".
+const canonicalJson = (value: unknown): string =>
+    JSON.stringify(value, (_key, v) =>
+        v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v
+    );
+
 // Grading multiplies each category's score by its weight, so weights that
 // don't sum to 1 would silently scale every student's mark up or down.
 function normalizeRubric(categories: RubricCategory[]): RubricCategory[] {
@@ -196,7 +203,7 @@ export async function applyUpdateQuestion(args: UpdateQuestionArgs, requester: R
 
     // Every update re-sends the content blocks, so say plainly whether they
     // actually changed — an unintended change to a code snippet then shows up.
-    const contentChanged = JSON.stringify(existing.contentBlocks ?? []) !== JSON.stringify(args.content_blocks);
+    const contentChanged = canonicalJson(existing.contentBlocks ?? []) !== canonicalJson(args.content_blocks);
     const parts = existing.type === "mcq" ? "wording and options" : "wording and rubric";
     return {
         changeLog: [`Updated the ${parts} of a question; its code/table/list content ${contentChanged ? "CHANGED" : "is unchanged"}.`],

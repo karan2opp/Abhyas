@@ -30,6 +30,13 @@ const getMistral = async () => {
     return mistralClient;
 };
 
+// Reasoning models from gpt-5.1 on (e.g. gpt-5.6-luna) refuse function tools
+// on /v1/chat/completions unless reasoning is turned off. Other models
+// (gpt-4.1-mini, Mistral) reject the parameter itself, so it's only sent where
+// it applies. Spread this into every chat.completions call that passes tools.
+export const toolCallParams = (model: string): { reasoning_effort?: "none" } =>
+    /^gpt-5\.\d/i.test(model) ? { reasoning_effort: "none" } : {};
+
 export const getClientForModel = async (model: string) => {
     const name = model.toLowerCase();
     // "ministral" (Mistral's small-model family, e.g. ministral-14b-2512)

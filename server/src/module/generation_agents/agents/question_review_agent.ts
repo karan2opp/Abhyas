@@ -15,7 +15,8 @@ import {
     applyUpdateQuestionOptions,
 } from "../question_review_ops.js";
 import type { Requester } from "../../../common/permissions/index.js";
-import { getClientForModel } from "../../../common/agent/openai.client.js";
+import { getClientForModel, toolCallParams } from "../../../common/agent/openai.client.js";
+import { restoreNullBackslashes } from "../question_cleanup.util.js";
 import { env } from "../../../env.js";
 import type { ConversationTurn } from "../Types/outputConversation.js";
 import { getQuestionReviewSystemPrompt } from "../../../prompts/question_review_agent.prompt.js";
@@ -55,7 +56,7 @@ export async function executeTool(
     requester: Requester
 ): Promise<{ resultText: string; changeLog: string[] }> {
     try {
-        const args = JSON.parse(argsRaw || "{}");
+        const args = restoreNullBackslashes(JSON.parse(argsRaw || "{}"));
         switch (name) {
             case "add_question": {
                 const r = await applyAddQuestion(AddQuestionArgsZodSchema.parse(args), requester);
@@ -132,6 +133,7 @@ export async function questionReviewAgentTurn(
             messages,
             tools,
             tool_choice: "auto",
+            ...toolCallParams(env.GENERATION_MODEL),
         });
 
         const choice = response.choices[0]?.message;

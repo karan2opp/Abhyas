@@ -25,7 +25,7 @@ import { getSectionsWithDetails } from "../sections/sections.service.js";
 import { inngest } from "../../common/inngest/client.js";
 import { countBlueprintQuestions } from "./allocation.js";
 import { rescaleSection, sectionTotal } from "./blueprint_edit_ops.js";
-import { assertQuota } from "../billing/usage.service.js";
+import { assertQuota, assertCredits } from "../billing/usage.service.js";
 import { z } from "zod";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { getUsableBook } from "../books/book_retrieval.js";
@@ -49,6 +49,7 @@ const ConversationTurnRequestZodSchema = z.object({
 export const conversationTurnHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     let stream: EventStream | null = null;
     try {
+        await assertCredits(req.user!.organisationId);
         const parsed = ConversationTurnRequestZodSchema.safeParse(req.body);
         if (!parsed.success) {
             const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
@@ -148,6 +149,7 @@ export const conversationTurnHandler = async (req: Request, res: Response, next:
 
 export const triggerBlueprintGenerationHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        await assertCredits(req.user!.organisationId);
         const { sessionId } = req.body || {};
         if (!sessionId || typeof sessionId !== "string") throw ApiError.badRequest("sessionId is required");
 
@@ -204,6 +206,7 @@ const BlueprintReviewTurnRequestZodSchema = z.object({
 export const blueprintReviewTurnHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     let stream: EventStream | null = null;
     try {
+        await assertCredits(req.user!.organisationId);
         const parsed = BlueprintReviewTurnRequestZodSchema.safeParse(req.body);
         if (!parsed.success) {
             const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
@@ -367,6 +370,7 @@ const QuestionReviewTurnRequestZodSchema = z.object({
 export const questionReviewTurnHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     let stream: EventStream | null = null;
     try {
+        await assertCredits(req.user!.organisationId);
         const parsed = QuestionReviewTurnRequestZodSchema.safeParse(req.body);
         if (!parsed.success) {
             const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
@@ -525,6 +529,7 @@ const TopicQuestionGenerationRequestZodSchema = z.object({
 
 export const generateTopicQuestionsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        await assertCredits(req.user!.organisationId);
         const parsed = TopicQuestionGenerationRequestZodSchema.safeParse(req.body);
         if (!parsed.success) {
             const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");

@@ -16,6 +16,9 @@ interface Plan {
   bufferStudents: number;
   maxQuestionGenerations: number;
   maxQuestionEvaluations: number;
+  maxTeachers?: number | null;
+  maxManagers?: number | null;
+  credits?: number | null;
   isActive: boolean;
 }
 
@@ -74,6 +77,24 @@ export default function AdminPlansPage() {
                   <div className="flex items-center gap-2 text-sm text-gray-300"><ClipboardCheck className="h-4 w-4 text-red-400" /> Evaluation</div>
                   <p className="text-lg font-bold text-white">{plan.maxQuestionEvaluations.toLocaleString()}</p>
                 </div>
+                {plan.maxTeachers != null && (
+                  <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-300"><Users className="h-4 w-4 text-red-400" /> Teachers</div>
+                    <p className="text-lg font-bold text-white">{plan.maxTeachers}</p>
+                  </div>
+                )}
+                {plan.maxManagers != null && (
+                  <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-300"><Users className="h-4 w-4 text-red-400" /> Managers</div>
+                    <p className="text-lg font-bold text-white">{plan.maxManagers}</p>
+                  </div>
+                )}
+                {plan.credits != null && (
+                  <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-300"><FileQuestion className="h-4 w-4 text-red-400" /> AI credits / month</div>
+                    <p className="text-lg font-bold text-white">{plan.credits}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -10,6 +10,9 @@ export interface CustomPlanLimits {
     maxQuestionGenerations?: number;
     maxQuestionEvaluations?: number;
     hasVoiceAgent?: boolean;
+    maxTeachers?: number | null;
+    maxManagers?: number | null;
+    credits?: number | null;
 }
 
 const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -34,6 +37,10 @@ export const assignPlanToOrganisation = async (
             maxQuestionEvaluations: customLimits?.maxQuestionEvaluations ?? 0,
             // Off unless explicitly bought, the same as every other custom limit.
             hasVoiceAgent: customLimits?.hasVoiceAgent ?? false,
+            // Empty means no limit on staff seats or credits.
+            maxTeachers: customLimits?.maxTeachers ?? null,
+            maxManagers: customLimits?.maxManagers ?? null,
+            credits: customLimits?.credits ?? null,
         }
         : {
             baseStudents: plan.baseStudents,
@@ -41,6 +48,9 @@ export const assignPlanToOrganisation = async (
             maxQuestionGenerations: plan.maxQuestionGenerations,
             maxQuestionEvaluations: plan.maxQuestionEvaluations,
             hasVoiceAgent: plan.hasVoiceAgent,
+            maxTeachers: plan.maxTeachers,
+            maxManagers: plan.maxManagers,
+            credits: plan.credits,
         };
 
     const now = new Date();

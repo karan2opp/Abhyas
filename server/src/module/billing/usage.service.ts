@@ -1,8 +1,9 @@
-import { and, eq, sql, count } from "drizzle-orm";
+import { and, eq, gte, sql, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { usageCounters, classrooms, classroomStudents, type UsageMetric } from "../../common/db/schema.js";
+import { usageCounters, classrooms, classroomStudents, users, aiUsageLog, type UsageMetric } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { getOrganisationSubscription } from "./subscription.service.js";
+import { CREDIT_USD } from "../ai_usage/ai_usage_report.service.js";
 
 export const getCurrentPeriodKey = (): string => {
     const d = new Date();
@@ -60,6 +61,9 @@ export const assertQuota = async (organisationId: string, metric: UsageMetric, a
         throw new ApiError(402, "No active subscription for this organisation");
     }
 
+    // AI work (generating and grading) stops when the month's credits are used up. Grading is then left for the teacher.
+    if (metric === "question_generation" || metric === "question_evaluation") await assertCredits(organisationId);
+
     const limit = getLimitForMetric(sub, metric);
     if (limit <= 0) {
         throw new ApiError(402, `Your plan does not include ${metric.replace(/_/g, " ")}`);
@@ -115,5 +119,69 @@ export const assertStudentQuota = async (organisationId: string) => {
             429,
             `Student limit reached (${current}/${limit}). Upgrade your plan or remove inactive students.`
         );
+    }
+};
+
+// ── AI credits (1 credit = $0.10 of AI cost, counted from the usage log, per calendar month like the counters above) ──
+export const getCreditsUsed = async (organisationId: string): Promise<number> => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [row] = await db
+        .select({ total: sql<number>`coalesce(sum(${aiUsageLog.costUsd}), 0)` })
+        .from(aiUsageLog)
+        .where(and(eq(aiUsageLog.organisationId, organisationId), gte(aiUsageLog.createdAt, monthStart)));
+    return Number(row?.total ?? 0) / CREDIT_USD;
+};
+
+/** What the plan allows and what this month has used. `limit` is null when the plan has no credit limit. */
+export const getCreditsSummary = async (organisationId: string) => {
+    const sub = await getOrganisationSubscription(organisationId);
+    return { limit: sub?.credits ?? null, used: await getCreditsUsed(organisationId) };
+};
+
+// Stops new AI work once the plan's credits are used up. No organisation, no plan, or no credit limit: nothing to stop.
+export const assertCredits = async (organisationId: string | null | undefined) => {
+    if (!organisationId) return;
+    const sub = await getOrganisationSubscription(organisationId);
+    if (!sub || sub.status !== "active" || sub.credits == null) return;
+
+    const used = await getCreditsUsed(organisationId);
+    if (used >= sub.credits) {
+        throw new ApiError(
+            402,
+            `Your organisation's AI credits for this month are used up (${used.toFixed(1)} of ${sub.credits}). Ask your administrator to add credits.`
+        );
+    }
+};
+
+// ── Staff seats (an empty limit means no limit; a staff member leaving frees the seat) ──
+const countStaff = async (organisationId: string, role: "teacher" | "manager"): Promise<number> => {
+    const [result] = await db
+        .select({ value: count() })
+        .from(users)
+        .where(and(eq(users.organisationId, organisationId), eq(users.role, role)));
+    return Number(result?.value ?? 0);
+};
+
+export const getStaffCounts = async (organisationId: string) => ({
+    teachers: await countStaff(organisationId, "teacher"),
+    managers: await countStaff(organisationId, "manager"),
+});
+
+export const assertTeacherQuota = async (organisationId: string) => {
+    const sub = await getOrganisationSubscription(organisationId);
+    if (!sub || sub.maxTeachers == null) return;
+    const current = await countStaff(organisationId, "teacher");
+    if (current + 1 > sub.maxTeachers) {
+        throw new ApiError(429, `Teacher limit reached (${current}/${sub.maxTeachers}). Ask your administrator to upgrade the plan.`);
+    }
+};
+
+export const assertManagerQuota = async (organisationId: string) => {
+    const sub = await getOrganisationSubscription(organisationId);
+    if (!sub || sub.maxManagers == null) return;
+    const current = await countStaff(organisationId, "manager");
+    if (current + 1 > sub.maxManagers) {
+        throw new ApiError(429, `Manager limit reached (${current}/${sub.maxManagers}). Ask your administrator to upgrade the plan.`);
     }
 };

@@ -31,6 +31,9 @@ interface Plan {
   bufferStudents: number;
   maxQuestionGenerations: number;
   maxQuestionEvaluations: number;
+  maxTeachers?: number | null;
+  maxManagers?: number | null;
+  credits?: number | null;
   isActive: boolean;
 }
 
@@ -43,6 +46,9 @@ interface Subscription {
   bufferStudents: number;
   maxQuestionGenerations: number;
   maxQuestionEvaluations: number;
+  maxTeachers?: number | null;
+  maxManagers?: number | null;
+  credits?: number | null;
   currentPeriodStart?: string;
   currentPeriodEnd?: string;
 }
@@ -78,7 +84,7 @@ function UsageMeter({ label, icon: Icon, used, limit, accent }: {
             {label}
           </div>
           <span className="text-xs text-gray-500">
-            {used.toLocaleString()} / {limit.toLocaleString()}
+            {used.toLocaleString(undefined, { maximumFractionDigits: 1 })} / {limit.toLocaleString()}
           </span>
         </div>
         <div className="h-2 w-full bg-[#1c1c1f] rounded-full overflow-hidden">
@@ -100,6 +106,8 @@ export default function ManagerBillingPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [usage, setUsage] = useState<UsageRow[]>([]);
   const [activeStudents, setActiveStudents] = useState(0);
+  const [credits, setCredits] = useState<{ limit: number | null; used: number }>({ limit: null, used: 0 });
+  const [staff, setStaff] = useState({ teachers: 0, managers: 0 });
 
   // Org edit
   const [editOpen, setEditOpen] = useState(false);
@@ -144,6 +152,8 @@ export default function ManagerBillingPage() {
       setSubscription(subRes?.data || null);
       setUsage(usageRes?.data?.usage || []);
       setActiveStudents(usageRes?.data?.activeStudents || 0);
+      setCredits(usageRes?.data?.credits || { limit: null, used: 0 });
+      setStaff(usageRes?.data?.staff || { teachers: 0, managers: 0 });
       setPlans(plansRes?.data || []);
     } catch (err) {
       console.error("[billing] loadAll error:", err);
@@ -321,10 +331,20 @@ export default function ManagerBillingPage() {
           limit={(subscription?.baseStudents || 0) + (subscription?.bufferStudents || 0)}
           accent="bg-[#1652F0]"
         />
+        {credits.limit != null && (
+          <UsageMeter label="AI credits" icon={FileQuestion} used={credits.used} limit={credits.limit} accent="bg-amber-500" />
+        )}
+        {subscription?.maxTeachers != null && (
+          <UsageMeter label="Teachers" icon={UserRound} used={staff.teachers} limit={subscription.maxTeachers} accent="bg-purple-500" />
+        )}
+        {subscription?.maxManagers != null && (
+          <UsageMeter label="Managers" icon={UserRound} used={staff.managers} limit={subscription.maxManagers} accent="bg-pink-500" />
+        )}
       </div>
 
       {/* Plans */}
-      <h3 className="text-lg font-semibold text-white mb-3">Plans</h3>
+      <h3 className="text-lg font-semibold text-white mb-1">Plans</h3>
+      <p className="text-sm text-gray-400 mb-3">Plans are assigned by your administrator. Contact them to change or add to your plan.</p>
       <div className="grid sm:grid-cols-3 gap-4">
         {plans.map((plan) => {
           const current = isCurrent(plan);
@@ -342,21 +362,15 @@ export default function ManagerBillingPage() {
                   )}
                   <li className="flex justify-between"><span>Generation</span><span className="text-white font-semibold">{plan.maxQuestionGenerations.toLocaleString()}</span></li>
                   <li className="flex justify-between"><span>Evaluation</span><span className="text-white font-semibold">{plan.maxQuestionEvaluations.toLocaleString()}</span></li>
+                  {plan.maxTeachers != null && <li className="flex justify-between"><span>Teachers</span><span className="text-white font-semibold">{plan.maxTeachers}</span></li>}
+                  {plan.maxManagers != null && <li className="flex justify-between"><span>Managers</span><span className="text-white font-semibold">{plan.maxManagers}</span></li>}
+                  {plan.credits != null && <li className="flex justify-between"><span>AI credits / month</span><span className="text-white font-semibold">{plan.credits}</span></li>}
                 </ul>
                 <div className="mt-4">
-                  {current ? (
+                  {current && (
                     <div className="text-center text-sm font-semibold text-amber-400 flex items-center justify-center gap-2">
                       <Check className="h-4 w-4" /> Current plan
                     </div>
-                  ) : plan.isCustom ? (
-                    <Button className="w-full bg-orange-600 hover:bg-orange-500 text-white" onClick={() => setCustomOpen(true)}>
-                      Configure Custom
-                    </Button>
-                  ) : (
-                    <Button className="w-full bg-orange-600 hover:bg-orange-500 text-white" disabled={purchasingPlan === plan.id} onClick={() => handlePurchase(plan)}>
-                      {purchasingPlan === plan.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Switch to {plan.name}
-                    </Button>
                   )}
                 </div>
               </CardContent>

@@ -60,6 +60,9 @@ interface Subscription {
   bufferStudents: number;
   maxQuestionGenerations: number;
   maxQuestionEvaluations: number;
+  maxTeachers?: number | null;
+  maxManagers?: number | null;
+  credits?: number | null;
   currentPeriodEnd?: string;
 }
 
@@ -80,6 +83,8 @@ export default function OrganisationDetailPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [usage, setUsage] = useState<{ metric: string; count: number }[]>([]);
+  const [credits, setCredits] = useState<{ limit: number | null; used: number }>({ limit: null, used: 0 });
+  const [staff, setStaff] = useState({ teachers: 0, managers: 0 });
   const [activeStudents, setActiveStudents] = useState(0);
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string>("");
@@ -121,6 +126,8 @@ export default function OrganisationDetailPage() {
       setSubscription(subRes?.data || null);
       setUsage(usageRes?.data?.usage || []);
       setActiveStudents(usageRes?.data?.activeStudents || 0);
+      setCredits(usageRes?.data?.credits || { limit: null, used: 0 });
+      setStaff(usageRes?.data?.staff || { teachers: 0, managers: 0 });
     } catch {
       toast.error("Failed to load subscription data");
     }
@@ -278,13 +285,16 @@ export default function OrganisationDetailPage() {
                   { label: "Generation used", icon: FileQuestion, used: usageFor("question_generation"), limit: subscription.maxQuestionGenerations, accent: "bg-red-500" },
                   { label: "Evaluation used", icon: ClipboardCheck, used: usageFor("question_evaluation"), limit: subscription.maxQuestionEvaluations, accent: "bg-emerald-500" },
                   { label: "Students", icon: Users, used: activeStudents, limit: subscription.baseStudents + subscription.bufferStudents, accent: "bg-[#1652F0]" },
+                  ...(credits.limit != null ? [{ label: "AI credits", icon: FileQuestion, used: credits.used, limit: credits.limit, accent: "bg-amber-500" }] : []),
+                  ...(subscription.maxTeachers != null ? [{ label: "Teachers", icon: Users, used: staff.teachers, limit: subscription.maxTeachers, accent: "bg-purple-500" }] : []),
+                  ...(subscription.maxManagers != null ? [{ label: "Managers", icon: Users, used: staff.managers, limit: subscription.maxManagers, accent: "bg-pink-500" }] : []),
                 ].map((m) => (
                   <div key={m.label} className="bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-sm text-gray-300 mb-1">
                       <m.icon className={`h-4 w-4 ${m.accent}`} /> {m.label}
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-                      <span>{m.used.toLocaleString()} / {m.limit.toLocaleString()}</span>
+                      <span>{m.used.toLocaleString(undefined, { maximumFractionDigits: 1 })} / {m.limit.toLocaleString()}</span>
                       <span>{usagePct(m.used, m.limit)}%</span>
                     </div>
                     <div className="h-2 w-full bg-[#1c1c1f] rounded-full overflow-hidden">

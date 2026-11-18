@@ -7,6 +7,7 @@ import { canAccessDocument } from "../question_bank/question_bank.service.js";
 import type { QuestionBankAccess } from "../question_bank/qdrant_client.js";
 import { questionBankVisibilityEnum } from "../question_bank/question_bank.schema.js";
 import { createBook, deleteBook, getBook, getSubsectionContent, listAccessibleBooks, setBookVisibility } from "./book.service.js";
+import { assertCredits } from "../billing/usage.service.js";
 
 const accessOf = (req: Request): QuestionBankAccess => ({
     userId: req.user!.id,
@@ -30,6 +31,7 @@ function assertOwnsBook(book: BookRow, req: Request) {
 
 export const uploadBookHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+        await assertCredits(req.user?.organisationId);
         if (!req.file) throw ApiError.badRequest("A PDF file is required (field name: file)");
         if (req.file.mimetype !== "application/pdf") throw ApiError.badRequest("Only PDF files are supported");
 

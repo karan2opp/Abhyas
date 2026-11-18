@@ -33,12 +33,9 @@ export const getMySubscription = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Organisation subscription", result);
 };
 
-export const purchasePlan = async (req: Request, res: Response) => {
-    const organisationId = req.user!.organisationId;
-    if (!organisationId) throw ApiError.badRequest("You are not associated with an organisation");
-    const { planId, customLimits } = req.body;
-    const result = await subscriptionService.purchasePlanForOrganisation(organisationId, planId, customLimits);
-    return ApiResponse.ok(res, "Plan purchased successfully", result);
+// Online payment is not set up yet, and "purchasing" would hand out a plan for free. Until it is, only a system admin assigns plans.
+export const purchasePlan = async (_req: Request, _res: Response) => {
+    throw ApiError.forbidden("Plans are assigned by your administrator.");
 };
 
 // ── Usage ────────────────────────────────────────────────────────────────────
@@ -47,11 +44,15 @@ export const getMyUsage = async (req: Request, res: Response) => {
     if (!organisationId) throw ApiError.badRequest("You are not associated with an organisation");
     const usage = await usageService.getUsage(organisationId);
     const activeStudents = await usageService.getActiveStudentCount(organisationId);
-    return ApiResponse.ok(res, "Organisation usage", { usage, activeStudents });
+    const credits = await usageService.getCreditsSummary(organisationId);
+    const staff = await usageService.getStaffCounts(organisationId);
+    return ApiResponse.ok(res, "Organisation usage", { usage, activeStudents, credits, staff });
 };
 
 export const getOrgUsage = async (req: Request, res: Response) => {
     const usage = await usageService.getUsage(req.params.orgId as string);
     const activeStudents = await usageService.getActiveStudentCount(req.params.orgId as string);
-    return ApiResponse.ok(res, "Organisation usage", { usage, activeStudents });
+    const credits = await usageService.getCreditsSummary(req.params.orgId as string);
+    const staff = await usageService.getStaffCounts(req.params.orgId as string);
+    return ApiResponse.ok(res, "Organisation usage", { usage, activeStudents, credits, staff });
 };

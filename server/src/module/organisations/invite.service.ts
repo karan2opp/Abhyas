@@ -3,6 +3,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { organisations, organisationInvites, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { assertTeacherQuota } from "../billing/usage.service.js";
 import { sendOrganisationInviteEmail } from "../../common/config/email.js";
 
 // How long an invitation stays open.
@@ -135,6 +136,8 @@ export const acceptInvite = async (token: string, userId: string) => {
     if (user.organisationId && user.organisationId !== invite.organisationId) {
         throw ApiError.badRequest("You already belong to another organisation. A teacher can only be in one.");
     }
+
+    if (user.organisationId !== invite.organisationId) await assertTeacherQuota(invite.organisationId);
 
     return await db.transaction(async (tx) => {
         // Only one answer counts: if two requests race, the second finds the invitation already answered.

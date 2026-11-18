@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import db from "../../common/db/index.js";
 import { organisations, users, classrooms, classroomStudents } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { assertTeacherQuota, assertManagerQuota } from "../billing/usage.service.js";
 import type { CreateOrganisationDto, UpdateOrganisationDto } from "./dto/organisation.dto.js";
 
 // 6-letter org invitation code (A-Z), easy to type and share.
@@ -120,6 +121,13 @@ const assignUserToOrganisation = async (userId: string, organisationId: string) 
     const [organisation] = await db.select().from(organisations).where(eq(organisations.id, organisationId));
     if (!organisation) throw ApiError.notFound("Organisation not found");
 
+    const [target] = await db.select().from(users).where(eq(users.id, userId));
+    if (!target) throw ApiError.notFound("User not found");
+    if (target.organisationId !== organisationId) {
+        if (target.role === "teacher") await assertTeacherQuota(organisationId);
+        if (target.role === "manager") await assertManagerQuota(organisationId);
+    }
+
     const [updatedUser] = await db.update(users)
         .set({ organisationId, updatedAt: new Date() })
         .where(eq(users.id, userId))
@@ -139,6 +147,7 @@ const assignManager = async (email: string, organisationId: string) => {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     if (!user) throw ApiError.notFound("User not found with this email address");
     if (user.role === "system_admin") throw ApiError.badRequest("Cannot assign manager to a system admin");
+    if (!(user.role === "manager" && user.organisationId === organisationId)) await assertManagerQuota(organisationId);
 
     const [updatedUser] = await db.update(users)
         .set({ role: "manager", organisationId, updatedAt: new Date() })
@@ -271,6 +280,8 @@ const joinOrganisationByCode = async (userId: string, code: string) => {
     if (user.role === "manager" || user.role === "system_admin") {
         throw ApiError.badRequest("Only students and teachers can join an organisation by code");
     }
+
+    if (user.role === "teacher" && user.organisationId !== organisation.id) await assertTeacherQuota(organisation.id);
 
     if (user.organisationId) {
         if (user.organisationId === organisation.id) {

@@ -344,6 +344,13 @@
       "when": 1794500048000,
       "tag": "0047_classroom_join_record",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794500049000,
+      "tag": "0048_plan_staff_and_credits",
+      "breakpoints": true
     }
   ]
 }

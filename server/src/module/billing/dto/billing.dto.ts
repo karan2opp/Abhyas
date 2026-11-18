@@ -6,6 +6,9 @@ export const customLimitsSchema = z.object({
     maxQuestionGenerations: z.number().int().min(0).optional(),
     maxQuestionEvaluations: z.number().int().min(0).optional(),
     hasVoiceAgent: z.boolean().optional(),
+    maxTeachers: z.number().int().min(0).nullable().optional(),
+    maxManagers: z.number().int().min(0).nullable().optional(),
+    credits: z.number().int().min(0).nullable().optional(),
 });
 
 export const assignPlanSchema = z.object({

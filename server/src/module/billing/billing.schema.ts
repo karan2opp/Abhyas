@@ -19,6 +19,10 @@ export const plans = pgTable("plans", {
   // it isn't. Organisations without it fall back to the text chat agents,
   // which do the same work — every voice flow has a chat equivalent.
   hasVoiceAgent: boolean("has_voice_agent").default(false).notNull(),
+  // Staff seats and AI credits. Empty (null) means no limit. 1 credit = $0.10 of AI cost (see ai_usage_report.service).
+  maxTeachers: integer("max_teachers"),
+  maxManagers: integer("max_managers"),
+  credits: integer("credits"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -47,6 +51,9 @@ export const organisationSubscriptions = pgTable("organisation_subscriptions", {
   // a later change to the plan template can't silently switch it off for an
   // organisation mid-period.
   hasVoiceAgent: boolean("has_voice_agent").default(false).notNull(),
+  maxTeachers: integer("max_teachers"),
+  maxManagers: integer("max_managers"),
+  credits: integer("credits"),
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

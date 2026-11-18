@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { getMyClassroomsService, joinClassroomService } from "./classroom.service";
+import { useAuthStore } from "@/store/authStore";
 import { formatDate } from "@/lib/date";
 
 interface Classroom {
@@ -56,6 +57,7 @@ export default function StudentClassroomsPage() {
     try {
       const res = await joinClassroomService(code.trim().toUpperCase());
       toast.success(res.message || "Joined classroom successfully");
+      useAuthStore.getState().fetchCurrentUser();
       setDialogOpen(false);
       setCode("");
       fetchClassrooms();

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldAlert, User, Building2, CreditCard, Activity } from "lucide-react";
+import { Users, LogOut, ChevronsLeft, ChevronsRight, Menu, X, ShieldAlert, User, Building2, CreditCard, Activity, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { useAuthStore } from "@/store/authStore";
@@ -13,6 +13,7 @@ const sidebarLinks = [
   { name: "Organisations", href: "/system_admin/organisations", icon: Building2 },
   { name: "Manage Admins", href: "/system_admin", icon: Users },
   { name: "Plans", href: "/system_admin/plans", icon: CreditCard },
+  { name: "Classroom joins", href: "/system_admin/joins", icon: UserPlus },
   { name: "AI usage", href: "/system_admin/ai-usage", icon: Activity },
   { name: "Profile", href: "/system_admin/profile", icon: User },
 ];

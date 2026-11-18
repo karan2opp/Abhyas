@@ -40,6 +40,10 @@ export const classroomStudents = pgTable("classroom_students", {
   status: text("status").$type<"active" | "left">().default("active").notNull(),
   enrolledAt: timestamp("enrolled_at").defaultNow().notNull(),
   leftAt: timestamp("left_at"),
+  // Which code the student joined with (the shared code is replaced over time, so the code itself is kept here) and how.
+  // Empty for students who joined before this was recorded.
+  joinedWithCode: text("joined_with_code"),
+  joinedVia: text("joined_via").$type<"code" | "invite">(),
 });
 
 // A targeted, single-use invite emailed to one specific student. Distinct from

@@ -337,6 +337,13 @@
       "when": 1794500047000,
       "tag": "0046_ai_usage_log",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794500048000,
+      "tag": "0047_classroom_join_record",
+      "breakpoints": true
     }
   ]
 }

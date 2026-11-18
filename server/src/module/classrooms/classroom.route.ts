@@ -21,6 +21,8 @@ router.patch("/:id", authenticate, authorize("teacher", "manager"), validate(upd
 router.delete("/:id", authenticate, authorize("teacher", "manager"), controller.deleteClassroom);
 
 router.get("/:id/roster", authenticate, authorize("teacher", "manager"), controller.getClassroomRoster);
+router.get("/all-joins", authenticate, authorize("system_admin"), controller.getAllJoins);
+router.get("/:id/joins", authenticate, authorize("teacher", "manager", "system_admin"), controller.getClassroomJoins);
 
 router.get("/:id/teachers", authenticate, authorize("teacher", "manager"), controller.listTeachers);
 router.post("/:id/teachers", authenticate, authorize("teacher", "manager"), validate(addTeacherSchema), controller.addTeacher);

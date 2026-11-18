@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import { eq, and, lt, sql, ilike, or } from "drizzle-orm";
+import { eq, and, lt, sql, ilike, or, isNull, desc } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users } from "../../common/db/schema.js";
+import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users, organisations } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { PermissionService } from "../../common/permissions/index.js";
 import { assertStudentQuota } from "../billing/usage.service.js";
@@ -257,7 +257,7 @@ const inviteStudent = async (classroomId: string, data: InviteStudentDto, reques
 
 // ── Join Classroom (student) ─────────────────────────────────────────────────
 // Accepts either a per-student invite code or the classroom's shared join code.
-const joinClassroom = async (code: string, studentId: string, studentEmail: string) => {
+const joinClassroomByCode = async (code: string, studentId: string, studentEmail: string) => {
     const [invite] = await db.select().from(classroomInvites).where(eq(classroomInvites.code, code));
 
     if (invite) {
@@ -301,6 +301,8 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
             const [membership] = await tx.insert(classroomStudents).values({
                 classroomId: invite.classroomId,
                 studentId,
+                joinedWithCode: code,
+                joinedVia: "invite",
             }).returning();
 
             if (!membership) throw ApiError.internal("Failed to join classroom");
@@ -345,6 +347,8 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
         const [membership] = await tx.insert(classroomStudents).values({
             classroomId: classroom.id,
             studentId,
+            joinedWithCode: code,
+            joinedVia: "code",
         }).returning();
 
         if (!membership) throw ApiError.internal("Failed to join classroom");
@@ -363,6 +367,16 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
 
         return { classroom: updatedClassroom, membership, alreadyJoined: false };
     });
+};
+
+// Joining a classroom also joins its organisation, so a student only needs the classroom code (a student already in an
+// organisation keeps it; their classrooms in other organisations still work, see getOrganisationForStudent).
+const joinClassroom = async (code: string, studentId: string, studentEmail: string) => {
+    const result = await joinClassroomByCode(code, studentId, studentEmail);
+    await db.update(users)
+        .set({ organisationId: result.classroom.organisationId, updatedAt: new Date() })
+        .where(and(eq(users.id, studentId), isNull(users.organisationId)));
+    return result;
 };
 
 // ── Get My Classrooms (teacher) ──────────────────────────────────────────────
@@ -413,7 +427,51 @@ const getClassroomRoster = async (classroomId: string, requester: Requester, sea
         .where(and(...conditions));
 };
 
+// ── Who joined with which code (teacher or manager of the classroom, or a system admin) ──
+const joinRecordColumns = {
+    studentId: users.id,
+    name: users.name,
+    email: users.email,
+    code: classroomStudents.joinedWithCode,
+    via: classroomStudents.joinedVia,
+    status: classroomStudents.status,
+    joinedAt: classroomStudents.enrolledAt,
+};
+
+const getClassroomJoins = async (classroomId: string, requester: Requester) => {
+    if (requester.role !== "system_admin") await assertCanManageClassroom(requester, classroomId);
+
+    return await db.select(joinRecordColumns)
+        .from(classroomStudents)
+        .innerJoin(users, eq(classroomStudents.studentId, users.id))
+        .where(eq(classroomStudents.classroomId, classroomId))
+        .orderBy(desc(classroomStudents.enrolledAt));
+};
+
+// Every join across all organisations, newest first (system admin).
+const getAllJoins = async (search?: string, limit = 500) => {
+    const match = search
+        ? or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`), ilike(classrooms.name, `%${search}%`), ilike(classroomStudents.joinedWithCode, `%${search}%`))
+        : undefined;
+
+    return await db.select({
+        ...joinRecordColumns,
+        classroomId: classrooms.id,
+        classroomName: classrooms.name,
+        organisationName: organisations.name,
+    })
+        .from(classroomStudents)
+        .innerJoin(users, eq(classroomStudents.studentId, users.id))
+        .innerJoin(classrooms, eq(classroomStudents.classroomId, classrooms.id))
+        .leftJoin(organisations, eq(classrooms.organisationId, organisations.id))
+        .where(match)
+        .orderBy(desc(classroomStudents.enrolledAt))
+        .limit(limit);
+};
+
 export {
+    getClassroomJoins,
+    getAllJoins,
     createClassroom,
     updateClassroom,
     deleteClassroom,

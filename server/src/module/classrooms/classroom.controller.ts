@@ -90,3 +90,13 @@ export const listOrganisationClassrooms = async (req: Request, res: Response) =>
     const result = await classroomService.listOrganisationClassrooms(organisationId, req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation classrooms", result);
 };
+
+export const getClassroomJoins = async (req: Request, res: Response) => {
+    const result = await classroomService.getClassroomJoins(req.params.id as string, toRequester(req));
+    return ApiResponse.ok(res, "Classroom joins", result);
+};
+
+export const getAllJoins = async (req: Request, res: Response) => {
+    const result = await classroomService.getAllJoins(req.query.search as string | undefined);
+    return ApiResponse.ok(res, "All classroom joins", result);
+};

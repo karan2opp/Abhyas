@@ -23,6 +23,7 @@ import {
 import { listGroupsService } from "../group.service";
 import { listExamsForClassroomService, deleteExamService } from "../exam.service";
 import { formatDate, formatDateTime } from "@/lib/date";
+import JoinHistory from "@/components/JoinHistory";
 
 interface Classroom {
   id: string;
@@ -476,6 +477,10 @@ export default function ManagerClassroomDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <div className="md:col-span-2">
+              <JoinHistory classroomId={classroomId} />
+            </div>
           </div>
         </TabsContent>
 

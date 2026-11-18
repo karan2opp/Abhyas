@@ -33,6 +33,7 @@ export default function ClassroomsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [maxUses, setMaxUses] = useState("1");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -74,9 +75,14 @@ export default function ClassroomsPage() {
       toast.error("Classroom name must be at least 2 characters");
       return;
     }
+    const parsedMaxUses = parseInt(maxUses, 10);
+    if (!Number.isInteger(parsedMaxUses) || parsedMaxUses < 1 || parsedMaxUses > 1000) {
+      toast.error("Students per join code must be between 1 and 1000");
+      return;
+    }
     setCreating(true);
     try {
-      await createClassroomService({ name: name.trim() });
+      await createClassroomService({ name: name.trim(), joinCodeMaxUses: parsedMaxUses });
       toast.success("Classroom created");
       setDialogOpen(false);
       setName("");
@@ -189,8 +195,18 @@ export default function ClassroomsPage() {
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               className="w-full py-3 text-white placeholder:text-gray-600 transition-all border-b transition-colors placeholder:text-zinc-500 rounded-none border-0 border-white/20 bg-transparent px-0 focus:border-orange-500 focus:outline-none focus:ring-0"
             />
+            <label className="text-xs font-medium text-gray-300 block pt-3">Students who can join with the code</label>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={maxUses}
+              onChange={(e) => setMaxUses(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              className="w-full py-3 text-white placeholder:text-gray-600 transition-all border-b transition-colors placeholder:text-zinc-500 rounded-none border-0 border-white/20 bg-transparent px-0 focus:border-orange-500 focus:outline-none focus:ring-0"
+            />
             <p className="text-xs text-gray-500">
-              A join code will be generated automatically (7-day expiry, 300 uses) — you can regenerate or revoke it anytime.
+              A join code is generated automatically (7-day expiry), and works for one student by default. Joining with it also adds the student to your organisation. You can change the limit, regenerate or revoke the code anytime.
             </p>
           </div>
 

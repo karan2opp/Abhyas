@@ -8,15 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { regenerateJoinCodeService, revokeJoinCodeService, updateJoinCodeService, inviteStudentService } from "../../classroom.service";
 import { useClassroom } from "../ClassroomContext";
-import { useAuthStore } from "@/store/authStore";
 import { formatDateTime } from "@/lib/date";
+import JoinHistory from "@/components/JoinHistory";
 
 export default function JoinCodePage() {
   const params = useParams();
   const classroomId = params.id as string;
   const { classroom, reloadClassroom } = useClassroom();
-  const user = useAuthStore(state => state.user);
-  const isManager = user?.role === "manager";
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -35,7 +33,7 @@ export default function JoinCodePage() {
     try {
       const parsedMaxUses = parseInt(maxUsesInput, 10);
       const payload =
-        isManager && Number.isInteger(parsedMaxUses) && parsedMaxUses >= 1 && parsedMaxUses <= 1000
+        Number.isInteger(parsedMaxUses) && parsedMaxUses >= 1 && parsedMaxUses <= 1000
           ? { joinCodeMaxUses: parsedMaxUses }
           : {};
       await regenerateJoinCodeService(classroomId, payload);
@@ -131,7 +129,7 @@ export default function JoinCodePage() {
               <p>Uses: {classroom.joinCodeUseCount} / {classroom.joinCodeMaxUses}</p>
             </div>
 
-            {isManager && (
+            {(
               <>
                 <div className="flex items-center gap-2 pt-1">
                   <label htmlFor="join-code-max-uses" className="text-xs text-gray-400 flex-1">
@@ -206,6 +204,10 @@ export default function JoinCodePage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-6">
+        <JoinHistory classroomId={classroomId} />
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { createClassroomService, getMyClassroomsService } from "./classroom.service";
 import { getOrganisationClassroomsService } from "../../manager/classrooms/classroom.service";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 import { useAuthStore } from "@/store/authStore";
 import { formatDate } from "@/lib/date";
 
@@ -37,26 +39,34 @@ export default function ClassroomsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 9;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  // A new search is a new list, so it starts again from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   const user = useAuthStore(state => state.user);
   const isInitialized = useAuthStore(state => state.isInitialized);
 
-  const fetchClassrooms = async (search: string) => {
+  const fetchClassrooms = async (search: string, pageNumber: number = page) => {
     setLoading(true);
     try {
-      let res;
       if (user?.role === "manager") {
-        res = await getOrganisationClassroomsService(search || undefined);
-        setClassrooms(res.data || []);
+        const res = await getOrganisationClassroomsService(search || undefined, pageNumber, PAGE_SIZE);
+        setClassrooms(res.data?.data || []);
+        setTotal(res.data?.total || 0);
       } else {
-        res = await getMyClassroomsService(search || undefined);
-        const rows = res.data || [];
-        setClassrooms(rows.map((r: any) => r.classroom));
+        const res = await getMyClassroomsService(search || undefined, pageNumber, PAGE_SIZE);
+        setClassrooms((res.data?.data || []).map((r: any) => r.classroom));
+        setTotal(res.data?.total || 0);
       }
     } catch {
       toast.error("Failed to load classrooms");
@@ -67,8 +77,8 @@ export default function ClassroomsPage() {
 
   useEffect(() => {
     if (!isInitialized) return;
-    fetchClassrooms(debouncedSearch);
-  }, [debouncedSearch, isInitialized, user]);
+    fetchClassrooms(debouncedSearch, page);
+  }, [debouncedSearch, page, isInitialized, user]);
 
   const handleCreate = async () => {
     if (name.trim().length < 2) {
@@ -86,7 +96,8 @@ export default function ClassroomsPage() {
       toast.success("Classroom created");
       setDialogOpen(false);
       setName("");
-      fetchClassrooms(debouncedSearch);
+      if (page !== 1) setPage(1);
+      else fetchClassrooms(debouncedSearch, 1);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to create classroom");
     } finally {
@@ -177,6 +188,8 @@ export default function ClassroomsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={pageCount(total, PAGE_SIZE)} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">

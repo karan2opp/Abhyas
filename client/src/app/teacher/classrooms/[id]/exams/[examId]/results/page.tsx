@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/controls/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { getExamByIdService, getExamSubmissionsService } from "../../../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 
 export default function ExamResultsPage() {
   const params = useParams();
@@ -17,16 +19,21 @@ export default function ExamResultsPage() {
   const [exam, setExam] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  // The numbers at the top cover every submission of the exam, not only the page being shown (the server works them out).
+  const [stats, setStats] = useState({ total: 0, average: 0, highest: 0 });
+
+  useEffect(() => {
+    if (examId) getExamByIdService(examId).then((examRes) => setExam(examRes.data || examRes)).catch(() => {});
+  }, [examId]);
 
   useEffect(() => {
     const fetchResults = async () => {
       try {
-        const [examRes, subsRes] = await Promise.all([
-          getExamByIdService(examId),
-          getExamSubmissionsService(examId)
-        ]);
-        setExam(examRes.data || examRes);
-        setSubmissions(subsRes.data || subsRes);
+        const res = await getExamSubmissionsService(examId, page, PAGE_SIZE);
+        setSubmissions(res.data.data);
+        setStats(res.data.stats);
       } catch (error) {
         console.error("Failed to load results", error);
       } finally {
@@ -34,23 +41,15 @@ export default function ExamResultsPage() {
       }
     };
     if (examId) fetchResults();
-  }, [examId]);
+  }, [examId, page]);
 
   if (loading) {
     return <div className="p-4 sm:p-6 md:p-10 text-white text-center">Loading results...</div>;
   }
 
-  const totalSubmissions = submissions.length;
-  
-  // Calculate stats based on submitted exams
-  const submittedExams = submissions.filter(s => s.submission.status === "submitted" || s.submission.status === "timeout");
-  const averageScore = submittedExams.length > 0 
-    ? submittedExams.reduce((acc, curr) => acc + (curr.submission.score || 0), 0) / submittedExams.length
-    : 0;
-  
-  const highestScore = submittedExams.length > 0
-    ? Math.max(...submittedExams.map(s => s.submission.score || 0))
-    : 0;
+  const totalSubmissions = stats.total;
+  const averageScore = stats.average;
+  const highestScore = stats.highest;
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-10">
@@ -173,6 +172,8 @@ export default function ExamResultsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Pagination page={page} totalPages={pageCount(totalSubmissions, PAGE_SIZE)} onPageChange={setPage} />
     </div>
   );
 }

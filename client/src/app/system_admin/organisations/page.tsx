@@ -15,6 +15,8 @@ import {
 import { toast } from "sonner";
 import { createOrganisationService, getOrganisationsService, deleteOrganisationService } from "./organisation.service";
 import { formatDate } from "@/lib/date";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 
 interface Organisation {
   id: string;
@@ -29,12 +31,18 @@ export default function OrganisationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const fetchOrganisations = async () => {
+  const fetchOrganisations = async (pageNumber: number = page) => {
     setLoading(true);
     try {
-      const res = await getOrganisationsService();
-      setOrganisations(res.data || []);
+      const res = await getOrganisationsService(pageNumber, PAGE_SIZE);
+      // The last organisation on the last page was deleted: show the page before it.
+      if ((res.data?.data || []).length === 0 && pageNumber > 1) setPage(pageNumber - 1);
+      setOrganisations(res.data?.data || []);
+      setTotal(res.data?.total || 0);
     } catch {
       toast.error("Failed to load organisations");
     } finally {
@@ -43,8 +51,8 @@ export default function OrganisationsPage() {
   };
 
   useEffect(() => {
-    fetchOrganisations();
-  }, []);
+    fetchOrganisations(page);
+  }, [page]);
 
   const handleCreate = async () => {
     if (name.trim().length < 2) {
@@ -141,6 +149,8 @@ export default function OrganisationsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={pageCount(total, PAGE_SIZE)} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">

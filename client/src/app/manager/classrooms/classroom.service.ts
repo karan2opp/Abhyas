@@ -1,7 +1,8 @@
 import api from "@/utils/axios";
 
-export const getOrganisationClassroomsService = async (search?: string) => {
-  const res = await api.get("/classrooms/org", { params: { search } });
+// One page of the organisation's classrooms: `data` in the reply is { data, total, page, limit, hasMore }.
+export const getOrganisationClassroomsService = async (search?: string, page = 1, limit = 9) => {
+  const res = await api.get("/classrooms/org", { params: { search, page, limit } });
   return res.data;
 };
 
@@ -15,8 +16,9 @@ export const deleteClassroomService = async (id: string) => {
   return res.data;
 };
 
-export const getClassroomRosterService = async (id: string, search?: string) => {
-  const res = await api.get(`/classrooms/${id}/roster`, { params: { search } });
+// One page of the students: `data` in the reply is { data, total, page, limit, hasMore }.
+export const getClassroomRosterService = async (id: string, search?: string, page = 1, limit = 12) => {
+  const res = await api.get(`/classrooms/${id}/roster`, { params: { search, page, limit } });
   return res.data;
 };
 

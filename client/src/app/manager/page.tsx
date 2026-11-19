@@ -18,11 +18,12 @@ export default function ManagerDashboardPage() {
     (async () => {
       try {
         const [classroomsRes, teachersRes] = await Promise.all([
-          getOrganisationClassroomsService(),
-          getMyOrganisationTeachersService(),
+          getOrganisationClassroomsService(undefined, 1, 1),
+          getMyOrganisationTeachersService(undefined, 1, 1),
         ]);
-        setClassroomCount((classroomsRes.data || []).length);
-        setTeacherCount((teachersRes.data || []).length);
+        setClassroomCount(classroomsRes.data.total);
+        // Only the number is needed, so one row is asked for and the total is read from the page.
+        setTeacherCount(teachersRes.total);
       } catch {
         toast.error("Failed to load overview");
       }

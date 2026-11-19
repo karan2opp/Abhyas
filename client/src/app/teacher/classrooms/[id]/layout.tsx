@@ -7,8 +7,7 @@ import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { ClassroomMobileNav } from "@/components/layout/ClassroomMobileNav";
 import { ArrowLeft, Settings, KeyRound, Users, UserPlus, ClipboardList, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { getMyClassroomsService } from "../classroom.service";
-import { getOrganisationClassroomsService } from "../../../manager/classrooms/classroom.service";
+import { getClassroomService } from "../classroom.service";
 import { ClassroomContext, type Classroom } from "./ClassroomContext";
 import { useAuthStore } from "@/store/authStore";
 
@@ -40,15 +39,8 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
 
   const reloadClassroom = async () => {
     try {
-      let res;
-      if (user?.role === "manager") {
-        res = await getOrganisationClassroomsService();
-      } else {
-        res = await getMyClassroomsService();
-      }
-      const list = user?.role === "manager" ? (res.data || []) : (res.data || []).map((r: any) => r.classroom);
-      const found = list.find((c: Classroom) => c.id === classroomId);
-      setClassroom(found || null);
+      const res = await getClassroomService(classroomId);
+      setClassroom(res.data || null);
     } catch {
       toast.error("Failed to load classroom");
     }

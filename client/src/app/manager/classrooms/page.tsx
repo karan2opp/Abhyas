@@ -6,6 +6,8 @@ import { School, ChevronRight, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getOrganisationClassroomsService } from "./classroom.service";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 import { formatDate } from "@/lib/date";
 
 interface Classroom {
@@ -23,25 +25,34 @@ export default function ManagerClassroomsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 9;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  // A new search is a new list, so it starts again from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const res = await getOrganisationClassroomsService(debouncedSearch || undefined);
-        setClassrooms(res.data || []);
+        const res = await getOrganisationClassroomsService(debouncedSearch || undefined, page, PAGE_SIZE);
+        setClassrooms(res.data?.data || []);
+        setTotal(res.data?.total || 0);
       } catch {
         toast.error("Failed to load classrooms");
       } finally {
         setLoading(false);
       }
     })();
-  }, [debouncedSearch]);
+  }, [debouncedSearch, page]);
 
   return (
     <div className="p-4 sm:p-6 md:p-10 h-full overflow-y-auto custom-scrollbar">
@@ -112,6 +123,8 @@ export default function ManagerClassroomsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={pageCount(total, PAGE_SIZE)} onPageChange={setPage} />
     </div>
   );
 }

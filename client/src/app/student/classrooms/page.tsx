@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import { getMyClassroomsService, joinClassroomService } from "./classroom.service";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 import { useAuthStore } from "@/store/authStore";
 import { formatDate } from "@/lib/date";
 
@@ -30,13 +32,16 @@ export default function StudentClassroomsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [code, setCode] = useState("");
   const [joining, setJoining] = useState(false);
+  const PAGE_SIZE = 9;
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
-  const fetchClassrooms = async () => {
+  const fetchClassrooms = async (pageNumber: number = page) => {
     setLoading(true);
     try {
-      const res = await getMyClassroomsService();
-      const rows = res.data || [];
-      setClassrooms(rows.map((r: any) => r.classroom));
+      const res = await getMyClassroomsService(pageNumber, PAGE_SIZE);
+      setClassrooms((res.data?.data || []).map((r: any) => r.classroom));
+      setTotal(res.data?.total || 0);
     } catch {
       toast.error("Failed to load your classrooms");
     } finally {
@@ -45,8 +50,8 @@ export default function StudentClassroomsPage() {
   };
 
   useEffect(() => {
-    fetchClassrooms();
-  }, []);
+    fetchClassrooms(page);
+  }, [page]);
 
   const handleJoin = async () => {
     if (code.trim().length < 6) {
@@ -60,7 +65,8 @@ export default function StudentClassroomsPage() {
       useAuthStore.getState().fetchCurrentUser();
       setDialogOpen(false);
       setCode("");
-      fetchClassrooms();
+      if (page !== 1) setPage(1);
+      else fetchClassrooms(1);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to join classroom");
     } finally {
@@ -122,6 +128,8 @@ export default function StudentClassroomsPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={page} totalPages={pageCount(total, PAGE_SIZE)} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-[#0f0f11] border border-white/10 text-white sm:max-w-md">

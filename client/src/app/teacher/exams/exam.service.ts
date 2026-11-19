@@ -101,13 +101,9 @@ export const deleteQuestionService = async (id: string) => {
 };
 
 // ------------- SUBMISSIONS -------------
-export const getExamSubmissionsService = async (examId: string) => {
-  const res = await api.get(`/submissions/exam/${examId}`);
-  return res.data;
-};
-
-export const getExamLeaderboardService = async (examId: string) => {
-  const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
+// One page of the attempts, newest first, with the numbers for the whole exam in `stats`.
+export const getExamSubmissionsService = async (examId: string, page = 1, limit = 10) => {
+  const res = await api.get(`/submissions/exam/${examId}`, { params: { page, limit } });
   return res.data;
 };
 

@@ -6,6 +6,8 @@ import { getExamLeaderboardService } from "@/app/student/student.service"; // Ad
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/controls/input";
 import { formatDateTime } from "@/lib/date";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 
 export function LeaderboardView({
   examId,
@@ -13,20 +15,40 @@ export function LeaderboardView({
   examId: string;
 }) {
   const router = useRouter();
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  // The podium is always the top three. The standings below it (rank 4 onwards) come a page at a time, from the server.
+  const [podium, setPodium] = useState<any[]>([]);
+  const [standings, setStandings] = useState<any[]>([]);
+  const [me, setMe] = useState<any>(null);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 10;
+
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // A new search is a new list, so it starts again from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   useEffect(() => {
     if (!examId) return;
 
     const fetchLeaderboard = async () => {
-      setLoading(true);
       setError("");
       try {
-        const res = await getExamLeaderboardService(examId);
-        setLeaderboard(res.data || res);
+        const res = await getExamLeaderboardService(examId, page, PAGE_SIZE, debouncedSearch || undefined);
+        const result = res.data;
+        setPodium(result.podium ?? []);
+        setStandings(result.data ?? []);
+        setMe(result.me ?? null);
+        setTotal(result.total ?? 0);
       } catch (err: any) {
         setError(err.response?.data?.message || "Failed to load leaderboard.");
       } finally {
@@ -35,7 +57,7 @@ export function LeaderboardView({
     };
 
     fetchLeaderboard();
-  }, [examId]);
+  }, [examId, page, debouncedSearch]);
 
   if (loading) {
     return (
@@ -56,7 +78,7 @@ export function LeaderboardView({
     );
   }
 
-  if (leaderboard.length === 0) {
+  if (podium.length === 0) {
     return (
       <div className="text-center py-20 min-h-[50vh]">
         <div className="inline-block p-6 text-gray-400 bg-[#14151f] border-white/15 text-white placeholder:text-zinc-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30/20 rounded-xl border border-white/5">
@@ -66,21 +88,11 @@ export function LeaderboardView({
     );
   }
 
-  const top3 = leaderboard.slice(0, 3);
-  const rest = leaderboard.slice(3);
+  const top3 = podium;
+  // The best score is the first place's, which is what the score bars are measured against.
+  const topScore = Math.max(1, podium[0]?.score ?? 1);
 
-  const filteredRest = rest.filter((entry) =>
-    entry.user.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Rearrange top3 for podium: 2nd, 1st, 3rd
-  const podium = [];
-  if (top3[1]) podium.push({ ...top3[1], rank: 2 });
-  if (top3[0]) podium.push({ ...top3[0], rank: 1 });
-  if (top3[2]) podium.push({ ...top3[2], rank: 3 });
-
-  // If only 1 or 2 users exist, we just display them normally without reordering or we handle it gracefully:
-  // Usually podium is [2nd, 1st, 3rd]. If 2nd is missing, it's just [1st].
+  // The podium shows 2nd, 1st, 3rd. If 2nd is missing, it is just 1st.
   const getPodiumOrder = () => {
     if (top3.length === 1) return [{ ...top3[0], rank: 1 }];
     if (top3.length === 2) return [{ ...top3[1], rank: 2 }, { ...top3[0], rank: 1 }];
@@ -184,10 +196,20 @@ export function LeaderboardView({
         </div>
 
         {/* Full Standings Section */}
-        {rest.length > 0 && (
+        {(total > 0 || debouncedSearch) && (
           <div>
             <h2 className="text-xl font-bold text-white mb-2">Full Standings</h2>
             <p className="text-sm text-gray-400 mb-6">See where everyone else placed.</p>
+
+            {/* A student's own place, since it may be on another page. */}
+            {me && (
+              <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm">
+                <span className="font-semibold text-orange-300">Your place</span>
+                <span className="font-bold text-white">
+                  #{me.rank} <span className="text-gray-400 font-normal">· {me.score} pts</span>
+                </span>
+              </div>
+            )}
 
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
@@ -209,21 +231,20 @@ export function LeaderboardView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {filteredRest.length === 0 ? (
+                  {standings.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                        No students found matching "{searchQuery}"
+                        No students found matching "{debouncedSearch}"
                       </td>
                     </tr>
                   ) : (
-                    filteredRest.map((entry, index) => {
-                      const actualRank = index + 4; // since top 3 are extracted
+                    standings.map((entry) => {
                       return (
                         <tr key={entry.id} className="hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex justify-center">
                               <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400 font-bold border border-white/10">
-                                #{actualRank}
+                                #{entry.rank}
                               </div>
                             </div>
                           </td>
@@ -243,7 +264,7 @@ export function LeaderboardView({
                               <div className="h-2 w-32 bg-white/5 rounded-full overflow-hidden hidden sm:block">
                                 <div 
                                   className="h-full bg-orange-500/50" 
-                                  style={{ width: `${Math.min(100, (entry.score / Math.max(...leaderboard.map(l => l.score))) * 100)}%` }}
+                                  style={{ width: `${Math.min(100, (entry.score / topScore) * 100)}%` }}
                                 ></div>
                               </div>
                               <span className="font-bold text-white text-lg">
@@ -258,6 +279,8 @@ export function LeaderboardView({
                 </tbody>
               </table>
             </div>
+
+            <Pagination page={page} totalPages={pageCount(total, PAGE_SIZE)} onPageChange={setPage} />
           </div>
         )}
       </div>

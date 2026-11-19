@@ -62,8 +62,9 @@ export const getSubmissionByIdService = async (id: string) => {
   return res.data;
 };
 
-export const getExamLeaderboardService = async (examId: string) => {
-  const res = await api.get(`/submissions/exam/${examId}/leaderboard`);
+// The top three, and then one page of the rest (ranked 4 onwards); a student's reply also has their own place in `me`.
+export const getExamLeaderboardService = async (examId: string, page = 1, limit = 10, search?: string) => {
+  const res = await api.get(`/submissions/exam/${examId}/leaderboard`, { params: { page, limit, search } });
   return res.data;
 };
 

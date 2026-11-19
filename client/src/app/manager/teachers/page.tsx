@@ -5,6 +5,8 @@ import { Users, UserPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/controls/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { toast } from "sonner";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 import {
   getMyOrganisationTeachersService,
   inviteTeacherService,
@@ -31,17 +33,30 @@ export default function ManagerTeachersPage() {
   const [busyInvite, setBusyInvite] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const PAGE_SIZE = 10;
+  const [teacherPage, setTeacherPage] = useState(1);
+  const [teacherTotal, setTeacherTotal] = useState(0);
+  const [invitePage, setInvitePage] = useState(1);
+  const [inviteTotal, setInviteTotal] = useState(0);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const fetchTeachers = async (search: string) => {
+  // A new search is a new list, so it starts again from the first page.
+  useEffect(() => {
+    setTeacherPage(1);
+  }, [debouncedSearch]);
+
+  const fetchTeachers = async (search: string, page: number = teacherPage) => {
     setLoading(true);
     try {
-      const res = await getMyOrganisationTeachersService(search || undefined);
-      setTeachers(res.data || []);
+      const res = await getMyOrganisationTeachersService(search || undefined, page, PAGE_SIZE);
+      // The last teacher on the last page was demoted: show the page before it.
+      if (res.data.length === 0 && page > 1) setTeacherPage(page - 1);
+      setTeachers(res.data);
+      setTeacherTotal(res.total);
     } catch {
       toast.error("Failed to load teachers");
     } finally {
@@ -50,21 +65,24 @@ export default function ManagerTeachersPage() {
   };
 
   useEffect(() => {
-    fetchTeachers(debouncedSearch);
-  }, [debouncedSearch]);
+    fetchTeachers(debouncedSearch, teacherPage);
+  }, [debouncedSearch, teacherPage]);
 
-  // Accepted invitations are not listed: those people show up under Current Teachers.
-  const fetchInvites = async () => {
+  // Accepted invitations are not listed (the server leaves them out): those people show up under Current Teachers.
+  const fetchInvites = async (page: number = invitePage) => {
     try {
-      setInvites((await getMyInvitesService()).filter((i) => i.status !== "accepted"));
+      const res = await getMyInvitesService(page, PAGE_SIZE);
+      if (res.data.length === 0 && page > 1) setInvitePage(page - 1);
+      setInvites(res.data);
+      setInviteTotal(res.total);
     } catch {
       toast.error("Failed to load invitations");
     }
   };
 
   useEffect(() => {
-    fetchInvites();
-  }, []);
+    fetchInvites(invitePage);
+  }, [invitePage]);
 
   const handleInvite = async () => {
     if (!email.includes("@")) {
@@ -156,9 +174,9 @@ export default function ManagerTeachersPage() {
         </CardContent>
       </Card>
 
-      {invites.length > 0 && (
+      {inviteTotal > 0 && (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold text-white mb-3">Invitations ({invites.length})</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">Invitations ({inviteTotal})</h3>
           <div className="flex flex-col gap-2">
             {invites.map((i) => (
               <div key={i.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#0f0f11] border border-white/5 rounded-xl">
@@ -185,10 +203,11 @@ export default function ManagerTeachersPage() {
               </div>
             ))}
           </div>
+          <Pagination page={invitePage} totalPages={pageCount(inviteTotal, PAGE_SIZE)} onPageChange={setInvitePage} />
         </div>
       )}
 
-      <h3 className="text-lg font-semibold text-white mb-3">Current Teachers ({teachers.length})</h3>
+      <h3 className="text-lg font-semibold text-white mb-3">Current Teachers ({teacherTotal})</h3>
 
       <div className="relative w-full max-w-md mb-4">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-orange-400" />
@@ -233,6 +252,8 @@ export default function ManagerTeachersPage() {
           ))}
         </div>
       )}
+
+      <Pagination page={teacherPage} totalPages={pageCount(teacherTotal, PAGE_SIZE)} onPageChange={setTeacherPage} />
     </div>
   );
 }

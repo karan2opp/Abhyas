@@ -6,8 +6,15 @@ export const createClassroomService = async (data: { name: string; joinCodeExpir
   return res.data;
 };
 
-export const getMyClassroomsService = async (search?: string) => {
-  const res = await api.get("/classrooms", { params: { search } });
+// One page of the teacher's classrooms: `data` in the reply is { data, total, page, limit, hasMore }.
+export const getMyClassroomsService = async (search?: string, page = 1, limit = 9) => {
+  const res = await api.get("/classrooms", { params: { search, page, limit } });
+  return res.data;
+};
+
+// One classroom, for its own pages (for a teacher or manager who runs it, or a student who is in it).
+export const getClassroomService = async (id: string) => {
+  const res = await api.get(`/classrooms/${id}`);
   return res.data;
 };
 
@@ -22,8 +29,16 @@ export const deleteClassroomService = async (id: string) => {
 };
 
 // ------------- ROSTER / TEACHERS -------------
-export const getClassroomRosterService = async (id: string, search?: string) => {
-  const res = await api.get(`/classrooms/${id}/roster`, { params: { search } });
+// One page of the students: `data` in the reply is { data, total, page, limit, hasMore }.
+// `activeOnly` leaves out students who left, and `notInGroup` those already in that group (for "add a student to a group").
+export const getClassroomRosterService = async (
+  id: string,
+  search?: string,
+  page = 1,
+  limit = 12,
+  options: { activeOnly?: boolean; notInGroup?: string } = {}
+) => {
+  const res = await api.get(`/classrooms/${id}/roster`, { params: { search, page, limit, ...options } });
   return res.data;
 };
 

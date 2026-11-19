@@ -20,8 +20,9 @@ export const deleteGroupService = async (id: string) => {
   return res.data;
 };
 
-export const getGroupMembersService = async (id: string, search?: string) => {
-  const res = await api.get(`/groups/${id}/students`, { params: { search } });
+// One page of the group's students: `data` in the reply is { data, total, page, limit, hasMore }.
+export const getGroupMembersService = async (id: string, search?: string, page = 1, limit = 10) => {
+  const res = await api.get(`/groups/${id}/students`, { params: { search, page, limit } });
   return res.data;
 };
 

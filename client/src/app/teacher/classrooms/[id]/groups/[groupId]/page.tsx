@@ -8,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/display/card";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { toast } from "sonner";
 import { getClassroomRosterService } from "../../../classroom.service";
+import { Pagination } from "@/components/common/Pagination";
+import { pageCount } from "@/lib/page";
 import {
   listGroupsService,
   getGroupMembersService,
@@ -54,6 +56,9 @@ export default function GroupDetailPage() {
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [debouncedMemberSearch, setDebouncedMemberSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(true);
+  const MEMBERS_PAGE_SIZE = 10;
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberTotal, setMemberTotal] = useState(0);
 
   const [rosterResults, setRosterResults] = useState<RosterEntry[]>([]);
   const [addSearchQuery, setAddSearchQuery] = useState("");
@@ -87,11 +92,14 @@ export default function GroupDetailPage() {
     }
   };
 
-  const loadMembers = async (search: string) => {
+  const loadMembers = async (search: string, page: number = memberPage) => {
     setMembersLoading(true);
     try {
-      const res = await getGroupMembersService(groupId, search || undefined);
-      setMembers(res.data || []);
+      const res = await getGroupMembersService(groupId, search || undefined, page, MEMBERS_PAGE_SIZE);
+      // The last student on the last page was removed: show the page before it.
+      if ((res.data?.data || []).length === 0 && page > 1) setMemberPage(page - 1);
+      setMembers(res.data?.data || []);
+      setMemberTotal(res.data?.total || 0);
     } catch {
       toast.error("Failed to load group members");
     } finally {
@@ -103,7 +111,7 @@ export default function GroupDetailPage() {
     if (groupId) {
       loadGroup();
       loadStats();
-      loadMembers("");
+      loadMembers("", 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
@@ -113,10 +121,15 @@ export default function GroupDetailPage() {
     return () => clearTimeout(handler);
   }, [memberSearchQuery]);
 
+  // A new search is a new list, so it starts again from the first page.
   useEffect(() => {
-    if (groupId) loadMembers(debouncedMemberSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setMemberPage(1);
   }, [debouncedMemberSearch]);
+
+  useEffect(() => {
+    if (groupId) loadMembers(debouncedMemberSearch, memberPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedMemberSearch, memberPage]);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedAddSearch(addSearchQuery), 400);
@@ -131,8 +144,10 @@ export default function GroupDetailPage() {
     (async () => {
       setAddSearchLoading(true);
       try {
-        const res = await getClassroomRosterService(classroomId, debouncedAddSearch);
-        setRosterResults(res.data || []);
+        // Only the best matches are needed to pick a student to add; the teacher narrows the search to find others.
+        // The server leaves out students who left and those already in this group.
+        const res = await getClassroomRosterService(classroomId, debouncedAddSearch, 1, 10, { activeOnly: true, notInGroup: groupId });
+        setRosterResults(res.data?.data || []);
       } catch {
         toast.error("Failed to search roster");
       } finally {
@@ -147,7 +162,7 @@ export default function GroupDetailPage() {
       await addStudentToGroupService(groupId, studentId);
       toast.success("Student added");
       setRosterResults((prev) => prev.filter((s) => s.studentId !== studentId));
-      loadMembers(debouncedMemberSearch);
+      loadMembers(debouncedMemberSearch, memberPage);
       loadGroup();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add student");
@@ -161,7 +176,7 @@ export default function GroupDetailPage() {
     try {
       await removeStudentFromGroupService(groupId, studentId);
       toast.success("Student removed");
-      loadMembers(debouncedMemberSearch);
+      loadMembers(debouncedMemberSearch, memberPage);
       loadGroup();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to remove student");
@@ -170,8 +185,7 @@ export default function GroupDetailPage() {
     }
   };
 
-  const memberIds = new Set(members.map((m) => m.studentId));
-  const addableResults = rosterResults.filter((s) => s.status === "active" && !memberIds.has(s.studentId));
+  const addableResults = rosterResults;
 
   if (loading) return <div className="text-gray-400 text-center py-6 sm:py-8 md:py-10">Loading group...</div>;
   if (!group) return <div className="text-gray-400 text-center py-6 sm:py-8 md:py-10">Group not found</div>;
@@ -320,6 +334,8 @@ export default function GroupDetailPage() {
               ))}
             </div>
           )}
+
+          <Pagination page={memberPage} totalPages={pageCount(memberTotal, MEMBERS_PAGE_SIZE)} onPageChange={setMemberPage} />
         </div>
 
         <div>

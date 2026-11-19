@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import {
-  getOrganisationsService,
+  getOrganisationService,
   getOrganisationManagersService,
   assignManagerService,
   revokeManagerService,
@@ -98,9 +98,8 @@ export default function OrganisationDetailPage() {
 
   const loadOrganisation = async () => {
     try {
-      const orgsRes = await getOrganisationsService();
-      const found = (orgsRes.data || []).find((o: Organisation) => o.id === organisationId);
-      setOrganisation(found || null);
+      const orgRes = await getOrganisationService(organisationId);
+      setOrganisation(orgRes.data || null);
     } catch {
       toast.error("Failed to load organisation");
     }

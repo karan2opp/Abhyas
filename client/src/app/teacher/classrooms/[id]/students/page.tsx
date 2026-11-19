@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/display/card";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
+import { Pagination } from "@/components/common/Pagination";
 import { getClassroomRosterService } from "../../classroom.service";
 
 interface RosterEntry {
@@ -28,16 +29,25 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 12;
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 400);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const loadRoster = async (search: string) => {
+  // A new search is a new list, so it starts again from the first page.
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const loadRoster = async (search: string, pageNumber: number) => {
     try {
-      const res = await getClassroomRosterService(classroomId, search || undefined);
-      setRoster(res.data || []);
+      const res = await getClassroomRosterService(classroomId, search || undefined, pageNumber, PAGE_SIZE);
+      setRoster(res.data?.data || []);
+      setTotal(res.data?.total || 0);
     } catch {
       toast.error("Failed to load students");
     } finally {
@@ -46,14 +56,14 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
-    if (classroomId) loadRoster(debouncedSearch);
-  }, [classroomId, debouncedSearch]);
+    if (classroomId) loadRoster(debouncedSearch, page);
+  }, [classroomId, debouncedSearch, page]);
 
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-6">
         <h3 className="text-2xl font-bold text-white">Students</h3>
-        <span className="text-xs text-gray-400 bg-white/5 px-2.5 py-1 rounded-full">{roster.length}</span>
+        <span className="text-xs text-gray-400 bg-white/5 px-2.5 py-1 rounded-full">{total}</span>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -107,6 +117,8 @@ export default function StudentsPage() {
             ))}
           </div>
         )}
+
+        <Pagination page={page} totalPages={Math.max(1, Math.ceil(total / PAGE_SIZE))} onPageChange={setPage} />
       </div>
     </div>
   );

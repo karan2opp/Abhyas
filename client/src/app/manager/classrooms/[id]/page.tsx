@@ -8,7 +8,6 @@ import { Card, CardContent } from "@/components/ui/display/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/display/tabs";
 import { toast } from "sonner";
 import {
-  getOrganisationClassroomsService,
   updateClassroomService,
   deleteClassroomService,
   getClassroomRosterService,
@@ -21,9 +20,11 @@ import {
   inviteStudentService,
 } from "../classroom.service";
 import { listGroupsService } from "../group.service";
+import { getClassroomService } from "../../../teacher/classrooms/classroom.service";
 import { listExamsForClassroomService, deleteExamService } from "../exam.service";
 import { formatDate, formatDateTime } from "@/lib/date";
 import JoinHistory from "@/components/classroom/JoinHistory";
+import { Pagination } from "@/components/common/Pagination";
 
 interface Classroom {
   id: string;
@@ -71,6 +72,9 @@ export default function ManagerClassroomDetailPage() {
 
   const [classroom, setClassroom] = useState<Classroom | null>(null);
   const [roster, setRoster] = useState<RosterEntry[]>([]);
+  const [rosterPage, setRosterPage] = useState(1);
+  const [rosterTotal, setRosterTotal] = useState(0);
+  const ROSTER_PAGE_SIZE = 12;
   const [teachers, setTeachers] = useState<TeacherEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,19 +110,20 @@ export default function ManagerClassroomDetailPage() {
 
   const loadClassroom = async () => {
     try {
-      const classroomsRes = await getOrganisationClassroomsService();
-      const found = (classroomsRes.data || []).find((c: Classroom) => c.id === classroomId);
-      setClassroom(found || null);
+      const res = await getClassroomService(classroomId);
+      const found: Classroom | null = res.data || null;
+      setClassroom(found);
       if (found) setMaxUsesInput(String(found.joinCodeMaxUses));
     } catch {
       toast.error("Failed to load classroom");
     }
   };
 
-  const loadRoster = async (search: string) => {
+  const loadRoster = async (search: string, page: number = rosterPage) => {
     try {
-      const rosterRes = await getClassroomRosterService(classroomId, search || undefined);
-      setRoster(rosterRes.data || []);
+      const rosterRes = await getClassroomRosterService(classroomId, search || undefined, page, ROSTER_PAGE_SIZE);
+      setRoster(rosterRes.data?.data || []);
+      setRosterTotal(rosterRes.data?.total || 0);
     } catch {
       toast.error("Failed to load roster");
     }
@@ -162,9 +167,14 @@ export default function ManagerClassroomDetailPage() {
     if (classroomId) loadAll();
   }, [classroomId]);
 
+  // A new search is a new list, so it starts again from the first page.
   useEffect(() => {
-    if (classroomId && !loading) loadRoster(debouncedStudentSearch);
+    setRosterPage(1);
   }, [debouncedStudentSearch]);
+
+  useEffect(() => {
+    if (classroomId && !loading) loadRoster(debouncedStudentSearch, rosterPage);
+  }, [debouncedStudentSearch, rosterPage]);
 
   useEffect(() => {
     if (classroomId && !loading) loadTeachers(debouncedTeacherSearch);
@@ -373,7 +383,7 @@ export default function ManagerClassroomDetailPage() {
       <Tabs defaultValue="joincode">
         <TabsList variant="line" className="mb-6 border-b border-white/5 w-full justify-start bg-transparent">
           <TabsTrigger value="joincode">Join Code</TabsTrigger>
-          <TabsTrigger value="roster">Roster ({roster.length})</TabsTrigger>
+          <TabsTrigger value="roster">Roster ({rosterTotal})</TabsTrigger>
           <TabsTrigger value="teachers">Teachers ({teachers.length})</TabsTrigger>
           <TabsTrigger value="exams">Exams ({exams.length})</TabsTrigger>
         </TabsList>
@@ -523,6 +533,8 @@ export default function ManagerClassroomDetailPage() {
                 ))}
               </div>
             )}
+
+            <Pagination page={rosterPage} totalPages={Math.max(1, Math.ceil(rosterTotal / ROSTER_PAGE_SIZE))} onPageChange={setRosterPage} />
           </div>
         </TabsContent>
 

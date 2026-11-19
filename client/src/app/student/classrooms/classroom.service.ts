@@ -1,7 +1,8 @@
 import api from "@/utils/axios";
 
-export const getMyClassroomsService = async () => {
-  const res = await api.get("/classrooms/me");
+// One page of the classrooms a student is in: `data` in the reply is { data, total, page, limit, hasMore }.
+export const getMyClassroomsService = async (page = 1, limit = 9) => {
+  const res = await api.get("/classrooms/me", { params: { page, limit } });
   return res.data;
 };
 

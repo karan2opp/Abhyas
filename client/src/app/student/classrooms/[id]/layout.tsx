@@ -7,7 +7,7 @@ import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { ClassroomMobileNav } from "@/components/layout/ClassroomMobileNav";
 import { ArrowLeft, ClipboardList, FileText, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { getMyClassroomsService } from "../classroom.service";
+import { getClassroomService } from "../../../teacher/classrooms/classroom.service";
 import { ClassroomContext, type Classroom } from "./ClassroomContext";
 import { useAuthStore } from "@/store/authStore";
 
@@ -30,9 +30,8 @@ export default function StudentClassroomLayout({ children }: { children: React.R
 
   const reloadClassroom = async () => {
     try {
-      const res = await getMyClassroomsService();
-      const found = (res.data || []).map((r: any) => r.classroom).find((c: Classroom) => c.id === classroomId);
-      setClassroom(found || null);
+      const res = await getClassroomService(classroomId);
+      setClassroom(res.data || null);
     } catch {
       toast.error("Failed to load classroom");
     }

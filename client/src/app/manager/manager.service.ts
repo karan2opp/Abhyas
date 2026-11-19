@@ -1,9 +1,10 @@
 import api from "@/utils/axios";
+import type { Page } from "@/lib/page";
 
 // ------------- ORGANISATION TEACHERS -------------
-export const getMyOrganisationTeachersService = async (search?: string) => {
-  const res = await api.get("/organisations/mine/teachers", { params: { search } });
-  return res.data;
+export const getMyOrganisationTeachersService = async (search?: string, page = 1, limit = 10): Promise<Page<{ id: string; name: string; email: string; createdAt: string }>> => {
+  const res = await api.get("/organisations/mine/teachers", { params: { search, page, limit } });
+  return res.data.data;
 };
 
 export interface TeacherInvite {
@@ -20,9 +21,9 @@ export const inviteTeacherService = async (email: string) => {
   return res.data;
 };
 
-export const getMyInvitesService = async (): Promise<TeacherInvite[]> => {
-  const res = await api.get("/organisations/mine/invites");
-  return res.data.data ?? [];
+export const getMyInvitesService = async (page = 1, limit = 10): Promise<Page<TeacherInvite>> => {
+  const res = await api.get("/organisations/mine/invites", { params: { page, limit } });
+  return res.data.data;
 };
 
 export const resendInviteService = async (inviteId: string) => {

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { createAssignmentService, copyQuestionsFromExamService, updateAssignmentService } from "@/app/teacher/assignments/assignment.service";
 import { createExamService } from "@/app/teacher/exams/exam.service";
-import { getMyClassroomsService } from "../../../classroom.service";
+import { getClassroomService } from "../../../classroom.service";
 import { listGroupsService } from "../../../group.service";
 import { AssignmentDetailsForm, AssignmentDetails, EMPTY_ASSIGNMENT_DETAILS } from "./AssignmentDetailsForm";
 import { QuestionBuilder, AiExamGeneratorForm, WorkspaceParts } from "../../exams/new/QuestionBuilder";
@@ -61,10 +61,11 @@ function NewAssignmentBuilderContent() {
   }, [resetStore]);
 
   useEffect(() => {
-    getMyClassroomsService()
-      .then((res) => setClassrooms((res.data || []).map((r: any) => r.classroom)))
-      .catch(() => toast.error("Failed to load classrooms"));
-  }, []);
+    // The form only shows this classroom (the select is locked), so only this one is loaded.
+    getClassroomService(classroomId)
+      .then((res) => setClassrooms(res.data ? [res.data] : []))
+      .catch(() => toast.error("Failed to load classroom"));
+  }, [classroomId]);
 
   useEffect(() => {
     if (!classroomId) return;

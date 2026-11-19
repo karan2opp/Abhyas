@@ -5,8 +5,15 @@ export const createOrganisationService = async (data: { name: string }) => {
   return res.data;
 };
 
-export const getOrganisationsService = async () => {
-  const res = await api.get("/organisations");
+// One page of the organisations (newest first).
+export const getOrganisationsService = async (page = 1, limit = 12) => {
+  const res = await api.get("/organisations", { params: { page, limit } });
+  return res.data;
+};
+
+// One organisation, for its own page.
+export const getOrganisationService = async (organisationId: string) => {
+  const res = await api.get(`/organisations/${organisationId}`);
   return res.data;
 };
 

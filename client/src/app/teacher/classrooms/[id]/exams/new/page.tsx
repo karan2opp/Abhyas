@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from "sonner";
 
 import { createExamService, updateExamService, deleteExamService } from "@/app/teacher/exams/exam.service";
-import { getMyClassroomsService } from "../../../classroom.service";
+import { getClassroomService } from "../../../classroom.service";
 import { listGroupsService } from "../../../group.service";
 import { QuestionBuilder, AiExamGeneratorForm, WorkspaceParts } from "./QuestionBuilder";
 import { PyqFlow, clearPyqProgress } from "./PyqFlow";
@@ -115,10 +115,11 @@ function NewExamBuilderContent() {
   }, [isMounted, examId, joinCode, mode, phase]);
 
   useEffect(() => {
-    getMyClassroomsService()
-      .then((res) => setClassrooms((res.data || []).map((r: any) => r.classroom)))
-      .catch(() => toast.error("Failed to load classrooms"));
-  }, []);
+    // The form only shows this classroom (the select is locked), so only this one is loaded.
+    getClassroomService(classroomId)
+      .then((res) => setClassrooms(res.data ? [res.data] : []))
+      .catch(() => toast.error("Failed to load classroom"));
+  }, [classroomId]);
 
   useEffect(() => {
     if (!classroomId) return;

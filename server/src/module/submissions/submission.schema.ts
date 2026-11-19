@@ -12,6 +12,9 @@ export const submissions = pgTable("submissions", {
   examId: text("exam_id").references(() => exams.id, { onDelete: "cascade" }).notNull(),
   status: submissionStatusEnum("status").notNull(),
   score: doublePrecision("score"),
+  // When the exam's clock started: the student pressed "Proceed to Exam" after reading the instructions. null = the
+  // attempt exists but the student has not begun (still on the instructions), so no time is running yet.
+  startedAt: timestamp("started_at"),
   submittedAt: timestamp("submitted_at"),
   // Set only when a teacher has manually reviewed/graded this submission
   // (as opposed to it only ever having gone through auto MCQ + AI scoring).

@@ -211,6 +211,13 @@ export const finalizeFailedEvaluation = async (submissionId: string): Promise<vo
     await finishSubmission(submissionId);
 };
 
+// When an attempt's time runs out: the exam's duration after the student pressed "Proceed to Exam". null until they have
+// (no time runs while they read the instructions) and for an exam with no time limit.
+const attemptDeadline = (submission: { startedAt: Date | null }, exam: { duration: number | null }): Date | null => {
+    if (!submission.startedAt || !exam.duration) return null;
+    return new Date(submission.startedAt.getTime() + exam.duration * 60000);
+};
+
 // ── Shared: start (or resume) a submission for a resolved exam ─────────────────
 const startSubmissionForExam = async (exam: typeof exams.$inferSelect, studentId: string) => {
     // check exam time is valid
@@ -281,8 +288,32 @@ const startScopedExam = async (examId: string, studentId: string) => {
     return startSubmissionForExam(exam, studentId);
 };
 
+// ── Begin: the student pressed "Proceed to Exam", so the clock starts now ──────
+// Asking again changes nothing (a reload must not give more time).
+const beginSubmission = async (submissionId: string, studentId: string) => {
+    const [row] = await db.select({ submission: submissions, exam: exams }).from(submissions)
+        .innerJoin(exams, eq(submissions.examId, exams.id))
+        .where(and(eq(submissions.id, submissionId), eq(submissions.userId, studentId), isNull(submissions.deletedAt)));
+    if (!row) throw ApiError.notFound("Submission not found");
+    if (row.submission.status !== "inprogress") throw ApiError.badRequest("Exam has already been submitted");
+    if (row.submission.startedAt) return row.submission;
+
+    const now = new Date();
+    if (row.exam.endTime && now > row.exam.endTime) throw ApiError.badRequest("Exam has already ended");
+
+    // Only the first request sets it, even if two arrive together.
+    const [updated] = await db.update(submissions)
+        .set({ startedAt: now, updatedAt: now })
+        .where(and(eq(submissions.id, submissionId), isNull(submissions.startedAt)))
+        .returning();
+    if (updated) return updated;
+
+    const [current] = await db.select().from(submissions).where(eq(submissions.id, submissionId));
+    return current!;
+};
+
 // ── Submit Exam ────────────────────────────────────────────────────────────────
-const submitExam = async (submissionId: string, studentId: string, mode: string) => {
+const submitExam =async (submissionId: string, studentId: string, mode: string) => {
     // verify submission exists and belongs to student
     const [submission] = await db.select().from(submissions).where(
         and(
@@ -473,16 +504,13 @@ const getSubmissionById = async (submissionId: string, requester: Requester, mod
     }
 
     if (submission.status === "inprogress") {
-        const exam = result.exam;
-        if (exam && exam.duration) {
-            const endTime = new Date(submission.createdAt.getTime() + exam.duration * 60000);
-            if (new Date() >= endTime) {
-                try {
-                    const updated = await submitExam(submissionId, submission.userId, mode);
-                    if (updated) submission = updated;
-                } catch (e) {
-                    console.error("Auto-submit failed", e);
-                }
+        const endTime = attemptDeadline(submission, result.exam);
+        if (endTime && new Date() >= endTime) {
+            try {
+                const updated = await submitExam(submissionId, submission.userId, mode);
+                if (updated) submission = updated;
+            } catch (e) {
+                console.error("Auto-submit failed", e);
             }
         }
     }
@@ -515,15 +543,13 @@ const getSubmissionsByExam = async (examId: string, requester: Requester, mode: 
     const now = new Date();
     for (const row of result) {
         const sub = row.submission;
-        if (sub && sub.status === "inprogress" && exam.duration) {
-            const endTime = new Date(sub.createdAt.getTime() + exam.duration * 60000);
-            if (now >= endTime) {
-                try {
-                    const updated = await submitExam(sub.id, sub.userId, mode);
-                    if (updated) row.submission = updated;
-                } catch (e) {
-                    console.error("Auto-submit failed", e);
-                }
+        const endTime = sub && sub.status === "inprogress" ? attemptDeadline(sub, exam) : null;
+        if (sub && endTime && now >= endTime) {
+            try {
+                const updated = await submitExam(sub.id, sub.userId, mode);
+                if (updated) row.submission = updated;
+            } catch (e) {
+                console.error("Auto-submit failed", e);
             }
         }
     }
@@ -586,15 +612,13 @@ const getMySubmissions = async (studentId: string, mode: string = "simple", sear
 
     const now = new Date();
     for (const row of data) {
-        if (row.submission.status === "inprogress" && row.exam.duration) {
-            const endTime = new Date(row.submission.createdAt.getTime() + row.exam.duration * 60000);
-            if (now >= endTime) {
-                try {
-                    const updated = await submitExam(row.submission.id, studentId, mode);
-                    if (updated) row.submission = updated;
-                } catch (e) {
-                    console.error("Auto-submit failed for", row.submission.id, e);
-                }
+        const endTime = row.submission.status === "inprogress" ? attemptDeadline(row.submission, row.exam) : null;
+        if (endTime && now >= endTime) {
+            try {
+                const updated = await submitExam(row.submission.id, studentId, mode);
+                if (updated) row.submission = updated;
+            } catch (e) {
+                console.error("Auto-submit failed for", row.submission.id, e);
             }
         }
     }
@@ -772,4 +796,4 @@ const getExamLeaderboard = async (examId: string, requester: Requester) => {
     return result;
 };
 
-export { joinExam, startScopedExam, submitExam, gradeExamSubmission, evaluateSubmissionWithAI, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getUpcomingExams, getExamForSubmission, verifyJoinCode, getExamLeaderboard };
+export { joinExam, startScopedExam, beginSubmission, submitExam, gradeExamSubmission, evaluateSubmissionWithAI, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getUpcomingExams, getExamForSubmission, verifyJoinCode, getExamLeaderboard };

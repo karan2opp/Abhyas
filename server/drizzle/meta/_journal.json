@@ -351,6 +351,13 @@
       "when": 1794500049000,
       "tag": "0048_plan_staff_and_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794500050000,
+      "tag": "0049_submission_started_at",
+      "breakpoints": true
     }
   ]
 }

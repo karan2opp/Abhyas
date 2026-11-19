@@ -14,6 +14,7 @@ router.post("/start/:examId", authenticate, authorize("student"), controller.sta
 router.get("/me", authenticate, authorize("student"), controller.getMySubmissions);
 router.get("/upcoming", authenticate, authorize("student"), controller.getUpcomingExams);
 router.get("/:id/exam", authenticate, authorize("student", "teacher", "manager"), controller.getExamForSubmission);
+router.patch("/:id/begin", authenticate, authorize("student"), controller.beginSubmission);
 router.patch("/:id/submit", authenticate, authorize("student"), controller.submitExam);
 router.get("/:id", authenticate, authorize("student", "teacher", "manager"), controller.getSubmissionById);
 router.delete("/:id", authenticate, authorize("student"), controller.deleteSubmission);

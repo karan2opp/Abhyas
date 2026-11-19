@@ -18,6 +18,11 @@ export const startScopedExam = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Exam started successfully", result);
 };
 
+export const beginSubmission = async (req: Request, res: Response) => {
+    const result = await submissionsService.beginSubmission(req.params.id as string, req.user!.id);
+    return ApiResponse.ok(res, "Exam clock started", result);
+};
+
 export const submitExam = async (req: Request, res: Response) => {
     const result = await submissionsService.submitExam(req.params.id as string, req.user!.id, req.body?.mode as string);
     return ApiResponse.ok(res, "Exam submitted successfully", result);

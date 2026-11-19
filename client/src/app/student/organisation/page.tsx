@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Building2, Mail, Phone, MapPin, KeyRound } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 import { getMyOrganisationService } from "../student.service";
 

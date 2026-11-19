@@ -4,14 +4,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, List, Loader2, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/controls/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/overlay/dialog";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
 import { formatDateTime } from "@/lib/date";
-import { ContentBlocksView, OptionValue, type ContentBlock, MarkdownCode } from "@/components/QuestionContentBlocks";
+import { ContentBlocksView, OptionValue, type ContentBlock, MarkdownCode } from "@/components/exam/QuestionContentBlocks";
 
 // The screen a student answers on, shared by exams and assignments: instructions first, then one question at a time with
 // a navigator, Save / Save & Next, answers kept on the device while offline, and a last check before submitting. An exam
@@ -33,6 +33,24 @@ export type TestQuestion = {
 
 // An exam's time runs out at endTime (it is then submitted by itself). An assignment is due at dueDate.
 export type TestClock = { kind: "timer"; endTime: number } | { kind: "due"; dueDate: string | null };
+
+// An exam's sections as one numbered list of questions, in order: what the student's exam and the teacher's preview both show.
+export const flattenExamSections = (sections: any[] | undefined): TestQuestion[] => {
+  let globalIndex = 0;
+  return (sections ?? []).flatMap((section) =>
+    (section.questions ?? []).map((q: any) => ({
+      id: q.id ?? q._id,
+      globalIndex: globalIndex++,
+      sectionTitle: section.title,
+      description: q.description ?? q.question_text ?? "",
+      marks: q.marks ?? 1,
+      type: q.type,
+      options: (q.options ?? []).map((option: any, i: number) => ({ ...option, id: option.id ?? option._id ?? String(i) })),
+      images: q.images ?? [],
+      contentBlocks: q.contentBlocks ?? [],
+    }))
+  );
+};
 
 export const SUBMISSION_CLOSED_MESSAGE = "The submission date has passed. This assignment can no longer be submitted.";
 
@@ -97,6 +115,7 @@ export function TestTakingScreen({
   instructionStats,
   teacherInstructions,
   skipInstructions = false,
+  preview = false,
   saveAnswer,
   submit,
   onSubmitted,
@@ -117,6 +136,9 @@ export function TestTakingScreen({
   teacherInstructions?: string | null;
   // Straight to the questions (an assignment opened again to edit it before the due date).
   skipInstructions?: boolean;
+  // A teacher trying the screen out: nothing is kept on this device, nothing is synced, the clock does not submit, and
+  // Submit stays off. Everything else is the screen a student sees.
+  preview?: boolean;
   saveAnswer: (questionId: string, answer: { options?: string[]; textAnswer?: string }) => Promise<void>;
   submit: () => Promise<void>;
   onSubmitted: () => void;
@@ -169,7 +191,7 @@ export function TestTakingScreen({
 
   // The answers from the server, then anything kept on this device while offline on top (not yet sent).
   useEffect(() => {
-    const local = loadLocalSnapshot(storageId);
+    const local = preview ? null : loadLocalSnapshot(storageId);
     const mergedAnswers = { ...initialAnswers };
     const mergedTextAnswers = { ...initialTextAnswers };
     const dirty = new Set<string>();
@@ -219,7 +241,7 @@ export function TestTakingScreen({
 
   // ── Auto-save: debounced sync of any unsaved (dirty) answers when online ─
   useEffect(() => {
-    if (!isOnline || isPastDue) return;
+    if (!isOnline || isPastDue || preview) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => {
       runSyncRef.current();
@@ -232,7 +254,13 @@ export function TestTakingScreen({
   const answerPayload = (q: TestQuestion) =>
     q.type === "mcq" ? { options: answersRef.current[q.id] } : { textAnswer: textAnswersRef.current[q.id] };
 
+  // Answers are copied to the device as they are typed, so they survive a lost connection or a reload. Not in a preview.
+  const rememberOnDevice = (nextAnswers: Record<string, string[]>, nextTextAnswers: Record<string, string>) => {
+    if (!preview) saveLocalSnapshot(storageId, nextAnswers, nextTextAnswers);
+  };
+
   const handleTimeUp = async () => {
+    if (preview) return;
     if (!navigator.onLine) {
       pendingSubmitRef.current = true;
       toast.error("Time is up! You need internet to submit. It will be submitted automatically when the connection returns.");
@@ -246,7 +274,7 @@ export function TestTakingScreen({
     const nextAnswers = { ...answersRef.current, [questionId]: [optionId] };
     setAnswers(nextAnswers);
     answersRef.current = nextAnswers;
-    saveLocalSnapshot(storageId, nextAnswers, textAnswersRef.current);
+    rememberOnDevice(nextAnswers, textAnswersRef.current);
     dirtyRef.current.add(questionId);
     setDirtyVersion((v) => v + 1);
   };
@@ -255,7 +283,7 @@ export function TestTakingScreen({
     const nextTextAnswers = { ...textAnswersRef.current, [questionId]: text };
     setTextAnswers(nextTextAnswers);
     textAnswersRef.current = nextTextAnswers;
-    saveLocalSnapshot(storageId, answersRef.current, nextTextAnswers);
+    rememberOnDevice(answersRef.current, nextTextAnswers);
     dirtyRef.current.add(questionId);
     setDirtyVersion((v) => v + 1);
   };
@@ -411,8 +439,10 @@ export function TestTakingScreen({
 
   if (!hasAcceptedInstructions) {
     return (
-      <div className="min-h-screen bg-[#050505] text-white custom-scrollbar overflow-y-auto">
-        <div className="max-w-2xl mx-auto w-full px-4 py-8 sm:px-6 sm:py-12 space-y-8 sm:space-y-10">
+      // h-full (not min-h-screen): 100vh is taller than what a phone shows while its browser bar is up, which pushed the
+      // Proceed button below the screen. The padding at the bottom adds the device's safe area on top of the usual space.
+      <div className="h-full bg-[#050505] text-white custom-scrollbar overflow-y-auto">
+        <div className="max-w-2xl mx-auto w-full px-4 pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-12 sm:pb-12 space-y-8 sm:space-y-10">
           {/* Title */}
           <div className="relative">
             <ThemeSwitch className="absolute -right-2 -top-2" />
@@ -563,7 +593,8 @@ export function TestTakingScreen({
           </Button>
           <Button
             onClick={handleSubmitClick}
-            disabled={isSubmitting || isPastDue}
+            disabled={isSubmitting || isPastDue || preview}
+            title={preview ? "Submit is turned off in the preview" : undefined}
             className="bg-orange-600 hover:bg-orange-700 text-white font-semibold transition-all shadow-lg shadow-orange-950/40 text-xs sm:text-sm px-3 sm:px-4"
           >
             {isSubmitting ? (
@@ -697,7 +728,7 @@ export function TestTakingScreen({
           </div>
 
           {/* Question Footer Actions */}
-          <div className="shrink-0 p-2.5 sm:p-6 sm:px-8 border-t border-white/5 bg-[#0f0f11]/50 flex items-center justify-end">
+          <div className="shrink-0 p-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] sm:p-6 sm:px-8 border-t border-white/5 bg-[#0f0f11]/50 flex items-center justify-end">
             {/* Phones: four equal columns that fill the row. From sm up: the usual right-aligned row. */}
             <div className="grid w-full grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-4">
               <Button
@@ -758,7 +789,7 @@ export function TestTakingScreen({
 
           {/* Section Tabs */}
           {sectionTitles.length > 0 && (
-            <div className="px-6 py-3 border-b border-white/5 flex gap-2 overflow-x-auto custom-scrollbar shrink-0">
+            <div className="px-4 sm:px-6 py-3 border-b border-white/5 flex flex-wrap gap-2 shrink-0">
               {sectionTitles.map((sectionTitle) => {
                 const isActive = currentQuestion.sectionTitle === sectionTitle;
                 return (
@@ -769,7 +800,7 @@ export function TestTakingScreen({
                       if (firstQIndex !== -1) setCurrentIndex(firstQIndex);
                     }}
                     className={`
-                      px-3 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap
+                      px-3 py-1.5 rounded-md text-xs font-bold transition-all max-w-full truncate
                       ${isActive ? "bg-orange-600 text-white shadow-md shadow-blue-900/20" : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"}
                     `}
                   >

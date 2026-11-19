@@ -2,15 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { Building2, UserRound, FileQuestion, ClipboardCheck, Pencil, Check, Crown, Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import {
   getMyOrganisationService,

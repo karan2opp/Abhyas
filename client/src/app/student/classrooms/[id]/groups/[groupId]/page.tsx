@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Users, ClipboardList, FileText } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 import { getMyGroupsService } from "../../../../classrooms/group.service";
 

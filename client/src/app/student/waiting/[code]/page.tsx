@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { verifyJoinCodeService, joinExamService } from "../../student.service";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 
 // Splits the time left into the units shown on the timer. Days only appear when the exam is more than a day away.
 const timeParts = (seconds: number) => {

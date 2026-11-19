@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { CreditCard, Users, FileQuestion, ClipboardCheck } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getPlansService } from "../billing.service";
 
@@ -69,14 +69,19 @@ export default function AdminPlansPage() {
                     <p className="text-[11px] text-emerald-400">+ {plan.bufferStudents} buffer</p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-300"><FileQuestion className="h-4 w-4 text-red-400" /> Generation</div>
-                  <p className="text-lg font-bold text-white">{plan.maxQuestionGenerations.toLocaleString()}</p>
-                </div>
-                <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
-                  <div className="flex items-center gap-2 text-sm text-gray-300"><ClipboardCheck className="h-4 w-4 text-red-400" /> Evaluation</div>
-                  <p className="text-lg font-bold text-white">{plan.maxQuestionEvaluations.toLocaleString()}</p>
-                </div>
+                {/* A plan with AI credits is limited by those alone, so the question counts are only shown for plans without them. */}
+                {plan.credits == null && (
+                  <>
+                    <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-300"><FileQuestion className="h-4 w-4 text-red-400" /> Generation</div>
+                      <p className="text-lg font-bold text-white">{plan.maxQuestionGenerations.toLocaleString()}</p>
+                    </div>
+                    <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-300"><ClipboardCheck className="h-4 w-4 text-red-400" /> Evaluation</div>
+                      <p className="text-lg font-bold text-white">{plan.maxQuestionEvaluations.toLocaleString()}</p>
+                    </div>
+                  </>
+                )}
                 {plan.maxTeachers != null && (
                   <div className="flex items-center justify-between bg-[#0a0a0c] border border-white/5 rounded-xl p-3">
                     <div className="flex items-center gap-2 text-sm text-gray-300"><Users className="h-4 w-4 text-red-400" /> Teachers</div>

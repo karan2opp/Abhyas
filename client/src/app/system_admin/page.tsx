@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { Users, Search, Trash2, UserPlus, ShieldAlert, Crown } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/controls/input";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getAdminsService, assignAdminService, revokeAdminService, searchUserService } from "./systemAdmin.service";
 

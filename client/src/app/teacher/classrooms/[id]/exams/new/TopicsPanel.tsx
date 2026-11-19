@@ -3,11 +3,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, Loader2, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/controls/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/overlay/dialog";
+import { Input } from "@/components/ui/controls/input";
+import { Textarea } from "@/components/ui/controls/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/controls/select";
 import { cn } from "@/lib/utils";
 import { remainingBySubtopic } from "@/lib/pyqMatching";
 import { getPaperTopicTree, listPaperTopics, listQuestionBankDocuments, type PaperTopicTree, type QuestionType } from "@/services/questionBank.service";

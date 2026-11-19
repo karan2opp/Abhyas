@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
-import { TestTakingScreen, clearLocalSnapshot, type TestQuestion } from "@/components/TestTakingScreen";
+import { TestTakingScreen, clearLocalSnapshot, flattenExamSections } from "@/components/exam/TestTakingScreen";
 
 export default function ExamAttemptPage() {
   const params = useParams();
@@ -57,23 +57,7 @@ export default function ExamAttemptPage() {
   }, [submissionId, router]);
 
   // Every section's questions in one list, numbered across the exam.
-  const questions = useMemo<TestQuestion[]>(() => {
-    if (!examData?.sections) return [];
-    let globalIndex = 0;
-    return examData.sections.flatMap((section: any) =>
-      (section.questions ?? []).map((q: any) => ({
-        id: q.id,
-        globalIndex: globalIndex++,
-        sectionTitle: section.title,
-        description: q.description,
-        marks: q.marks,
-        type: q.type,
-        options: q.options || [],
-        images: q.images || [],
-        contentBlocks: q.contentBlocks || [],
-      }))
-    );
-  }, [examData]);
+  const questions = useMemo(() => flattenExamSections(examData?.sections), [examData]);
 
   if (loading) return <div className="flex items-center justify-center h-full bg-[#050505] text-white">Loading Exam...</div>;
   if (!examData) return <div className="flex items-center justify-center h-full bg-[#050505] text-white">Exam not found.</div>;

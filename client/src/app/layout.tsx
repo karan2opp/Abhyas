@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, Geist_Mono } from "next/font/google";
 import "katex/dist/katex.min.css";
 import "./globals.css";
-import { AuthInitializer } from "@/components/AuthInitializer";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { AppToaster } from "@/components/AppToaster";
+import { AuthInitializer } from "@/components/layout/AuthInitializer";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { AppToaster } from "@/components/layout/AppToaster";
 
 const inter = Inter({
   variable: "--font-inter",

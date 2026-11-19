@@ -3,8 +3,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, BookOpen, Loader2, UploadCloud } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
 import { cn } from "@/lib/utils";
 import { getBook, listBooks, uploadBook, type BookSummary, type BookToc, type BookVisibility } from "@/services/books.service";
 import { AiExamGeneratorForm, type AiGeneratorStage, type WorkspaceParts } from "./QuestionBuilder";

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { History } from "lucide-react";
 import api from "@/utils/axios";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Pagination } from "@/components/common/Pagination";
 import { formatDateTime } from "@/lib/date";
 
 export type JoinRecord = {
@@ -19,13 +20,18 @@ export type JoinRecord = {
   organisationName?: string | null;
 };
 
-export const getClassroomJoinsService = async (classroomId: string): Promise<JoinRecord[]> => {
-  const res = await api.get(`/classrooms/${classroomId}/joins`);
+// One page of joins, as the server sends every list.
+export type JoinPage = { data: JoinRecord[]; total: number; page: number; limit: number; hasMore: boolean };
+
+const JOIN_PAGE_SIZE = 10;
+
+export const getClassroomJoinsService = async (classroomId: string, page: number): Promise<JoinPage> => {
+  const res = await api.get(`/classrooms/${classroomId}/joins`, { params: { page, limit: JOIN_PAGE_SIZE } });
   return res.data.data;
 };
 
-export const getAllJoinsService = async (search?: string): Promise<JoinRecord[]> => {
-  const res = await api.get("/classrooms/all-joins", { params: search ? { search } : {} });
+export const getAllJoinsService = async (page: number, search?: string): Promise<JoinPage> => {
+  const res = await api.get("/classrooms/all-joins", { params: { page, limit: JOIN_PAGE_SIZE, ...(search ? { search } : {}) } });
   return res.data.data;
 };
 
@@ -55,14 +61,42 @@ export function JoinRows({ rows, showClassroom }: { rows: JoinRecord[]; showClas
   );
 }
 
-/** For a teacher or manager: who joined this classroom, and with which code. */
-export default function JoinHistory({ classroomId }: { classroomId: string }) {
-  const [rows, setRows] = useState<JoinRecord[] | null>(null);
+/**
+ * The joins a `load` function returns, one page at a time, with the page buttons underneath. A new `load` (another
+ * classroom, another search) means a different list, so the caller gives this a new `key` to start again from page 1.
+ */
+export function PagedJoinRows({ load, showClassroom }: { load: (page: number) => Promise<JoinPage>; showClassroom?: boolean }) {
+  const [page, setPage] = useState(1);
+  const [result, setResult] = useState<JoinPage | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    getClassroomJoinsService(classroomId).then(setRows).catch(() => setFailed(true));
-  }, [classroomId]);
+    let current = true;
+    load(page)
+      .then((loaded) => {
+        if (!current) return;
+        setResult(loaded);
+        setFailed(false);
+      })
+      .catch(() => current && setFailed(true));
+    return () => {
+      current = false;
+    };
+  }, [load, page]);
+
+  if (failed) return <p className="text-sm text-red-400 py-2">Could not load the join history.</p>;
+  if (result === null) return <p className="text-sm text-gray-500 py-2">Loading...</p>;
+  return (
+    <>
+      <JoinRows rows={result.data} showClassroom={showClassroom} />
+      <Pagination page={page} totalPages={Math.max(1, Math.ceil(result.total / result.limit))} onPageChange={setPage} />
+    </>
+  );
+}
+
+/** For a teacher or manager: who joined this classroom, and with which code. */
+export default function JoinHistory({ classroomId }: { classroomId: string }) {
+  const load = useCallback((page: number) => getClassroomJoinsService(classroomId, page), [classroomId]);
 
   return (
     <Card className="bg-[#0f0f11] border-white/5">
@@ -70,13 +104,7 @@ export default function JoinHistory({ classroomId }: { classroomId: string }) {
         <div className="flex items-center gap-2 text-gray-300 text-sm font-semibold">
           <History className="h-4 w-4" /> Who joined with which code
         </div>
-        {failed ? (
-          <p className="text-sm text-red-400 py-2">Could not load the join history.</p>
-        ) : rows === null ? (
-          <p className="text-sm text-gray-500 py-2">Loading...</p>
-        ) : (
-          <JoinRows rows={rows} />
-        )}
+        <PagedJoinRows key={classroomId} load={load} />
       </CardContent>
     </Card>
   );

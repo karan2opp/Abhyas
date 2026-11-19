@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Trophy, Clock, ArrowLeft, Search } from "lucide-react";
 import { getExamLeaderboardService } from "@/app/student/student.service"; // Adjust import if needed
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/controls/input";
 import { formatDateTime } from "@/lib/date";
 
 export function LeaderboardView({

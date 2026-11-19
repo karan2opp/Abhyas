@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/controls/button";
 import { useAuthStore } from "@/store/authStore";
 import { withRedirect } from "@/lib/redirect";
 import { acceptInviteService, declineInviteService, getInviteService, type InviteInfo } from "../invite.service";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 
 const STATUS_MESSAGE: Record<string, string> = {
   accepted: "This invitation has already been accepted.",

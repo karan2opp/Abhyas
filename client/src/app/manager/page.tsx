@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { School, Users, ChevronRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
 import { getOrganisationClassroomsService } from "./classrooms/classroom.service";

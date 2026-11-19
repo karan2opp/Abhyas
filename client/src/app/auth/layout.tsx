@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { ThemeSwitch } from '@/components/ThemeSwitch';
+import { ThemeSwitch } from '@/components/layout/ThemeSwitch';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

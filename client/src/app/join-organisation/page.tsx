@@ -1,7 +1,7 @@
 "use client";
 
-import JoinOrganisationView from "@/components/JoinOrganisationView";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import JoinOrganisationView from "@/components/classroom/JoinOrganisationView";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 
 export default function JoinOrganisationPage() {
   return (

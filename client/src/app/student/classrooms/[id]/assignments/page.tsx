@@ -3,8 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ClipboardList, Layers, Lock, Search, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getMyAssignmentsService } from "../../../assignments/assignment.service";
 import { getMyGroupsService } from "../../../classrooms/group.service";

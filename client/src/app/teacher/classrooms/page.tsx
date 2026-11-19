@@ -3,15 +3,15 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, School, ChevronRight, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import { createClassroomService, getMyClassroomsService } from "./classroom.service";
 import { getOrganisationClassroomsService } from "../../manager/classrooms/classroom.service";

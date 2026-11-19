@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CalendarX2, CheckCircle2, Clock, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 import {
   getAssignmentByIdService,
@@ -14,8 +14,8 @@ import {
   getMySubmissionService,
 } from "../assignment.service";
 import { formatDateTime } from "@/lib/date";
-import { SUBMISSION_CLOSED_MESSAGE, TestTakingScreen, type TestQuestion } from "@/components/TestTakingScreen";
-import { OptionValue, QuestionText } from "@/components/QuestionContentBlocks";
+import { SUBMISSION_CLOSED_MESSAGE, TestTakingScreen, type TestQuestion } from "@/components/exam/TestTakingScreen";
+import { OptionValue, QuestionText } from "@/components/exam/QuestionContentBlocks";
 
 interface Assignment {
   id: string;

@@ -2,13 +2,13 @@
 
 import React, { useMemo } from "react";
 import { Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
+import { Switch } from "@/components/ui/controls/switch";
+import { Textarea } from "@/components/ui/controls/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/controls/select";
 import { cn } from "@/lib/utils";
-import { DateTimeInput } from "@/components/DateTimeInput";
+import { DateTimeInput } from "@/components/common/DateTimeInput";
 
 export type ExamDetails = {
   title: string;

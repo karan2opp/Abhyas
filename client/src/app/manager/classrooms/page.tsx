@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { School, ChevronRight, Search } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getOrganisationClassroomsService } from "./classroom.service";
 import { formatDate } from "@/lib/date";

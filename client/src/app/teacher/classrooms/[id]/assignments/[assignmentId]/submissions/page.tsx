@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, ClipboardCheck, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import { toast } from "sonner";
 import { getAssignmentByIdService, getSubmissionsForAssignmentService } from "../../../../../assignments/assignment.service";
 

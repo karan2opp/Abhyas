@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 import { Trophy, ArrowLeft, Check, X, Bot, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "../../student.service";
 
@@ -12,7 +12,7 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
-import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/QuestionContentBlocks";
+import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/exam/QuestionContentBlocks";
 
 export default function ResultsPage() {
   const params = useParams();

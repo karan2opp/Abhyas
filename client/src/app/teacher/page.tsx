@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { FileText, Users, BarChart, Clock, ClipboardCheck, Activity, Loader } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 
 import { useRouter } from "next/navigation";
 import { getTeacherOverviewStatsService } from "./exams/exam.service";

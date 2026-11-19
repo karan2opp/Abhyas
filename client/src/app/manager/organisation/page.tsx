@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Building2, Save, Loader2, Mail, Phone, MapPin, ImagePlus, UploadCloud, X, KeyRound, Copy, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 import { getMyOrganisationService, updateMyOrganisationService, uploadMyOrganisationLogoService, getMyOrganisationJoinCodeService, regenerateMyOrganisationJoinCodeService } from "../billing.service";
 

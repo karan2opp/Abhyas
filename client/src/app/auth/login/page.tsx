@@ -54,32 +54,20 @@ export default function LoginPage() {
 
   const startCooldown = () => setResendCooldown(30);
 
+  // Signing in and verifying the email code both answer with the token and the user. Store them, then go back to where the
+  // person was heading, or to the home page of their role (/student, /teacher, /manager, /system_admin).
+  const finishSignIn = (response: { data: { accessToken: string; user: Parameters<typeof setUser>[0] } }) => {
+    const { accessToken, user } = response.data;
+    setUser(user, accessToken);
+    router.replace(readRedirect() ?? `/${user.role}`);
+  };
+
   const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     try {
       const response = await loginService(data);
-
-      const userData = response.data?.user || response.data;
-      const token = response.data?.accessToken || response.accessToken;
-
-      setUser(userData, token);
+      finishSignIn(response);
       toast.success("Successfully logged in");
-
-      const back = readRedirect();
-      if (back) {
-        router.push(back);
-        return;
-      }
-
-      if (userData?.role === "system_admin") {
-        router.push('/system_admin');
-      } else if (userData?.role === "teacher") {
-        router.push('/teacher');
-      } else if (userData?.role === "manager") {
-        router.push('/manager');
-      } else {
-        router.push('/student');
-      }
     } catch (error: any) {
       const msg = error.message || "";
       if (/verify your email/i.test(msg)) {
@@ -109,10 +97,10 @@ export default function LoginPage() {
     }
     setIsVerifying(true);
     try {
-      await verifyOtpService({ email: pendingEmail, otp: verifyOtp });
-      toast.success("Email verified! You can now sign in.");
-      setStep('LOGIN');
-      setVerifyOtp('');
+      // The server signs them in once the code is right, so there is no password to type again.
+      const response = await verifyOtpService({ email: pendingEmail, otp: verifyOtp });
+      finishSignIn(response);
+      toast.success("Email verified!");
     } catch (error: any) {
       toast.error(error.message || "Verification failed. Please check your code.");
     } finally {

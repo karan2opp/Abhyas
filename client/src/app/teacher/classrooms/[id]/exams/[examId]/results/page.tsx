@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Users, CheckCircle, AlertCircle, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { getExamByIdService, getExamSubmissionsService } from "../../../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
 

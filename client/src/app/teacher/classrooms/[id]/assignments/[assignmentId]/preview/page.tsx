@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { OptionValue, QuestionText, type ContentBlock } from "@/components/QuestionContentBlocks";
+import { OptionValue, QuestionText, type ContentBlock } from "@/components/exam/QuestionContentBlocks";
 import { getAssignmentByIdService, getQuestionsService } from "../../../../../assignments/assignment.service";
 
 interface Assignment {

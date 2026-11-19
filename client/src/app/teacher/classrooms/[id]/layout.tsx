@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
+import { ClassroomMobileNav } from "@/components/layout/ClassroomMobileNav";
 import { ArrowLeft, Settings, KeyRound, Users, UserPlus, ClipboardList, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { getMyClassroomsService } from "../classroom.service";
@@ -25,6 +26,7 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const classroomId = params.id as string;
+  const classroomBase = `/teacher/classrooms/${classroomId}`;
   // Creating or editing an exam needs the whole width: no classroom sidebar there, only the page's own back button.
   const isExamBuilder = /\/exams\/[^/]+$/.test(pathname);
 
@@ -34,6 +36,7 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
 
   const user = useAuthStore(state => state.user);
   const isInitialized = useAuthStore(state => state.isInitialized);
+  const backHref = user?.role === "manager" ? "/manager/classrooms" : "/teacher/classrooms";
 
   const reloadClassroom = async () => {
     try {
@@ -66,47 +69,16 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
   return (
     <ClassroomContext.Provider value={{ classroom, reloadClassroom }}>
       <div className="flex flex-col md:flex-row h-full overflow-hidden">
-        {/* ── On phones the sidebar becomes a bar at the top: back link, classroom name, and the sections as a row you can scroll. ── */}
+        {/* ── On phones the sidebar is a menu button that opens the same sections as a sidebar. ── */}
         {!isExamBuilder && (
-        <div className="md:hidden shrink-0 border-b border-white/10 bg-black">
-          <div className="flex items-center justify-between gap-3 px-4 pt-3">
-            <button
-              onClick={() => router.push(user?.role === "manager" ? "/manager/classrooms" : "/teacher/classrooms")}
-              className="flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 shrink-0" /> <span>All Classrooms</span>
-            </button>
-            <Link
-              href={`/teacher/classrooms/${classroomId}/settings`}
-              className={`flex items-center gap-1.5 text-xs shrink-0 transition-colors ${
-                pathname === `/teacher/classrooms/${classroomId}/settings` ? "text-orange-400 font-semibold" : "text-gray-400 hover:text-orange-400"
-              }`}
-            >
-              <Settings className="h-3.5 w-3.5" /> Classroom info
-            </Link>
-            <ThemeSwitch />
-          </div>
-          <h2 className="px-4 pt-2 text-lg font-bold text-white tracking-tight truncate" title={classroom.name}>{classroom.name}</h2>
-          <nav className="flex gap-2 overflow-x-auto custom-scrollbar px-4 py-3">
-            {navItems.map((item) => {
-              const href = `/teacher/classrooms/${classroomId}/${item.href}`;
-              const isActive = pathname === href || pathname.startsWith(href + "/");
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={href}
-                  className={`shrink-0 whitespace-nowrap flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium transition-colors ${
-                    isActive ? "bg-orange-600 text-white font-semibold" : "bg-zinc-900 text-white/70 hover:text-white"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+          <ClassroomMobileNav
+            classroomName={classroom.name}
+            backHref={backHref}
+            items={[
+              ...navItems.map((item) => ({ ...item, href: `${classroomBase}/${item.href}` })),
+              { href: `${classroomBase}/settings`, label: "Classroom info", icon: Settings },
+            ]}
+          />
         )}
 
         {/* ── Secondary Sidebar ─────────────────────────────────────── */}
@@ -117,7 +89,7 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
           <div className="p-4 border-b border-white/10">
             <div className="flex items-center justify-between gap-2 mb-3">
               <button
-                onClick={() => router.push(user?.role === "manager" ? "/manager/classrooms" : "/teacher/classrooms")}
+                onClick={() => router.push(backHref)}
                 className={`flex items-center gap-1.5 text-gray-400 hover:text-white text-sm transition-colors ${
                   isCollapsed ? "justify-center w-full" : ""
                 }`}

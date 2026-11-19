@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, LogOut, ChevronsLeft, ChevronsRight, Menu, X, BookOpen, User, School, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeSwitch } from "@/components/ThemeSwitch";
+import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
 import { useAuthStore } from "@/store/authStore";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/overlay/tooltip";
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/teacher", icon: LayoutDashboard },

@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Search, Users, UserPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { UserAvatar } from "@/components/UserAvatar";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { UserAvatar } from "@/components/common/UserAvatar";
 import { toast } from "sonner";
 import { getClassroomTeachersService, addTeacherService, removeTeacherService } from "../../classroom.service";
 

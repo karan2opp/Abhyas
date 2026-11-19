@@ -3,14 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FileText, Plus, Search, Clock, Eye, User as UserIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { listExamsForClassroomService, deleteExamService, updateExamService } from "../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
-import { TeacherExamPreviewModal } from "@/components/TeacherExamPreviewModal";
-import { Pagination } from "@/components/Pagination";
+import { TeacherExamPreviewModal } from "@/components/exam/TeacherExamPreviewModal";
+import { Pagination } from "@/components/common/Pagination";
 import { useAuthStore } from "@/store/authStore";
 
 interface ExamEntry {
@@ -225,6 +225,12 @@ export default function ExamsPage() {
                   {e.title}
                 </h3>
 
+                {e.joinCode && (
+                  <p className="text-xs text-zinc-500 mb-2">
+                    Join code: <span className="font-mono font-bold tracking-widest text-orange-400">{e.joinCode}</span>
+                  </p>
+                )}
+
                 {/* Creator */}
                 {e.createdByName && (
                   <p className="flex items-center gap-1.5 text-xs text-zinc-500 mb-4">
@@ -256,40 +262,43 @@ export default function ExamsPage() {
                     <p className="text-zinc-400">
                       • Duration: <span className="text-orange-300 font-medium">{e.duration} mins</span>
                     </p>
+                    <p className="text-zinc-400">
+                      • Status:{" "}
+                      <span className={`font-medium ${(e as any).status === "PUBLISHED" ? "text-emerald-400" : "text-amber-400"}`}>
+                        {(e as any).status === "PUBLISHED" ? "Published" : "Draft"}
+                      </span>
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Actions Bottom Bar */}
-              <div className="flex items-center justify-between pt-4 border-t border-white/10 mt-2">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <Button
-                    size="sm"
-                    className="bg-zinc-800/90 hover:bg-zinc-700 text-white border border-zinc-700 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
-                    onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}`)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-zinc-800/90 hover:bg-zinc-700 text-orange-300 hover:text-white border border-orange-500/30 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
-                    onClick={() => setPreviewExamId(e.id)}
-                  >
-                    <Eye className="mr-1.5 h-4 w-4 text-orange-400" /> Preview
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm px-4 py-2 rounded-xl shadow-md shadow-orange-950/40 transition-all"
-                    onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}/results`)}
-                  >
-                    Results
-                  </Button>
-                </div>
-
+              <div className="grid grid-cols-2 gap-2.5 pt-4 border-t border-white/10 mt-2">
+                <Button
+                  size="sm"
+                  className="w-full bg-zinc-800/90 hover:bg-zinc-700 text-white border border-zinc-700 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
+                  onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}`)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  className="w-full bg-zinc-800/90 hover:bg-zinc-700 text-orange-300 hover:text-white border border-orange-500/30 text-sm font-semibold px-3.5 py-2 rounded-xl transition-all"
+                  onClick={() => setPreviewExamId(e.id)}
+                >
+                  <Eye className="mr-1.5 h-4 w-4 text-orange-400" /> Preview
+                </Button>
+                <Button
+                  size="sm"
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold text-sm px-4 py-2 rounded-xl shadow-md shadow-orange-950/40 transition-all"
+                  onClick={() => router.push(`/teacher/classrooms/${classroomId}/exams/${e.id}/results`)}
+                >
+                  Results
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 shrink-0 h-9 rounded-xl font-semibold px-3.5"
+                  className="w-full bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 h-9 rounded-xl font-semibold px-3.5"
                   onClick={() => handleDeleteExam(e.id, e.title)}
                   title="Delete exam"
                 >

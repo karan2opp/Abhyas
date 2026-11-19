@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { updateClassroomService, deleteClassroomService } from "../../classroom.service";
 import { useClassroom } from "../ClassroomContext";

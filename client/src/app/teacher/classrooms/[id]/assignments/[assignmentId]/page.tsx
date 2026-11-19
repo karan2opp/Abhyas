@@ -3,14 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Plus, Pencil, ListChecks, X, Check, Eye, Sparkles, FileText, Loader2, BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/overlay/dialog";
+import { Input } from "@/components/ui/controls/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/controls/radio-group";
+import { Switch } from "@/components/ui/controls/switch";
 import { toast } from "sonner";
-import { OptionValue, QuestionText, type ContentBlock } from "@/components/QuestionContentBlocks";
+import { OptionValue, QuestionText, type ContentBlock } from "@/components/exam/QuestionContentBlocks";
 import {
   getAssignmentByIdService,
   updateAssignmentService,
@@ -28,7 +28,7 @@ import {
 } from "@/services/questionBank.service";
 import { listBooks, BookSummary as Book } from "@/services/books.service";
 import { generateTopicQuestions } from "@/services/generationAgents.service";
-import { DateTimeInput } from "@/components/DateTimeInput";
+import { DateTimeInput } from "@/components/common/DateTimeInput";
 import { AiEvaluationSettings } from "@/app/teacher/classrooms/[id]/exams/new/ExamDetailsForm";
 
 interface Assignment {

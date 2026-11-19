@@ -3,9 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronLeft, ChevronRight, Download, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Input } from "@/components/ui/controls/input";
 import { cn } from "@/lib/utils";
 import {
   downloadUsageCsvService,

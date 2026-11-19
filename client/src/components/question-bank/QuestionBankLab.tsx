@@ -3,9 +3,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { FileUp, Loader2, Search, RefreshCw, Library, CheckCircle2, XCircle, Clock, Pencil, Trash2, Check, X, Lock, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/display/card";
 import { useAuthStore } from "@/store/authStore";
 import {
   uploadQuestionBankDocument,

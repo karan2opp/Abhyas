@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
 import { Copy, RefreshCw, Ban, Mail, KeyRound } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { regenerateJoinCodeService, revokeJoinCodeService, updateJoinCodeService, inviteStudentService } from "../../classroom.service";
 import { useClassroom } from "../ClassroomContext";
 import { formatDateTime } from "@/lib/date";
-import JoinHistory from "@/components/JoinHistory";
+import JoinHistory from "@/components/classroom/JoinHistory";
 
 export default function JoinCodePage() {
   const params = useParams();

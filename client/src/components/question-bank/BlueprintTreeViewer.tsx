@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight, AlertTriangle, BookMarked, BookOpen, Sparkles, Pencil, Check, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
 import { cn } from "@/lib/utils";
 
 export interface BlueprintSubtopic {

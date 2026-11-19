@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FileText, Clock, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getMyExamsService, startScopedExamService } from "../../../student.service";
 import { formatDateTime } from "@/lib/date";
-import { Pagination } from "@/components/Pagination";
+import { Pagination } from "@/components/common/Pagination";
+import { ExamActionButton } from "../../../ExamActionButton";
 
 interface ExamEntry {
   id: string;
@@ -95,54 +95,6 @@ export default function StudentClassroomExamsPage() {
     return { label: `Submitted · ${sub.score ?? 0}/${exam.totalMarks}`, cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" };
   };
 
-  const renderAction = (exam: ExamEntry) => {
-    const sub = exam.mySubmission;
-    if (sub?.status === "submitted" || sub?.status === "evaluating") {
-      return (
-        <Button
-          size="sm"
-          className="bg-zinc-800 hover:bg-zinc-700 text-white"
-          onClick={() => router.push(`/student/results/${sub.id}`)}
-        >
-          View Result
-        </Button>
-      );
-    }
-    if (sub?.status === "inprogress") {
-      return (
-        <Button
-          size="sm"
-          className="bg-amber-600 hover:bg-amber-700 text-white"
-          onClick={() => router.push(`/student/exams/${sub.id}`)}
-        >
-          Resume
-        </Button>
-      );
-    }
-    if (exam.type === "SCHEDULED" && exam.startTime && new Date(exam.startTime) > new Date()) {
-      return (
-        <Button
-          size="sm"
-          variant="outline"
-          className="bg-transparent border-white/10 text-gray-400 hover:text-white"
-          onClick={() => exam.joinCode && router.push(`/student/waiting/${exam.joinCode}`)}
-        >
-          Not Started Yet
-        </Button>
-      );
-    }
-    return (
-      <Button
-        size="sm"
-        className="bg-orange-600 hover:bg-orange-700 text-white"
-        onClick={() => handleStartExam(exam.id)}
-        disabled={startingExamId === exam.id}
-      >
-        {startingExamId === exam.id ? "Starting..." : "Start Exam"}
-      </Button>
-    );
-  };
-
   const tabs: { key: CategoryKey; label: string; count: number }[] = [
     { key: "all", label: "All", count: counts.upcoming + counts.inprogress + counts.closed },
     { key: "upcoming", label: "Upcoming", count: counts.upcoming },
@@ -223,7 +175,7 @@ export default function StudentClassroomExamsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
                   <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${st.cls}`}>{st.label}</span>
-                  {renderAction(exam)}
+                  <ExamActionButton exam={exam} starting={startingExamId === exam.id} onStart={() => handleStartExam(exam.id)} />
                 </div>
               </div>
             );

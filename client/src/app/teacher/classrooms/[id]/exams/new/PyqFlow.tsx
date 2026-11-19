@@ -3,9 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, FileText, Loader2, Plus, UploadCloud, X, Sparkles, AlertTriangle, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/controls/button";
+import { Input } from "@/components/ui/controls/input";
+import { Textarea } from "@/components/ui/controls/textarea";
 import { cn } from "@/lib/utils";
 import {
   listQuestionBankDocuments,
@@ -25,7 +25,7 @@ import { saveGeneratedExamService } from "../../../../exams/exam.service";
 import type { WorkspaceParts } from "./QuestionBuilder";
 import { StatTile } from "./workspace";
 import { SubtopicRow } from "./SubtopicRow";
-import { ContentBlocksView, MarkdownCode, OptionValue } from "@/components/QuestionContentBlocks";
+import { ContentBlocksView, MarkdownCode, OptionValue } from "@/components/exam/QuestionContentBlocks";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";

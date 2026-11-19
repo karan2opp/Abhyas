@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 
-import { registerService, verifyOtpService, resendOtpService, loginService } from '../auth.service';
+import { registerService, verifyOtpService, resendOtpService } from '../auth.service';
 import { readRedirect, withRedirect } from '@/lib/redirect';
 import { useAuthStore } from '@/store/authStore';
 
@@ -33,7 +33,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [step, setStep] = useState<'REGISTER' | 'VERIFY'>('REGISTER');
   const [registeredEmail, setRegisteredEmail] = useState('');
-  const [registeredPassword, setRegisteredPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -82,7 +81,6 @@ export default function RegisterPage() {
     try {
       await registerService(data);
       setRegisteredEmail(data.email);
-      setRegisteredPassword(data.password);
       setStep('VERIFY');
       toast.success("Registration successful! We've sent a 6-digit code to your email.", { duration: 5000 });
     } catch (error: any) {
@@ -95,18 +93,12 @@ export default function RegisterPage() {
   const onVerify = async (data: VerifyFormValues) => {
     setIsLoading(true);
     try {
-      await verifyOtpService({ email: registeredEmail, otp: data.otp });
-
-      // Verification just confirmed this is really their email/password —
-      // sign them in immediately with the credentials from step 1 instead of
-      // sending them back to the login page to retype what they just entered.
-      const response = await loginService({ email: registeredEmail, password: registeredPassword });
-      const userData = response.data?.user || response.data;
-      const token = response.data?.accessToken || response.accessToken;
-      setUser(userData, token);
+      // The server signs them in once the code is right, so the password does not have to be kept here or sent again.
+      const response = await verifyOtpService({ email: registeredEmail, otp: data.otp });
+      setUser(response.data.user, response.data.accessToken);
 
       toast.success("Email verified — you're all set!");
-      router.push(readRedirect() ?? '/student');
+      router.replace(readRedirect() ?? '/student');
     } catch (error: any) {
       toast.error(error.message || "Verification failed. Please check your code.");
     } finally {

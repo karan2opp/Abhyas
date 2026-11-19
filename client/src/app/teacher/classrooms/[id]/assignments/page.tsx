@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Layers, Plus, ClipboardList, ClipboardCheck, Settings, Search, ChevronLeft, ChevronRight, Info, Clock, Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/overlay/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/controls/radio-group";
 import { toast } from "sonner";
 import { listGroupsService } from "../../group.service";
 import {
@@ -19,7 +19,7 @@ import {
   listAssignmentsForClassroomService,
 } from "../../../assignments/assignment.service";
 import { formatDateTime } from "@/lib/date";
-import { DateTimeInput } from "@/components/DateTimeInput";
+import { DateTimeInput } from "@/components/common/DateTimeInput";
 
 type View = "landing" | "series" | "seriesDetail" | "seriesSettings" | "standalone";
 type StatusFilter = "all" | "upcoming" | "live" | "closed";

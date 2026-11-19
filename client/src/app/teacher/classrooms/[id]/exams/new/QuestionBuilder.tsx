@@ -2,24 +2,24 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ArrowLeft, ArrowUp, Plus, Check, X, CheckCircle2, Circle, Zap, Sparkles, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Input } from "@/components/ui/controls/input";
+import { Textarea } from "@/components/ui/controls/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/controls/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
-import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/QuestionContentBlocks";
+import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/exam/QuestionContentBlocks";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
 
 import { TopicsPanel } from "./TopicsPanel";
 import { ModePicker, type CreationMode } from "./workspace";
-import { BlueprintTreeViewer } from "@/components/BlueprintTreeViewer";
-import BlueprintRefinementChat from "@/components/BlueprintRefinementChat";
-import QuestionReviewChat from "@/components/QuestionReviewChat";
+import { BlueprintTreeViewer } from "@/components/question-bank/BlueprintTreeViewer";
+import BlueprintRefinementChat from "@/components/question-bank/BlueprintRefinementChat";
+import QuestionReviewChat from "@/components/exam/QuestionReviewChat";
 import { createSectionService, getSectionsWithDetailsService, updateSectionService, deleteSectionService, createQuestionService, updateQuestionService, deleteQuestionService, saveGeneratedExamService, getExamByIdService } from "../../../../exams/exam.service";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 import {
@@ -39,8 +39,8 @@ import {
   getExamIntentConversation,
 } from "@/services/generationAgents.service";
 import { buildSourceLookup, type BookToc } from "@/services/books.service";
-import { CopyButton } from "@/components/CopyButton";
-import { MicButton, ListeningIndicator } from "@/components/MicButton";
+import { CopyButton } from "@/components/common/CopyButton";
+import { MicButton, ListeningIndicator } from "@/components/common/MicButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
   buildExamInputFromConfig,

@@ -3,8 +3,8 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/controls/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 
 import { createExamService, updateExamService, deleteExamService } from "@/app/teacher/exams/exam.service";
@@ -24,9 +24,9 @@ import {
   AiEvaluationSettings,
 } from "./ExamDetailsForm";
 import { WorkspaceShell, ModePicker, CreationMode } from "./workspace";
-import QuestionReviewChat from "@/components/QuestionReviewChat";
+import QuestionReviewChat from "@/components/exam/QuestionReviewChat";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
-import { DateTimeInput } from "@/components/DateTimeInput";
+import { DateTimeInput } from "@/components/common/DateTimeInput";
 
 // Picking how to build the exam creates a working copy so questions have somewhere to be written. It stays hidden
 // (status UNSAVED) until the teacher chooses Save as Draft or Publish; leaving without saving asks first. The details

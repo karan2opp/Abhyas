@@ -2,8 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ArrowRight, Loader2, ShieldAlert, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/controls/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/overlay/dialog";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 
@@ -24,9 +24,9 @@ import {
   AiEvaluationToggle,
 } from "../new/ExamDetailsForm";
 import { WorkspaceShell, CreationMode } from "../new/workspace";
-import QuestionReviewChat from "@/components/QuestionReviewChat";
+import QuestionReviewChat from "@/components/exam/QuestionReviewChat";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
-import { DateTimeInput } from "@/components/DateTimeInput";
+import { DateTimeInput } from "@/components/common/DateTimeInput";
 
 // The details students see (title, timing, instructions) live on the publish step, same as when creating an exam.
 type Phase = "questions" | "publish";

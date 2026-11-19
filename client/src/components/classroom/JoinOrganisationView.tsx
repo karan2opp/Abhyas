@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, Loader2, KeyRound } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
 import { joinOrganisationByCodeService } from "@/services/join.service";

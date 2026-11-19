@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
-import { OptionValue, QuestionText, type ContentBlock } from "@/components/QuestionContentBlocks";
+import { OptionValue, QuestionText, type ContentBlock } from "@/components/exam/QuestionContentBlocks";
 import {
   getAssignmentByIdService,
   getSubmissionByIdService,

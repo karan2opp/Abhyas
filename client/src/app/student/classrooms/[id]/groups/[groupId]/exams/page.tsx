@@ -3,12 +3,12 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Clock, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getMyExamsService, startScopedExamService } from "../../../../../student.service";
 import { formatDateTime } from "@/lib/date";
-import { Pagination } from "@/components/Pagination";
+import { Pagination } from "@/components/common/Pagination";
+import { ExamActionButton } from "../../../../../ExamActionButton";
 
 interface ExamEntry {
   id: string;
@@ -18,6 +18,8 @@ interface ExamEntry {
   startTime: string | null;
   endTime: string | null;
   groupId: string | null;
+  joinCode?: string;
+  mySubmission?: { id: string; status: string } | null;
 }
 
 export default function StudentGroupExamsPage() {
@@ -127,13 +129,7 @@ export default function StudentGroupExamsPage() {
                   </p>
                 </div>
               </div>
-              <Button
-                className="bg-orange-600 hover:bg-orange-700 text-white"
-                onClick={() => handleStartExam(exam.id)}
-                disabled={startingExamId === exam.id}
-              >
-                {startingExamId === exam.id ? "Starting..." : "Start Exam"}
-              </Button>
+              <ExamActionButton exam={exam} starting={startingExamId === exam.id} onStart={() => handleStartExam(exam.id)} />
             </div>
           ))}
         </div>

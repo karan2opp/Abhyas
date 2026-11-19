@@ -3,7 +3,7 @@
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
 
 import { createAssignmentService, copyQuestionsFromExamService, updateAssignmentService } from "@/app/teacher/assignments/assignment.service";
@@ -16,7 +16,7 @@ import { PyqFlow } from "../../exams/new/PyqFlow";
 import { SourceFlow } from "../../exams/new/SourceFlow";
 import { AiEvaluationSettings, suggestTitleFromSections } from "../../exams/new/ExamDetailsForm";
 import { WorkspaceShell, ModePicker, CreationMode } from "../../exams/new/workspace";
-import QuestionReviewChat from "@/components/QuestionReviewChat";
+import QuestionReviewChat from "@/components/exam/QuestionReviewChat";
 import { useExamBuilderStore } from "@/store/useExamBuilderStore";
 
 // Picking how to build the assignment creates a draft straight away; the details students see (title, dates,

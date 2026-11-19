@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Copy, RefreshCw, Ban, UserPlus, Mail, Trash2, Users, KeyRound, Pencil, Check, X, Search, FileText, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/display/tabs";
 import { toast } from "sonner";
 import {
   getOrganisationClassroomsService,
@@ -23,7 +23,7 @@ import {
 import { listGroupsService } from "../group.service";
 import { listExamsForClassroomService, deleteExamService } from "../exam.service";
 import { formatDate, formatDateTime } from "@/lib/date";
-import JoinHistory from "@/components/JoinHistory";
+import JoinHistory from "@/components/classroom/JoinHistory";
 
 interface Classroom {
   id: string;

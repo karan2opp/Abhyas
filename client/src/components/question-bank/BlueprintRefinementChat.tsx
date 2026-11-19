@@ -4,8 +4,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { ArrowUp, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/controls/button";
+import { Textarea } from "@/components/ui/controls/textarea";
 import { cn } from "@/lib/utils";
 import {
   sendBlueprintReviewTurn,
@@ -13,8 +13,8 @@ import {
   ConversationTurn,
   ExamBlueprintSection,
 } from "@/services/generationAgents.service";
-import { CopyButton } from "@/components/CopyButton";
-import { MicButton, ListeningIndicator } from "@/components/MicButton";
+import { CopyButton } from "@/components/common/CopyButton";
+import { MicButton, ListeningIndicator } from "@/components/common/MicButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 
 interface BlueprintRefinementChatProps {

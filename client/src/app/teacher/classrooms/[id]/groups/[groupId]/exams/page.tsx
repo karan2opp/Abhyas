@@ -3,13 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, FileText, Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/controls/button";
+import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { listGroupsService } from "../../../../group.service";
 import { listExamsForClassroomService, deleteExamService } from "../../../../../exams/exam.service";
 import { formatDateTime } from "@/lib/date";
-import { Pagination } from "@/components/Pagination";
+import { Pagination } from "@/components/common/Pagination";
 
 interface GroupEntry {
   id: string;

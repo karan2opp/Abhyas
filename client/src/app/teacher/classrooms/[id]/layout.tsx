@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
+import { SignOutButton } from "@/components/layout/SignOutButton";
 import { ClassroomMobileNav } from "@/components/layout/ClassroomMobileNav";
 import { ArrowLeft, Settings, KeyRound, Users, UserPlus, ClipboardList, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -158,8 +159,9 @@ export default function ClassroomLayout({ children }: { children: React.ReactNod
               )}
             </div>
           </div>
-          <div className="p-3 border-t border-white/10">
+          <div className="p-3 border-t border-white/10 space-y-1">
             <ThemeSwitch label={!isCollapsed} className={`w-full ${isCollapsed ? "justify-center" : "justify-start px-3"}`} />
+            <SignOutButton collapsed={isCollapsed} />
           </div>
         </aside>
         )}

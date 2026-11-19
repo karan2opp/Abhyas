@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, Menu, X } from "lucide-react";
 import { ThemeSwitch } from "@/components/layout/ThemeSwitch";
+import { SignOutButton } from "@/components/layout/SignOutButton";
 import { cn } from "@/lib/utils";
 
 export type ClassroomNavItem = { href: string; label: string; icon: React.ElementType };
@@ -80,6 +81,10 @@ export function ClassroomMobileNav({
             );
           })}
         </nav>
+
+        <div className="p-3 border-t border-white/10 shrink-0">
+          <SignOutButton />
+        </div>
       </aside>
     </div>
   );

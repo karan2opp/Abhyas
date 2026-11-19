@@ -18,14 +18,18 @@ const refreshCookieOptions = (req: Request) => {
     return { httpOnly: true, secure: crossSite, sameSite: (crossSite ? "none" : "lax") as "none" | "lax" };
 };
 
-export const login = async (req: Request, res: Response) => {
-    const result = await authService.login(req.body)
-
-    res.cookie("refreshToken", result.refreshToken, {
+// Sets the sign-in cookie and sends the token and user back. Used by login and by verifying the email code.
+const sendSession = (req: Request, res: Response, message: string, session: Awaited<ReturnType<typeof authService.login>>) => {
+    res.cookie("refreshToken", session.refreshToken, {
         ...refreshCookieOptions(req),
         maxAge: 7 * 24 * 60 * 60 * 1000
     })
-    return ApiResponse.ok(res, "User logged in successfully", { accessToken: result.accessToken, user: result.safeUser })
+    return ApiResponse.ok(res, message, { accessToken: session.accessToken, user: session.safeUser })
+}
+
+export const login = async (req: Request, res: Response) => {
+    const result = await authService.login(req.body)
+    return sendSession(req, res, "User logged in successfully", result)
 }
 export const logout = async (req: Request, res: Response) => {
     const result = await authService.logout(req.user!.id)
@@ -37,8 +41,8 @@ export const logout = async (req: Request, res: Response) => {
 }
 
 export const verifyOtp = async (req: Request, res: Response) => {
-    await authService.verifyOtp(req.body);
-    return ApiResponse.ok(res, "Email verified successfully", null);
+    const result = await authService.verifyOtp(req.body);
+    return sendSession(req, res, "Email verified successfully", result);
 };
 
 export const resendOtp = async (req: Request, res: Response) => {

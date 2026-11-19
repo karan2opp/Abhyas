@@ -13,6 +13,7 @@ import {
     hashToken,
 } from "../../common/utils/jwt.utils.js";
 import type { RegisterDto, LoginDto, VerifyOtpDto } from "./auth.dto.js";
+import type { User } from "./user.schema.js";
 
 // ── Register ──────────────────────────────────────────────────────────────────
 const register = async (data: RegisterDto) => {
@@ -52,15 +53,21 @@ const login = async (data: LoginDto) => {
 
     if (!existing.isVerified) throw ApiError.unauthorized("Please verify your email first");
 
-    const accessToken = generateAccessToken({ id: existing.id, role: existing.role });
-    const refreshToken = generateRefreshToken({ id: existing.id });
+    return startSession(existing);
+};
+
+// Signs a verified user in: new tokens, and the refresh token's hash stored so it can be checked when it is used.
+// Shared by login and by verifying the email code, which signs the user in too.
+const startSession = async (user: User) => {
+    const accessToken = generateAccessToken({ id: user.id, role: user.role });
+    const refreshToken = generateRefreshToken({ id: user.id });
 
     await db.update(users)
         .set({ refreshToken: hashToken(refreshToken) })
-        .where(eq(users.id, existing.id));
+        .where(eq(users.id, user.id));
 
-    // reuse existing, no need for extra DB call
-    const { password, verificationToken, refreshToken: _, resetPasswordToken, resetPasswordExpires, ...safeUser } = existing;
+    // reuse the row we already have, no need for extra DB call
+    const { password, verificationToken, refreshToken: _, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
     return { accessToken, refreshToken, safeUser };
 };
 
@@ -90,8 +97,10 @@ const verifyOtp = async (data: VerifyOtpDto) => {
         .set({ isVerified: true, verificationToken: null, verificationExpires: null })
         .where(eq(users.id, user.id))
         .returning();
+    if (!updatedUser) throw ApiError.internal("Failed to verify the account");
 
-    return updatedUser;
+    // The code proves the email is theirs, so they are signed in straight away instead of typing the password again.
+    return startSession(updatedUser);
 };
 
 // ── Resend verification OTP ───────────────────────────────────────────────

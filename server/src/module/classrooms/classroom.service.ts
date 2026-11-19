@@ -1,8 +1,9 @@
 import crypto from "crypto";
-import { eq, and, lt, sql, ilike, or, isNull, desc } from "drizzle-orm";
+import { eq, and, lt, sql, ilike, or, isNull, desc, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users, organisations } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { PermissionService } from "../../common/permissions/index.js";
 import { assertStudentQuota } from "../billing/usage.service.js";
 import { sendClassroomInviteEmail } from "../../common/config/email.js";
@@ -438,23 +439,37 @@ const joinRecordColumns = {
     joinedAt: classroomStudents.enrolledAt,
 };
 
-const getClassroomJoins = async (classroomId: string, requester: Requester) => {
+// Newest first; the row's id breaks ties so a row never repeats or goes missing between pages.
+const newestJoinFirst = [desc(classroomStudents.enrolledAt), desc(classroomStudents.id)];
+
+const getClassroomJoins = async (classroomId: string, requester: Requester, paging: PageParams) => {
     if (requester.role !== "system_admin") await assertCanManageClassroom(requester, classroomId);
 
-    return await db.select(joinRecordColumns)
+    const inClassroom = eq(classroomStudents.classroomId, classroomId);
+    const [total] = await db.select({ value: count() }).from(classroomStudents).where(inClassroom);
+    const rows = await db.select(joinRecordColumns)
         .from(classroomStudents)
         .innerJoin(users, eq(classroomStudents.studentId, users.id))
-        .where(eq(classroomStudents.classroomId, classroomId))
-        .orderBy(desc(classroomStudents.enrolledAt));
+        .where(inClassroom)
+        .orderBy(...newestJoinFirst)
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, total?.value ?? 0, paging);
 };
 
 // Every join across all organisations, newest first (system admin).
-const getAllJoins = async (search?: string, limit = 500) => {
+const getAllJoins = async (paging: PageParams, search?: string) => {
     const match = search
         ? or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`), ilike(classrooms.name, `%${search}%`), ilike(classroomStudents.joinedWithCode, `%${search}%`))
         : undefined;
 
-    return await db.select({
+    const [total] = await db.select({ value: count() })
+        .from(classroomStudents)
+        .innerJoin(users, eq(classroomStudents.studentId, users.id))
+        .innerJoin(classrooms, eq(classroomStudents.classroomId, classrooms.id))
+        .where(match);
+    const rows = await db.select({
         ...joinRecordColumns,
         classroomId: classrooms.id,
         classroomName: classrooms.name,
@@ -465,8 +480,11 @@ const getAllJoins = async (search?: string, limit = 500) => {
         .innerJoin(classrooms, eq(classroomStudents.classroomId, classrooms.id))
         .leftJoin(organisations, eq(classrooms.organisationId, organisations.id))
         .where(match)
-        .orderBy(desc(classroomStudents.enrolledAt))
-        .limit(limit);
+        .orderBy(...newestJoinFirst)
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, total?.value ?? 0, paging);
 };
 
 export {

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { parsePageParams } from "../../common/utils/pagination.js";
 import * as classroomService from "./classroom.service.js";
 
 const toRequester = (req: Request) => ({
@@ -92,11 +93,11 @@ export const listOrganisationClassrooms = async (req: Request, res: Response) =>
 };
 
 export const getClassroomJoins = async (req: Request, res: Response) => {
-    const result = await classroomService.getClassroomJoins(req.params.id as string, toRequester(req));
+    const result = await classroomService.getClassroomJoins(req.params.id as string, toRequester(req), parsePageParams(req.query));
     return ApiResponse.ok(res, "Classroom joins", result);
 };
 
 export const getAllJoins = async (req: Request, res: Response) => {
-    const result = await classroomService.getAllJoins(req.query.search as string | undefined);
+    const result = await classroomService.getAllJoins(parsePageParams(req.query), req.query.search as string | undefined);
     return ApiResponse.ok(res, "All classroom joins", result);
 };

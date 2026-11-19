@@ -1,8 +1,9 @@
-import { eq, and, count, ilike, or } from "drizzle-orm";
+import { eq, and, count, ilike, or, asc, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import db from "../../common/db/index.js";
 import { organisations, users, classrooms, classroomStudents } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { assertTeacherQuota, assertManagerQuota } from "../billing/usage.service.js";
 import type { CreateOrganisationDto, UpdateOrganisationDto } from "./dto/organisation.dto.js";
 
@@ -112,8 +113,15 @@ const deleteOrganisation = async (organisationId: string) => {
 };
 
 // ── List Organisations ───────────────────────────────────────────────────────
-const listOrganisations = async () => {
-    return await db.select().from(organisations);
+// One page of the organisations, newest first (the id breaks ties so none repeats or goes missing between pages).
+const listOrganisations = async (paging: PageParams, search?: string) => {
+    const where = search ? ilike(organisations.name, `%${search}%`) : undefined;
+    const [total] = await db.select({ value: count() }).from(organisations).where(where);
+    const rows = await db.select().from(organisations).where(where)
+        .orderBy(desc(organisations.createdAt), desc(organisations.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 // ── Assign User to Organisation ──────────────────────────────────────────────
@@ -227,16 +235,23 @@ const removeTeacherFromOrganisation = async (organisationId: string, userId: str
 };
 
 // ── Get Organisation Teachers ──────────────────────────────────────────────────
-const getOrganisationTeachers = async (organisationId: string, search?: string) => {
+// One page of the teachers, by name (the id breaks ties).
+const getOrganisationTeachers = async (organisationId: string, paging: PageParams, search?: string) => {
     const conditions = [eq(users.organisationId, organisationId), eq(users.role, "teacher")];
     if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
+    const where = and(...conditions);
 
-    return await db.select({
+    const [total] = await db.select({ value: count() }).from(users).where(where);
+    const rows = await db.select({
         id: users.id,
         name: users.name,
         email: users.email,
         createdAt: users.createdAt,
-    }).from(users).where(and(...conditions));
+    }).from(users).where(where)
+        .orderBy(asc(users.name), asc(users.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 // ── Get / create organisation join code ──────────────────────────────────────

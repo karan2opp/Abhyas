@@ -1,4 +1,5 @@
-import { eq, and, isNull, desc, or, ne, ilike, gte, count, inArray } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, desc, asc, or, ne, ilike, gte, gt, lte, count, inArray, sql, avg, max } from "drizzle-orm";
+import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import db from "../../common/db/index.js";
 import { submissions, examRegistrations, exams, answers, options, questions, sections, users, classroomStudents, groupStudents, classrooms, classroomTeachers } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
@@ -524,10 +525,34 @@ const getSubmissionById = async (submissionId: string, requester: Requester, mod
 };
 
 // ── Get All Submissions for an Exam (creator, co-teacher, or manager of the org) ─
-const getSubmissionsByExam = async (examId: string, requester: Requester, mode: string = "simple") => {
+const getSubmissionsByExam = async (examId: string, requester: Requester, mode: string = "simple", paging: PageParams) => {
     const exam = await assertCanManageExamSubmissions(requester, examId);
+    const ofExam = and(eq(submissions.examId, examId), isNull(submissions.deletedAt));
 
-    const result = await db.select({
+    // An attempt whose time has run out is submitted now (every one of them, not only those on this page).
+    if (exam.duration) {
+        const cutoff = new Date(Date.now() - exam.duration * 60000);
+        const expired = await db.select().from(submissions).where(
+            and(ofExam, eq(submissions.status, "inprogress"), isNotNull(submissions.startedAt), lte(submissions.startedAt, cutoff))
+        );
+        for (const sub of expired) {
+            try {
+                await submitExam(sub.id, sub.userId, mode);
+            } catch (e) {
+                console.error("Auto-submit failed", e);
+            }
+        }
+    }
+
+    const [totalRow] = await db.select({ value: count() }).from(submissions).where(ofExam);
+    const total = Number(totalRow?.value) || 0;
+
+    // The numbers at the top of the results page cover every submission, not only the page being shown.
+    const [finished] = await db.select({ average: avg(submissions.score), highest: max(submissions.score) })
+        .from(submissions)
+        .where(and(ofExam, inArray(submissions.status, ["submitted", "timeout"])));
+
+    const rows = await db.select({
         submission: submissions,
         user: {
             id: users.id,
@@ -536,25 +561,15 @@ const getSubmissionsByExam = async (examId: string, requester: Requester, mode: 
         }
     }).from(submissions)
         .innerJoin(users, eq(submissions.userId, users.id))
-        .where(
-            and(eq(submissions.examId, examId), isNull(submissions.deletedAt))
-        );
+        .where(ofExam)
+        .orderBy(desc(submissions.createdAt), desc(submissions.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
 
-    const now = new Date();
-    for (const row of result) {
-        const sub = row.submission;
-        const endTime = sub && sub.status === "inprogress" ? attemptDeadline(sub, exam) : null;
-        if (sub && endTime && now >= endTime) {
-            try {
-                const updated = await submitExam(sub.id, sub.userId, mode);
-                if (updated) row.submission = updated;
-            } catch (e) {
-                console.error("Auto-submit failed", e);
-            }
-        }
-    }
-
-    return result;
+    return {
+        ...toPage(rows, total, paging),
+        stats: { total, average: Number(finished?.average) || 0, highest: Number(finished?.highest) || 0 },
+    };
 };
 
 // ── Soft Delete Submission ─────────────────────────────────────────────────────
@@ -759,7 +774,9 @@ const getUpcomingExams = async (studentId: string) => {
 };
 
 // ── Get Exam Leaderboard ─────────────────────────────────────────────────────────
-const getExamLeaderboard = async (examId: string, requester: Requester) => {
+// The standings of the students who submitted: the podium (the top three, always) and then everyone else, a page at a time.
+// A student is also sent their own place, since they may not be on the page being shown.
+const getExamLeaderboard = async (examId: string, requester: Requester, paging: PageParams, search?: string) => {
     const [exam] = await db.select().from(exams).where(eq(exams.id, examId));
     if (!exam) throw ApiError.notFound("Exam not found");
 
@@ -772,28 +789,43 @@ const getExamLeaderboard = async (examId: string, requester: Requester) => {
         throw ApiError.forbidden("You do not have permission to view this leaderboard.");
     }
 
-    const result = await db.select({
+    // Best score first, then whoever finished earlier; the id makes the order the same every time.
+    const ranked = db.select({
         id: submissions.id,
         score: submissions.score,
         submittedAt: submissions.submittedAt,
-        user: {
-            id: users.id,
-            name: users.name,
-            email: users.email
-        }
+        // Aliased: both tables have an "id" column, and a subquery cannot have two columns with the same name.
+        userId: sql<string>`${users.id}`.as("user_id"),
+        name: users.name,
+        email: users.email,
+        rank: sql<number>`(row_number() over (order by ${submissions.score} desc, ${submissions.submittedAt} asc, ${submissions.id} asc))::int`.as("rank"),
     })
-    .from(submissions)
-    .innerJoin(users, eq(submissions.userId, users.id))
-    .where(
-        and(
-            eq(submissions.examId, examId),
-            eq(submissions.status, "submitted"),
-            isNull(submissions.deletedAt)
-        )
-    )
-    .orderBy(desc(submissions.score), submissions.submittedAt);
+        .from(submissions)
+        .innerJoin(users, eq(submissions.userId, users.id))
+        .where(and(eq(submissions.examId, examId), eq(submissions.status, "submitted"), isNull(submissions.deletedAt)))
+        .as("ranked");
 
-    return result;
+    const PODIUM_SIZE = 3;
+    const standings = and(gt(ranked.rank, PODIUM_SIZE), search ? ilike(ranked.name, `%${search}%`) : undefined);
+
+    const podiumRows = await db.select().from(ranked).where(lte(ranked.rank, PODIUM_SIZE)).orderBy(asc(ranked.rank));
+    const [totalRow] = await db.select({ value: count() }).from(ranked).where(standings);
+    const rows = await db.select().from(ranked).where(standings).orderBy(asc(ranked.rank)).limit(paging.limit).offset(paging.offset);
+    const [mine] = requester.role === "student" ? await db.select().from(ranked).where(eq(ranked.userId, requester.id)) : [];
+
+    const entry = (r: (typeof podiumRows)[number]) => ({
+        id: r.id,
+        score: r.score,
+        submittedAt: r.submittedAt,
+        rank: r.rank,
+        user: { id: r.userId, name: r.name, email: r.email },
+    });
+
+    return {
+        ...toPage(rows.map(entry), Number(totalRow?.value) || 0, paging),
+        podium: podiumRows.map(entry),
+        me: mine ? entry(mine) : null,
+    };
 };
 
 export { joinExam, startScopedExam, beginSubmission, submitExam, gradeExamSubmission, evaluateSubmissionWithAI, getSubmissionById, getSubmissionsByExam, deleteSubmission, getMySubmissions, getUpcomingExams, getExamForSubmission, verifyJoinCode, getExamLeaderboard };

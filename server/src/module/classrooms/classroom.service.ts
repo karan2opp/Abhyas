@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import { eq, and, lt, sql, ilike, or, isNull, desc, count } from "drizzle-orm";
+import { eq, and, lt, sql, ilike, or, isNull, asc, desc, count } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { classrooms, classroomTeachers, classroomStudents, classroomInvites, users, organisations } from "../../common/db/schema.js";
+import { classrooms, classroomTeachers, classroomStudents, classroomInvites, groupStudents, users, organisations } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { PermissionService } from "../../common/permissions/index.js";
@@ -381,40 +381,103 @@ const joinClassroom = async (code: string, studentId: string, studentEmail: stri
 };
 
 // ── Get My Classrooms (teacher) ──────────────────────────────────────────────
-const getMyClassrooms = async (teacherId: string, search?: string) => {
+// One page of the teacher's classrooms, newest first (the id breaks ties so none repeats or goes missing between pages).
+const getMyClassrooms = async (teacherId: string, paging: PageParams, search?: string) => {
     const conditions = [eq(classroomTeachers.teacherId, teacherId)];
     if (search) conditions.push(ilike(classrooms.name, `%${search}%`));
+    const where = and(...conditions);
 
-    return await db.select({ classroom: classrooms })
+    const [total] = await db.select({ value: count() })
         .from(classroomTeachers)
         .innerJoin(classrooms, eq(classroomTeachers.classroomId, classrooms.id))
-        .where(and(...conditions));
+        .where(where);
+
+    const rows = await db.select({ classroom: classrooms })
+        .from(classroomTeachers)
+        .innerJoin(classrooms, eq(classroomTeachers.classroomId, classrooms.id))
+        .where(where)
+        .orderBy(desc(classrooms.createdAt), desc(classrooms.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, Number(total?.value) || 0, paging);
+};
+
+// ── Get one classroom (a teacher or manager who runs it, or a student who is in it) ──
+const getClassroomById = async (classroomId: string, requester: Requester) => {
+    if (requester.role === "student") {
+        const [membership] = await db.select().from(classroomStudents).where(
+            and(eq(classroomStudents.classroomId, classroomId), eq(classroomStudents.studentId, requester.id), eq(classroomStudents.status, "active"))
+        );
+        if (!membership) throw ApiError.notFound("Classroom not found");
+    } else {
+        await assertCanManageClassroom(requester, classroomId);
+    }
+
+    const [classroom] = await db.select().from(classrooms).where(eq(classrooms.id, classroomId));
+    if (!classroom) throw ApiError.notFound("Classroom not found");
+    return classroom;
 };
 
 // ── List Classrooms in Organisation (manager) ────────────────────────────────
-const listOrganisationClassrooms = async (organisationId: string, search?: string) => {
+// One page of the organisation's classrooms, newest first.
+const listOrganisationClassrooms = async (organisationId: string, paging: PageParams, search?: string) => {
     const conditions = [eq(classrooms.organisationId, organisationId)];
     if (search) conditions.push(ilike(classrooms.name, `%${search}%`));
+    const where = and(...conditions);
 
-    return await db.select().from(classrooms).where(and(...conditions));
+    const [total] = await db.select({ value: count() }).from(classrooms).where(where);
+    const rows = await db.select().from(classrooms).where(where)
+        .orderBy(desc(classrooms.createdAt), desc(classrooms.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 // ── Get My Classrooms (student) ──────────────────────────────────────────────
-const getMyClassroomsAsStudent = async (studentId: string) => {
-    return await db.select({ classroom: classrooms })
+// One page of the classrooms a student is in, newest first.
+const getMyClassroomsAsStudent = async (studentId: string, paging: PageParams) => {
+    const where = and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active"));
+
+    const [total] = await db.select({ value: count() }).from(classroomStudents).where(where);
+    const rows = await db.select({ classroom: classrooms })
         .from(classroomStudents)
         .innerJoin(classrooms, eq(classroomStudents.classroomId, classrooms.id))
-        .where(and(eq(classroomStudents.studentId, studentId), eq(classroomStudents.status, "active")));
+        .where(where)
+        .orderBy(desc(classrooms.createdAt), desc(classrooms.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 // ── Get Classroom Roster (teacher or manager) ────────────────────────────────
-const getClassroomRoster = async (classroomId: string, requester: Requester, search?: string) => {
+// One page of the students, by name (the row's id breaks ties so a student never repeats or goes missing between pages).
+// `activeOnly` leaves out students who left, and `notInGroup` those already in that group: what "add a student to a group" needs.
+const getClassroomRoster = async (
+    classroomId: string,
+    requester: Requester,
+    paging: PageParams,
+    search?: string,
+    options: { activeOnly?: boolean; notInGroup?: string | undefined } = {},
+) => {
     await assertCanManageClassroom(requester, classroomId);
 
     const conditions = [eq(classroomStudents.classroomId, classroomId)];
     if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
+    if (options.activeOnly) conditions.push(eq(classroomStudents.status, "active"));
+    if (options.notInGroup) {
+        conditions.push(sql`not exists (select 1 from ${groupStudents} where ${groupStudents.groupId} = ${options.notInGroup} and ${groupStudents.studentId} = ${users.id})`);
+    }
+    const where = and(...conditions);
 
-    return await db.select({
+    const [total] = await db.select({ value: count() })
+        .from(classroomStudents)
+        .innerJoin(users, eq(classroomStudents.studentId, users.id))
+        .where(where);
+
+    const rows = await db.select({
         studentId: users.id,
         name: users.name,
         email: users.email,
@@ -425,7 +488,12 @@ const getClassroomRoster = async (classroomId: string, requester: Requester, sea
     })
         .from(classroomStudents)
         .innerJoin(users, eq(classroomStudents.studentId, users.id))
-        .where(and(...conditions));
+        .where(where)
+        .orderBy(asc(users.name), asc(classroomStudents.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 // ── Who joined with which code (teacher or manager of the classroom, or a system admin) ──
@@ -502,6 +570,7 @@ export {
     revokeJoinCode,
     joinClassroom,
     getMyClassrooms,
+    getClassroomById,
     getMyClassroomsAsStudent,
     getClassroomRoster,
     listOrganisationClassrooms,

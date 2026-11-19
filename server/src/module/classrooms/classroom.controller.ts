@@ -70,17 +70,26 @@ export const joinClassroom = async (req: Request, res: Response) => {
 };
 
 export const getMyClassrooms = async (req: Request, res: Response) => {
-    const result = await classroomService.getMyClassrooms(req.user!.id, req.query.search as string | undefined);
+    const result = await classroomService.getMyClassrooms(req.user!.id, parsePageParams(req.query, 9), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Your classrooms", result);
 };
 
 export const getMyClassroomsAsStudent = async (req: Request, res: Response) => {
-    const result = await classroomService.getMyClassroomsAsStudent(req.user!.id);
+    const result = await classroomService.getMyClassroomsAsStudent(req.user!.id, parsePageParams(req.query, 9));
     return ApiResponse.ok(res, "Your classrooms", result);
 };
 
+export const getClassroom = async (req: Request, res: Response) => {
+    const result = await classroomService.getClassroomById(req.params.id as string, toRequester(req));
+    return ApiResponse.ok(res, "Classroom", result);
+};
+
 export const getClassroomRoster = async (req: Request, res: Response) => {
-    const result = await classroomService.getClassroomRoster(req.params.id as string, toRequester(req), req.query.search as string | undefined);
+    // 12 to a page: the students page shows them three to a row.
+    const result = await classroomService.getClassroomRoster(req.params.id as string, toRequester(req), parsePageParams(req.query, 12), req.query.search as string | undefined, {
+        activeOnly: req.query.activeOnly === "true",
+        notInGroup: (req.query.notInGroup as string | undefined) || undefined,
+    });
     return ApiResponse.ok(res, "Classroom roster", result);
 };
 
@@ -88,7 +97,7 @@ export const listOrganisationClassrooms = async (req: Request, res: Response) =>
     const organisationId = req.user!.organisationId;
     if (!organisationId) throw ApiError.badRequest("Your account is not linked to an organisation yet");
 
-    const result = await classroomService.listOrganisationClassrooms(organisationId, req.query.search as string | undefined);
+    const result = await classroomService.listOrganisationClassrooms(organisationId, parsePageParams(req.query, 9), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation classrooms", result);
 };
 

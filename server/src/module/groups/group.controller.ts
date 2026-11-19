@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
 import * as groupService from "./group.service.js";
+import { parsePageParams } from "../../common/utils/pagination.js";
 
 export const createGroup = async (req: Request, res: Response) => {
     const result = await groupService.createGroup(req.body, req.user!.id);
@@ -37,7 +38,7 @@ export const removeStudentFromGroup = async (req: Request, res: Response) => {
 };
 
 export const getGroupMembers = async (req: Request, res: Response) => {
-    const result = await groupService.getGroupMembers(req.params.id as string, req.user!.id, req.query.search as string | undefined);
+    const result = await groupService.getGroupMembers(req.params.id as string, req.user!.id, parsePageParams(req.query), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Group members", result);
 };
 

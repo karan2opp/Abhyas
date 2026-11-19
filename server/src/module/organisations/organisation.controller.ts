@@ -3,6 +3,7 @@ import { ApiResponse } from "../../common/utils/ApiResponse.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import * as organisationService from "./organisation.service.js";
 import * as inviteService from "./invite.service.js";
+import { parsePageParams } from "../../common/utils/pagination.js";
 
 export const createOrganisation = async (req: Request, res: Response) => {
     const result = await organisationService.createOrganisation(req.body);
@@ -10,7 +11,7 @@ export const createOrganisation = async (req: Request, res: Response) => {
 };
 
 export const listOrganisations = async (req: Request, res: Response) => {
-    const result = await organisationService.listOrganisations();
+    const result = await organisationService.listOrganisations(parsePageParams(req.query), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisations", result);
 };
 
@@ -81,7 +82,7 @@ export const getOrganisationManagers = async (req: Request, res: Response) => {
 
 // ── Manager-scoped: manage teachers within their own organisation ────────────
 export const getMyOrganisationTeachers = async (req: Request, res: Response) => {
-    const result = await organisationService.getOrganisationTeachers(req.user!.organisationId!, req.query.search as string | undefined);
+    const result = await organisationService.getOrganisationTeachers(req.user!.organisationId!, parsePageParams(req.query), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Organisation teachers", result);
 };
 
@@ -92,7 +93,7 @@ export const inviteTeacher = async (req: Request, res: Response) => {
 };
 
 export const listMyInvites = async (req: Request, res: Response) => {
-    const result = await inviteService.listInvites(req.user!.organisationId!);
+    const result = await inviteService.listInvites(req.user!.organisationId!, parsePageParams(req.query));
     return ApiResponse.ok(res, "Invitations", result);
 };
 

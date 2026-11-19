@@ -37,4 +37,7 @@ router.patch("/:id/join-code", authenticate, authorize("teacher", "manager"), va
 router.post("/join", authenticate, authorize("student"), validate(joinClassroomSchema), controller.joinClassroom);
 router.get("/me", authenticate, authorize("student"), controller.getMyClassroomsAsStudent);
 
+// One classroom. Last of the GET routes, so "/org", "/me" and "/all-joins" above are not taken for an id.
+router.get("/:id", authenticate, authorize("teacher", "manager", "student"), controller.getClassroom);
+
 export default router;

@@ -1,7 +1,8 @@
-import { eq, and, or, ilike, inArray, count } from "drizzle-orm";
+import { eq, and, or, ilike, inArray, count, asc } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { groups, groupStudents, classroomStudents, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { PermissionService } from "../../common/permissions/index.js";
 import type { CreateGroupDto, UpdateGroupDto, AddStudentToGroupDto } from "./dto/group.dto.js";
 
@@ -126,14 +127,21 @@ const getMyGroups = async (studentId: string, classroomId: string) => {
 };
 
 // ── Get Group Members ─────────────────────────────────────────────────────────
-const getGroupMembers = async (groupId: string, teacherId: string, search?: string) => {
+// One page of the group's students, by name (the row's id breaks ties).
+const getGroupMembers = async (groupId: string, teacherId: string, paging: PageParams, search?: string) => {
     const hasAccess = await PermissionService.teacher.canManageGroup(teacherId, groupId);
     if (!hasAccess) throw ApiError.forbidden("You are not authorized to view this group");
 
     const conditions = [eq(groupStudents.groupId, groupId)];
     if (search) conditions.push(or(ilike(users.name, `%${search}%`), ilike(users.email, `%${search}%`))!);
+    const where = and(...conditions);
 
-    return await db.select({
+    const [total] = await db.select({ value: count() })
+        .from(groupStudents)
+        .innerJoin(users, eq(groupStudents.studentId, users.id))
+        .where(where);
+
+    const rows = await db.select({
         studentId: users.id,
         name: users.name,
         email: users.email,
@@ -142,7 +150,12 @@ const getGroupMembers = async (groupId: string, teacherId: string, search?: stri
     })
         .from(groupStudents)
         .innerJoin(users, eq(groupStudents.studentId, users.id))
-        .where(and(...conditions));
+        .where(where)
+        .orderBy(asc(users.name), asc(groupStudents.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+
+    return toPage(rows, Number(total?.value) || 0, paging);
 };
 
 export {

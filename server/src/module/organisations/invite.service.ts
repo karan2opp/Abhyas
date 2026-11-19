@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "crypto";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import db from "../../common/db/index.js";
 import { organisations, organisationInvites, users } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
+import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { assertTeacherQuota } from "../billing/usage.service.js";
 import { sendOrganisationInviteEmail } from "../../common/config/email.js";
 
@@ -72,14 +73,24 @@ const sendInviteEmail = async (invite: InviteRow, token: string) => {
 };
 
 // ── Manager: the invitations of their organisation ────────────────────────────
-export const listInvites = async (organisationId: string) => {
+// One page of the open and finished invitations, newest first. Revoked ones are gone, and accepted ones are not listed
+// (those people are in the teachers list).
+export const listInvites = async (organisationId: string, paging: PageParams) => {
+    const where = and(
+        eq(organisationInvites.organisationId, organisationId),
+        ne(organisationInvites.status, "revoked"),
+        ne(organisationInvites.status, "accepted"),
+    );
+    const [total] = await db.select({ value: count() }).from(organisationInvites).where(where);
     const rows = await db
         .select()
         .from(organisationInvites)
-        .where(and(eq(organisationInvites.organisationId, organisationId), ne(organisationInvites.status, "revoked")))
-        .orderBy(desc(organisationInvites.createdAt))
-        .limit(50);
-    return rows.map((r) => ({ id: r.id, email: r.email, status: statusOf(r), expiresAt: r.expiresAt, createdAt: r.createdAt, respondedAt: r.respondedAt }));
+        .where(where)
+        .orderBy(desc(organisationInvites.createdAt), desc(organisationInvites.id))
+        .limit(paging.limit)
+        .offset(paging.offset);
+    const data = rows.map((r) => ({ id: r.id, email: r.email, status: statusOf(r), expiresAt: r.expiresAt, createdAt: r.createdAt, respondedAt: r.respondedAt }));
+    return toPage(data, Number(total?.value) || 0, paging);
 };
 
 export const resendInvite = async (organisationId: string, inviteId: string) => {

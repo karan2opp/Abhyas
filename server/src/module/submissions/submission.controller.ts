@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { ApiResponse } from "../../common/utils/ApiResponse.js";
 import * as submissionsService from "./submission.service.js";
+import { parsePageParams } from "../../common/utils/pagination.js";
 
 const toRequester = (req: Request) => ({
     id: req.user!.id,
@@ -46,7 +47,7 @@ export const getSubmissionById = async (req: Request, res: Response) => {
 
 export const getSubmissionsByExam = async (req: Request, res: Response) => {
     const mode = (req.query.mode as string) || "simple";
-    const submissions = await submissionsService.getSubmissionsByExam(req.params.examId as string, toRequester(req), mode);
+    const submissions = await submissionsService.getSubmissionsByExam(req.params.examId as string, toRequester(req), mode, parsePageParams(req.query));
     return ApiResponse.ok(res, "Submissions fetched successfully", submissions);
 };
 
@@ -85,6 +86,6 @@ export const verifyJoinCode = async (req: Request, res: Response) => {
 };
 
 export const getExamLeaderboard = async (req: Request, res: Response) => {
-    const leaderboard = await submissionsService.getExamLeaderboard(req.params.examId as string, toRequester(req));
+    const leaderboard = await submissionsService.getExamLeaderboard(req.params.examId as string, toRequester(req), parsePageParams(req.query), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Leaderboard fetched successfully", leaderboard);
 };

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
+import { beginExamService, getExamForSubmissionService, getSubmissionByIdService, submitAnswerService, submitExamService } from "../../student.service";
 import { TestTakingScreen, clearLocalSnapshot, flattenExamSections } from "@/components/exam/TestTakingScreen";
 
 export default function ExamAttemptPage() {
@@ -66,6 +66,13 @@ export default function ExamAttemptPage() {
   const totalMarks = questions.reduce((acc, q) => acc + (q.marks || 0), 0);
   const duration = examData.duration || 60;
 
+  // The clock starts when the student presses "Proceed to Exam", not when the exam was opened. Until then there is no end time.
+  const handleProceed = async () => {
+    const res = await beginExamService(submissionId);
+    const begun = res.data || res;
+    setSubmissionData((prev: any) => ({ ...prev, startedAt: begun.startedAt }));
+  };
+
   return (
     <TestTakingScreen
       kind="exam"
@@ -75,8 +82,11 @@ export default function ExamAttemptPage() {
       sectionTitles={(examData.sections ?? []).map((s: any) => s.title)}
       initialAnswers={initialAnswers}
       initialTextAnswers={initialTextAnswers}
-      // The time runs from when the student started the exam.
-      clock={{ kind: "timer", endTime: new Date(submissionData.createdAt).getTime() + duration * 60 * 1000 }}
+      // The time runs from when the student pressed Proceed. Someone who has already begun (a reload) skips the instructions.
+      clock={{ kind: "timer", endTime: submissionData.startedAt ? new Date(submissionData.startedAt).getTime() + duration * 60 * 1000 : null }}
+      skipInstructions={!!submissionData.startedAt}
+      onProceed={handleProceed}
+      onBack={() => (window.history.length > 1 ? router.back() : router.push("/student"))}
       instructionStats={[
         { label: "Duration", value: `${duration} mins` },
         { label: "Questions", value: String(questions.length) },

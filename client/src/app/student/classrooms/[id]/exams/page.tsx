@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { FileText, Clock, Search } from "lucide-react";
+import { FileText, Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import { getMyExamsService, startScopedExamService } from "../../../student.service";
-import { formatDateTime } from "@/lib/date";
+import { ExamSchedule } from "@/components/exam/ExamSchedule";
 import { Pagination } from "@/components/common/Pagination";
 import { ExamActionButton } from "../../../ExamActionButton";
 
@@ -164,13 +164,7 @@ export default function StudentClassroomExamsPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-white font-semibold text-sm truncate">{exam.title}</p>
-                    <p className="text-gray-500 text-xs flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {exam.type === "SCHEDULED" && exam.startTime
-                        ? `${formatDateTime(exam.startTime)} - ${exam.endTime ? formatDateTime(exam.endTime) : ""}`
-                        : "On-demand"}
-                      {" · "}{exam.totalMarks} marks
-                    </p>
+                    <ExamSchedule startTime={exam.startTime} endTime={exam.endTime} totalMarks={exam.totalMarks} />
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 sm:shrink-0">

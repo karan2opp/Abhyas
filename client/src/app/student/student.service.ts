@@ -46,6 +46,12 @@ export const submitAnswerService = async (data: any) => {
   return res.data;
 };
 
+// The student pressed "Proceed to Exam": the exam's clock starts now.
+export const beginExamService = async (id: string) => {
+  const res = await api.patch(`/submissions/${id}/begin`);
+  return res.data;
+};
+
 export const submitExamService = async (id: string) => {
   const res = await api.patch(`/submissions/${id}/submit`, undefined, { timeout: 60000 });
   return res.data;

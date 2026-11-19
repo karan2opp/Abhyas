@@ -118,9 +118,10 @@ export function DateTimeInput({ value, onChange }: { value: string; onChange: (v
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger
         type="button"
-        className="flex h-11 w-full items-center justify-between gap-2 border-0 border-b border-white/20 bg-transparent px-0 py-2 text-left text-base outline-none transition-colors focus-visible:border-orange-500 data-popup-open:border-orange-500 md:text-sm"
+        className="flex min-h-11 w-full items-center justify-between gap-2 border-0 border-b border-white/20 bg-transparent px-0 py-2 text-left text-base outline-none transition-colors focus-visible:border-orange-500 data-popup-open:border-orange-500 md:text-sm"
       >
-        <span className={cn("truncate", label ? "text-white" : "text-zinc-500")}>{label || "Select date & time"}</span>
+        {/* A date that does not fit on one line wraps instead of being cut off with "...". */}
+        <span className={cn("min-w-0 leading-snug", label ? "text-white" : "text-zinc-500")}>{label || "Select date & time"}</span>
         <CalendarDays className="h-4 w-4 shrink-0 text-orange-400" />
       </Popover.Trigger>
       <Popover.Portal>

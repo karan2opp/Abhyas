@@ -186,14 +186,15 @@ export default function StudentDashboard() {
                         <div className="h-10 w-10 bg-orange-600/20 text-orange-400 rounded-lg flex items-center justify-center shrink-0 border border-orange-500/20">
                           <FileText className="h-5 w-5" />
                         </div>
-                        <div className="w-[200px] xl:w-[250px] shrink-0">
+                        <div className="min-w-0 flex-1 sm:flex-none sm:w-[200px] xl:w-[250px]">
                           <h3 className="text-[15px] font-bold text-white leading-tight truncate" title={exam.title}>{exam.title}</h3>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-gray-400 text-[13px] w-[150px] shrink-0">
+                      {/* Wide enough for the longest date ("30 Sep 2026, 12:55 pm") and never cut off. */}
+                      <div className="flex items-center gap-2 text-gray-400 text-[13px] whitespace-nowrap shrink-0 sm:w-[190px]">
                         <CalendarIcon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{formattedDate}</span>
+                        <span>{formattedDate}</span>
                       </div>
                     </div>
                     

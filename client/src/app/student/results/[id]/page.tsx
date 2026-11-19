@@ -13,6 +13,7 @@ import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
 import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/exam/QuestionContentBlocks";
+import { ResultNavigator, OpenQuestionsButton } from "@/components/exam/ResultNavigator";
 
 export default function ResultsPage() {
   const params = useParams();
@@ -23,8 +24,9 @@ export default function ResultsPage() {
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Sidebar toggle state
+  // Wide screens: the questions bar can be collapsed. Phones: it is a sidebar that is opened from the top bar.
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [selectedSectionId, setSelectedSectionId] = useState<string>("");
   const [selectedQuestionId, setSelectedQuestionId] = useState<string>("");
@@ -161,14 +163,22 @@ export default function ResultsPage() {
   const isDescriptive = selectedQuestion?.type === "descriptive";
   const questionIndex = currentSection?.questions?.findIndex((q: any) => q.id === selectedQuestionId) ?? 0;
 
-  const renderNavigationSidebar = (containerClass: string) => (
-    <div className={containerClass}>
-      <Card className="bg-[#0f0f11] border-white/5 md:h-full flex flex-col md:max-h-full md:overflow-hidden rounded-2xl">
+  const renderNavigationSidebar = () => (
+      <Card className="bg-[#0f0f11] border-white/5 flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl">
         <CardHeader className="pb-3 border-b border-white/5 shrink-0 px-5 pt-4">
           <CardTitle className="text-base font-bold text-white flex items-center justify-between">
             <span>Questions Bar</span>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 font-normal">{totalQuestions} Total</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden h-7 w-7 p-0 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg"
+                onClick={() => setIsDrawerOpen(false)}
+                aria-label="Close questions bar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -181,7 +191,7 @@ export default function ResultsPage() {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-4 flex-1 md:overflow-y-auto custom-scrollbar">
+        <CardContent className="p-4 flex-1 overflow-y-auto custom-scrollbar">
           {exam.sections?.length > 1 && (
             <div className="mb-4 flex flex-col gap-1.5">
               {exam.sections.map((section: any) => (
@@ -236,7 +246,10 @@ export default function ResultsPage() {
               return (
                 <button
                   key={q.id}
-                  onClick={() => setSelectedQuestionId(q.id)}
+                  onClick={() => {
+                    setSelectedQuestionId(q.id);
+                    setIsDrawerOpen(false);
+                  }}
                   className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center font-bold text-xs border transition-all ${btnClass}`}
                 >
                   {idx + 1}
@@ -263,7 +276,6 @@ export default function ResultsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
   );
 
   return (
@@ -281,25 +293,27 @@ export default function ResultsPage() {
             <h1 className="text-sm sm:text-base font-bold text-white truncate max-w-[60vw] sm:max-w-md">{exam.title}</h1>
           </div>
 
-          {/* On phones these wrap onto a second row instead of pushing the page wider than the screen. */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-            <Link href={`/student/exams/${exam?.id}/leaderboard`}>
+          {/* Phones: a tidy two-by-two grid, every item the same height (Leaderboard | Marks, then Status | Questions). From sm up, one row. */}
+          <div className="grid grid-cols-2 gap-2 w-full min-w-0 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3">
+            <Link href={`/student/exams/${exam?.id}/leaderboard`} className="block sm:inline-block">
               <Button
                 size="sm"
-                className="bg-yellow-600/90 hover:bg-yellow-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-md"
+                className="w-full sm:w-auto justify-center bg-yellow-600/90 hover:bg-yellow-600 text-white font-bold text-xs h-8 px-3 rounded-xl shadow-md"
               >
                 <Trophy className="mr-1.5 h-3.5 w-3.5" /> Leaderboard
               </Button>
             </Link>
-            <div className={`flex items-center gap-1.5 sm:gap-2 whitespace-nowrap px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border ${borderClass} ${bgClass} text-xs font-bold`}>
-              <span className="text-gray-400 font-normal">Your Marks:</span>
+            <div className={`flex h-8 items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap px-2.5 sm:px-3 sm:h-auto sm:py-1.5 rounded-xl border ${borderClass} ${bgClass} text-xs font-bold`}>
+              <span className="text-gray-400 font-normal"><span className="hidden sm:inline">Your </span>Marks:</span>
               <span className={colorClass}>{score} / {totalMarks} ({percentage}%)</span>
             </div>
-            <span className="text-[11px] sm:text-xs px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase tracking-wider">
+            <span className="flex h-8 items-center justify-center text-[11px] sm:text-xs px-2 sm:px-2.5 sm:h-auto sm:py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase tracking-wider">
               {submission.status}
             </span>
 
-            {/* Questions Bar Toggle */}
+            <OpenQuestionsButton onClick={() => setIsDrawerOpen(true)} />
+
+            {/* Questions Bar Toggle (wide screens) */}
             <Button
               variant="outline"
               size="sm"
@@ -435,9 +449,10 @@ export default function ResultsPage() {
             )}
           </div>
 
-          {/* RIGHT SIDE */}
-          {/* Phones: always shown, above the question, so any question can be picked. From md up the toggle in the top bar collapses it. */}
-          {renderNavigationSidebar(`${isSidebarOpen ? "flex" : "flex md:hidden"} order-first md:order-none md:col-span-1 flex-col gap-4 md:min-h-0 animate-in fade-in duration-200`)}
+          {/* RIGHT SIDE: a sidebar on phones, the questions column from md up */}
+          <ResultNavigator open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} desktopVisible={isSidebarOpen}>
+            {renderNavigationSidebar()}
+          </ResultNavigator>
         </div>
       </div>
     </div>

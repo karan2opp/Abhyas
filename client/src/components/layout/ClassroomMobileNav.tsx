@@ -28,14 +28,17 @@ export function ClassroomMobileNav({
 
   return (
     <div className="md:hidden shrink-0 border-b border-white/10 bg-black">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <button onClick={() => setOpen(true)} className="p-2 -ml-1 rounded-md text-gray-300 hover:text-white hover:bg-white/10" aria-label="Open classroom menu">
-          <Menu className="h-5 w-5" />
-        </button>
+      {/* Same as the main header on phones: the title on the left, the theme switch and the menu button on the right. */}
+      <div className="flex items-center justify-between gap-2 p-4">
         <h2 className="flex-1 min-w-0 text-lg font-bold text-white tracking-tight truncate" title={classroomName}>
           {classroomName}
         </h2>
-        <ThemeSwitch />
+        <div className="flex items-center gap-1 shrink-0">
+          <ThemeSwitch />
+          <button onClick={() => setOpen(true)} className="p-2 -mr-2 text-gray-400 hover:text-white" aria-label="Open classroom menu">
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
       </div>
 
       {open && <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setOpen(false)} />}

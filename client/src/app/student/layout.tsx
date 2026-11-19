@@ -35,8 +35,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
   }, [user, isInitialized, router]);
 
-  // Answering an exam or an assignment takes the whole screen.
-  const isExamMode = pathname.includes('/exams/') || pathname.includes('/waiting/') || /^\/student\/assignments\/[^/]+/.test(pathname);
+  // Answering an exam or an assignment, and looking at a result, take the whole screen.
+  const isExamMode = pathname.includes('/exams/') || pathname.includes('/waiting/') || /^\/student\/(assignments|results)\/[^/]+/.test(pathname);
   const isInsideClassroomDetail = /^\/student\/classrooms\/[^/]+/.test(pathname);
   const hideSidebar = isExamMode || isInsideClassroomDetail;
 

@@ -31,8 +31,9 @@ export type TestQuestion = {
   contentBlocks: ContentBlock[];
 };
 
-// An exam's time runs out at endTime (it is then submitted by itself). An assignment is due at dueDate.
-export type TestClock = { kind: "timer"; endTime: number } | { kind: "due"; dueDate: string | null };
+// An exam's time runs out at endTime (it is then submitted by itself); null while the clock has not started yet. An
+// assignment is due at dueDate.
+export type TestClock = { kind: "timer"; endTime: number | null } | { kind: "due"; dueDate: string | null };
 
 // An exam's sections as one numbered list of questions, in order: what the student's exam and the teacher's preview both show.
 export const flattenExamSections = (sections: any[] | undefined): TestQuestion[] => {
@@ -115,6 +116,8 @@ export function TestTakingScreen({
   instructionStats,
   teacherInstructions,
   skipInstructions = false,
+  onProceed,
+  onBack,
   preview = false,
   saveAnswer,
   submit,
@@ -136,6 +139,11 @@ export function TestTakingScreen({
   teacherInstructions?: string | null;
   // Straight to the questions (an assignment opened again to edit it before the due date).
   skipInstructions?: boolean;
+  // Called when "Proceed" is pressed, before the questions show: an exam starts its clock here. If it throws, the student
+  // stays on the instructions.
+  onProceed?: () => Promise<void>;
+  // Shows a Back link on the instructions screen.
+  onBack?: () => void;
   // A teacher trying the screen out: nothing is kept on this device, nothing is synced, the clock does not submit, and
   // Submit stays off. Everything else is the screen a student sees.
   preview?: boolean;
@@ -167,6 +175,21 @@ export function TestTakingScreen({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasAcceptedInstructions, setHasAcceptedInstructions] = useState(skipInstructions);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+
+  const proceed = async () => {
+    if (onProceed) {
+      setIsStarting(true);
+      try {
+        await onProceed();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || `Could not start the ${noun}. Check your connection and try again.`);
+        setIsStarting(false);
+        return;
+      }
+    }
+    setHasAcceptedInstructions(true);
+  };
 
   // An assignment's deadline is checked again every half minute, so the screen closes itself when it passes.
   const [now, setNow] = useState(() => Date.now());
@@ -446,6 +469,15 @@ export function TestTakingScreen({
           {/* Title */}
           <div className="relative">
             <ThemeSwitch className="absolute -right-2 -top-2" />
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="mb-4 -ml-1 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" /> Back
+              </button>
+            )}
             <p className="text-[11px] font-semibold text-orange-400 uppercase tracking-widest">{Noun}</p>
             <h1 className="text-2xl sm:text-3xl font-bold text-white mt-1.5 tracking-tight break-words">{title}</h1>
           </div>
@@ -473,6 +505,10 @@ export function TestTakingScreen({
             <ul className="mt-4 space-y-3 pl-5 list-disc marker:text-orange-500 text-sm text-zinc-300 leading-relaxed">
               {kind === "exam" ? (
                 <>
+                  <li>
+                    <span className="font-semibold text-white">The timer starts when you press Proceed to Exam.</span> Going back before that
+                    costs you no time.
+                  </li>
                   <li>Stay connected to the internet and do not switch browser tabs.</li>
                   <li>Answer all questions before submitting. You cannot change your answers after you submit.</li>
                 </>
@@ -530,11 +566,11 @@ export function TestTakingScreen({
             </label>
 
             <Button
-              disabled={!agreedToTerms}
-              onClick={() => setHasAcceptedInstructions(true)}
+              disabled={!agreedToTerms || isStarting}
+              onClick={proceed}
               className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white font-semibold text-sm h-11 px-4 sm:px-6 md:px-8 rounded-lg shrink-0"
             >
-              Proceed to {Noun}
+              {isStarting ? "Starting..." : `Proceed to ${Noun}`}
             </Button>
           </div>
         </div>
@@ -551,8 +587,9 @@ export function TestTakingScreen({
     <div className="flex flex-col h-full bg-[#050505]">
       {/* Top Header */}
       <header className="relative shrink-0 bg-[#0f0f11] border-b border-white/5 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3 shadow-md">
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">{title}</h1>
+        {/* On a phone the name would be cut to "Pyth..." beside the timer and buttons, so it is shown in the navigator instead. */}
+        <div className="hidden sm:block min-w-0">
+          <h1 className="text-xl font-bold text-white tracking-tight truncate">{title}</h1>
         </div>
 
         {/* Timer or due date: centred on wide screens, between the title and the buttons on phones */}
@@ -560,7 +597,11 @@ export function TestTakingScreen({
           {clock.kind === "timer" ? (
             <>
               <span className="text-[10px] font-bold text-gray-500 tracking-widest uppercase mb-1">Time Remaining</span>
-              <ExamTimer endTime={clock.endTime} onTimeUp={handleTimeUp} />
+              {clock.endTime === null ? (
+                <span className="font-mono text-2xl font-bold tracking-wider text-gray-200">--:--</span>
+              ) : (
+                <ExamTimer endTime={clock.endTime} onTimeUp={handleTimeUp} />
+              )}
             </>
           ) : (
             <>
@@ -775,6 +816,12 @@ export function TestTakingScreen({
         <aside
           className={`fixed inset-y-0 right-0 z-40 w-72 max-w-[85vw] transition-transform duration-200 lg:static lg:z-auto lg:w-80 lg:max-w-none lg:translate-x-0 border-l border-white/5 bg-[#0f0f11] shrink-0 flex flex-col ${showNavigator ? "translate-x-0" : "translate-x-full"}`}
         >
+          {/* The exam's name, on phones (wider screens show it in the top bar) */}
+          <div className="sm:hidden px-4 pt-4 pb-3 border-b border-white/5">
+            <p className="text-[11px] font-semibold text-orange-400 uppercase tracking-widest">{Noun}</p>
+            <h2 className="mt-1 text-base font-bold text-white break-words">{title}</h2>
+          </div>
+
           <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <button onClick={() => setShowNavigator(false)} className="lg:hidden -ml-1 p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10" aria-label="Close navigator">

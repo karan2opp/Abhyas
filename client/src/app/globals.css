@@ -142,23 +142,29 @@
    Base tokens for the app's light theme. The screens' own dark-only colour classes are switched in light-theme.css (generated).
    The landing page has its own theme and is left out. */
 html.light:not(:has(.landing)) {
-  --background: #ead8ac;
-  --foreground: #18181b;
-  --card: #f5e3b8;
-  --card-foreground: #18181b;
-  --popover: #f5e3b8;
-  --popover-foreground: #18181b;
-  --muted: #eed7a0;
-  --muted-foreground: #52525b;
-  --accent: #eed7a0;
-  --accent-foreground: #18181b;
-  --border: #cdb274;
-  --input: #c6ae78;
-  --sidebar: #f5e3b8;
-  --sidebar-foreground: #18181b;
-  --sidebar-accent: #eed7a0;
-  --sidebar-accent-foreground: #18181b;
-  --sidebar-border: #cdb274;
+  /* Warm and soft: an off-white page, a peach sidebar, near-white cards with warm hairlines, and dark brown text. */
+  --background: #fbf5ee;
+  --foreground: #2a1712;
+  --card: #fdfaf6;
+  --card-foreground: #2a1712;
+  --popover: #fdfaf6;
+  --popover-foreground: #2a1712;
+  --muted: #f5ede7;
+  --muted-foreground: #6f645c;
+  --accent: #f5ede7;
+  --accent-foreground: #2a1712;
+  --border: #eadfd4;
+  --input: #dccfc2;
+  --sidebar: #f6e9dd;
+  --sidebar-foreground: #2a1712;
+  --sidebar-accent: #efdfd0;
+  --sidebar-accent-foreground: #2a1712;
+  --sidebar-border: #eadfd4;
+}
+
+/* Join codes are green monospace text on the dark theme. On the warm light theme they are a dark orange instead. */
+html.light:not(:has(.landing)) .font-mono.text-emerald-400:not(.keep-dark):not(.keep-dark *) {
+  color: #c2410c;
 }
 
 /* ── Landing page theme ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -166,15 +172,16 @@ html.light:not(:has(.landing)) {
    theme: the "dark" class that next-themes puts on <html>. The ink variables are space-separated channels, used as
    rgb(var(--l-ink-rgb) / 0.7), so any shade of text, line or shadow follows the theme. */
 .landing {
-  --l-bg: #fefefc;
-  --l-paper: #f7f6f3;
+  /* Kira-style light: a cream page, white surfaces, soft grey panels and near-black ink. */
+  --l-bg: #fffdf0;
+  --l-paper: #f5f5f4;
   --l-surface: #ffffff;
-  --l-ink: #1b1410;
-  --l-ink-rgb: 27 20 16;
-  --l-shadow-rgb: 27 20 16;
-  --l-nav-bg: rgb(254 254 252 / 0.85);
+  --l-ink: #1a1a1a;
+  --l-ink-rgb: 26 26 26;
+  --l-shadow-rgb: 26 26 26;
+  --l-nav-bg: rgb(255 253 240 / 0.85);
   --l-glass-a: #ffffff;
-  --l-glass-b: #f1efea;
+  --l-glass-b: #f5f5f4;
   --l-crack-hi: rgb(255 255 255 / 0.95);
   --l-sheen: rgb(255 255 255 / 0.7);
   --l-green: #3c7a00;
@@ -182,7 +189,7 @@ html.light:not(:has(.landing)) {
   --l-cta-a: #fff6ec;
   --l-cta-b: #fde6d0;
   --l-cta-border: rgb(242 106 27 / 0.22);
-  --l-hero-panel: #fefefc;
+  --l-hero-panel: #fffdf0;
   color-scheme: light;
 }
 

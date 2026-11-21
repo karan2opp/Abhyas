@@ -13,4 +13,4 @@ export const C = {
 } as const;
 
 // A soft offset shadow, like a cut-out paper sticker.
-export const STICKER_SHADOW = "6px 7px 0 rgba(27,20,16,0.16)";
+export const STICKER_SHADOW = "6px 7px 0 rgba(26,26,26,0.16)";

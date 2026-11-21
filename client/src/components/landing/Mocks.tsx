@@ -215,7 +215,7 @@ export function MockResults() {
             </span>
           </p>
         </div>
-        <span className="px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ background: C.lime, color: "#1B1410" }}>
+        <span className="px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ background: C.lime, color: "#1A1A1A" }}>
           Marked in seconds
         </span>
       </div>

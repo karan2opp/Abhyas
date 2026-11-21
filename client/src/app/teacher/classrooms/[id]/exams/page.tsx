@@ -196,29 +196,10 @@ export default function ExamsPage() {
               className="bg-[#12131a] border border-white/10 hover:border-orange-500/50 rounded-2xl p-6 relative flex flex-col justify-between shadow-2xl transition-all duration-300 group"
             >
               <div>
-                {/* Top Badges: Status & Max Marks */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-xs font-semibold text-zinc-400">
-                    {e.type === "SCHEDULED" ? "Fixed Time" : "Flexible"}
-                  </span>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => handleTogglePublish(e.id, (e as any).status)}
-                      title="Click to toggle Published / Draft status"
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border transition-all hover:scale-105 cursor-pointer whitespace-nowrap shrink-0 ${
-                        (e as any).status === "PUBLISHED"
-                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
-                          : "bg-amber-500/15 text-amber-300 border-amber-500/30 hover:bg-amber-500/25"
-                      }`}
-                    >
-                      {(e as any).status === "PUBLISHED" ? "Published" : "Draft"}
-                    </button>
-                    <span className="bg-[#2d1e0f] text-orange-400 border border-orange-500/30 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide whitespace-nowrap shrink-0">
-                      Max Marks {e.totalMarks || 100}
-                    </span>
-                  </div>
-                </div>
+                {/* Exam type (the status and the marks are in Timeline & Details below) */}
+                <p className="text-xs font-semibold text-zinc-400 mb-3">
+                  {e.type === "SCHEDULED" ? "Fixed Time" : "Flexible"}
+                </p>
 
                 {/* Main Title */}
                 <h3 className="text-2xl font-extrabold text-white tracking-tight mb-1.5 leading-snug" title={e.title}>
@@ -263,10 +244,21 @@ export default function ExamsPage() {
                       • Duration: <span className="text-orange-300 font-medium">{e.duration} mins</span>
                     </p>
                     <p className="text-zinc-400">
+                      • Max marks: <span className="text-zinc-200 font-medium">{e.totalMarks || 100}</span>
+                    </p>
+                    <p className="text-zinc-400">
                       • Status:{" "}
-                      <span className={`font-medium ${(e as any).status === "PUBLISHED" ? "text-emerald-400" : "text-amber-400"}`}>
+                      {/* Clicking the status switches the exam between Draft and Published. */}
+                      <button
+                        type="button"
+                        onClick={() => handleTogglePublish(e.id, (e as any).status)}
+                        title={(e as any).status === "PUBLISHED" ? "Click to move back to Draft" : "Click to publish"}
+                        className={`font-medium underline decoration-dotted underline-offset-4 cursor-pointer transition-colors ${
+                          (e as any).status === "PUBLISHED" ? "text-emerald-400 hover:text-emerald-300" : "text-amber-400 hover:text-amber-300"
+                        }`}
+                      >
                         {(e as any).status === "PUBLISHED" ? "Published" : "Draft"}
-                      </span>
+                      </button>
                     </p>
                   </div>
                 </div>

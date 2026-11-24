@@ -236,6 +236,8 @@ export default function SubmissionReviewPage() {
   const selectedAnswer = selectedQuestion ? submission.answers?.find((a: any) => a.questionId === selectedQuestion.id) : undefined;
   const isDescriptive = selectedQuestion?.type === "descriptive";
   const isCurrentSectionDescriptive = currentSection?.questions?.some((q: any) => q.type === "descriptive");
+  // AI grading only marks written answers (choice questions are marked automatically), so its button needs at least one.
+  const hasWrittenQuestions = orderedQuestions.some((entry) => entry.question.type === "descriptive");
 
   const marksInputClass =
     "w-24 bg-[#0d111a] border border-white/10 text-white rounded-lg px-3 py-2 text-base font-bold text-right focus:outline-none focus:ring-1 focus:ring-blue-500";
@@ -561,16 +563,16 @@ export default function SubmissionReviewPage() {
                 </Button>
               </div>
               <div className="flex flex-wrap justify-end gap-2">
-                {exam?.aiEvaluation !== false && (
+                {exam?.aiEvaluation !== false && hasWrittenQuestions && (
                   <Button
                     variant="outline"
                     className="bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-10"
                     onClick={handleEvaluateWithAi}
                     disabled={evaluatingAi || savingGrade}
-                    title="Re-runs AI evaluation for any descriptive answer you haven't manually graded yet"
+                    title="Re-runs AI evaluation for every written answer in this submission that you haven't graded yourself"
                   >
                     <Bot className="mr-1.5 h-3.5 w-3.5" />
-                    {evaluatingAi ? "Evaluating..." : "Evaluate with AI"}
+                    {evaluatingAi ? "Evaluating..." : "Evaluate written answers with AI"}
                   </Button>
                 )}
                 <Button

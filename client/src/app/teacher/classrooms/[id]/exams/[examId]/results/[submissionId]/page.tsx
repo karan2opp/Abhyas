@@ -235,6 +235,8 @@ export default function ResultsPage() {
   const selectedQuestion = currentSection?.questions?.find((q: any) => q.id === selectedQuestionId);
   const selectedAnswer = submission.answers?.find((a: any) => a.questionId === selectedQuestionId);
   const isDescriptive = selectedQuestion?.type === "descriptive";
+  // AI grading only marks written answers (choice questions are marked automatically), so its button needs at least one.
+  const hasWrittenQuestions = exam.sections?.some((s: any) => s.questions?.some((q: any) => q.type === "descriptive"));
   const questionIndex = currentSection?.questions?.findIndex((q: any) => q.id === selectedQuestionId) ?? 0;
 
   const renderNavigationSidebar = () => (
@@ -584,15 +586,16 @@ export default function ResultsPage() {
                       Saving locks manual grades from AI overwrites.
                     </p>
                     <div className="flex items-center gap-2 ml-auto">
-                      {exam?.aiEvaluation !== false && (
+                      {exam?.aiEvaluation !== false && hasWrittenQuestions && (
                         <Button
                           variant="outline"
                           className="bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-9 px-3"
                           onClick={handleEvaluateWithAi}
                           disabled={evaluatingAi || savingGrade}
+                          title="Re-runs AI evaluation for every written answer in this submission that you haven't graded yourself"
                         >
                           <Bot className="mr-1.5 h-3.5 w-3.5 text-orange-400" />
-                          {evaluatingAi ? "Evaluating..." : "Evaluate with AI"}
+                          {evaluatingAi ? "Evaluating..." : "Evaluate written answers with AI"}
                         </Button>
                       )}
                       <Button

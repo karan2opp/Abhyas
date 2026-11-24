@@ -572,7 +572,7 @@ export default function SubmissionReviewPage() {
                     title="Re-runs AI evaluation for every written answer in this submission that you haven't graded yourself"
                   >
                     <Bot className="mr-1.5 h-3.5 w-3.5" />
-                    {evaluatingAi ? "Evaluating..." : "Evaluate written answers with AI"}
+                    {evaluatingAi ? "Evaluating..." : "Evaluate with AI"}
                   </Button>
                 )}
                 <Button

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/display/card";
 import { Button } from "@/components/ui/controls/button";
-import { ArrowLeft, Check, X, Bot, User, MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Check, X, Bot, User, MessageSquare, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
 import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from "../../../../../../exams/exam.service";
 import { toast } from "sonner";
@@ -239,6 +239,18 @@ export default function ResultsPage() {
   const hasWrittenQuestions = exam.sections?.some((s: any) => s.questions?.some((q: any) => q.type === "descriptive"));
   const questionIndex = currentSection?.questions?.findIndex((q: any) => q.id === selectedQuestionId) ?? 0;
 
+  // Previous / Next walk through every question of the exam in order, moving on to the next section when one ends.
+  const orderedQuestions: { sectionId: string; questionId: string }[] = (exam.sections || []).flatMap((s: any) =>
+    (s.questions || []).map((q: any) => ({ sectionId: s.id as string, questionId: q.id as string }))
+  );
+  const currentIndex = orderedQuestions.findIndex((entry) => entry.questionId === selectedQuestionId);
+  const goToOffset = (offset: number) => {
+    const target = orderedQuestions[currentIndex + offset];
+    if (!target) return;
+    setSelectedSectionId(target.sectionId);
+    setSelectedQuestionId(target.questionId);
+  };
+
   const renderNavigationSidebar = () => (
       <Card className="bg-[#0f0f11] border-white/5 flex-1 min-h-0 flex flex-col overflow-hidden rounded-2xl">
         <CardHeader className="pb-3 border-b border-white/5 shrink-0 px-5 pt-4">
@@ -412,9 +424,9 @@ export default function ResultsPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 md:min-h-0 h-full">
           
           {/* LEFT SIDE */}
-          <div className={`${isSidebarOpen ? "md:col-span-3" : "md:col-span-4"} flex flex-col flex-1 h-full min-h-0 min-w-0 transition-all duration-300`}>
+          <div className={`${isSidebarOpen ? "md:col-span-3" : "md:col-span-4"} flex flex-col flex-1 md:h-full md:min-h-0 min-w-0 transition-all duration-300`}>
             {selectedQuestion && (
-              <Card className="bg-[#0f0f11] border-white/5 shadow-2xl flex-1 flex flex-col rounded-2xl h-full min-h-0 overflow-hidden">
+              <Card className="bg-[#0f0f11] border-white/5 shadow-2xl flex-1 flex flex-col rounded-2xl md:h-full md:min-h-0 md:overflow-hidden">
                 
                 {/* Question Header */}
                 <CardHeader className="border-b border-white/5 pb-3 p-4 shrink-0 bg-white/[0.01]">
@@ -475,11 +487,11 @@ export default function ResultsPage() {
                 </CardHeader>
 
                 {/* Answer Content */}
-                <CardContent className="p-4 sm:p-5 flex-1 flex flex-col space-y-3 overflow-y-auto custom-scrollbar min-h-0">
+                <CardContent className="p-4 sm:p-5 flex-1 flex flex-col space-y-3 md:overflow-y-auto custom-scrollbar md:min-h-0">
                   {isDescriptive ? (
                     <div className="flex-1 flex flex-col space-y-2 min-h-0 h-full">
                       <div className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Student's Answer:</div>
-                      <div className="flex-1 p-3 sm:p-6 rounded-xl sm:rounded-2xl bg-[#0d111a] border border-white/10 text-gray-100 whitespace-pre-wrap break-words font-mono text-sm sm:text-base leading-relaxed overflow-y-auto custom-scrollbar shadow-inner min-h-[140px] sm:min-h-[350px]">
+                      <div className="flex-1 p-3 sm:p-6 rounded-xl sm:rounded-2xl bg-[#0d111a] border border-white/10 text-gray-100 whitespace-pre-wrap break-words font-mono text-sm sm:text-base leading-relaxed overflow-y-auto custom-scrollbar shadow-inner min-h-[55dvh] sm:min-h-[350px]">
                         {selectedAnswer?.textAnswer || <span className="text-gray-500 italic">No answer provided.</span>}
                       </div>
 
@@ -526,9 +538,9 @@ export default function ResultsPage() {
                           <textarea
                             value={selectedAnswer ? (feedbackByAnswer[selectedAnswer.id] ?? "") : ""}
                             onChange={(e) => selectedAnswer && setFeedbackByAnswer((prev) => ({ ...prev, [selectedAnswer.id]: e.target.value }))}
-                            rows={2}
+                            rows={5}
                             placeholder="Feedback for this question answer..."
-                            className="w-full bg-[#0d111a] text-gray-100 border border-white/10 rounded-xl px-4 py-2.5 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all text-sm resize-none font-sans"
+                            className="w-full bg-[#0d111a] text-gray-100 border border-white/10 rounded-xl px-4 py-2.5 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all text-sm resize-y min-h-28 font-sans"
                           />
                         </div>
                       )}
@@ -543,9 +555,9 @@ export default function ResultsPage() {
                           <textarea
                             value={overallFeedbackInput}
                             onChange={(e) => setOverallFeedbackInput(e.target.value)}
-                            rows={2}
+                            rows={5}
                             placeholder="Overall comments for the student..."
-                            className="w-full bg-[#0d111a] text-gray-100 border border-white/10 rounded-xl px-4 py-2.5 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all text-sm resize-none font-sans"
+                            className="w-full bg-[#0d111a] text-gray-100 border border-white/10 rounded-xl px-4 py-2.5 placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all text-sm resize-y min-h-28 font-sans"
                           />
                         </div>
                       )}
@@ -579,27 +591,51 @@ export default function ResultsPage() {
                       })}
                     </div>
                   )}
+                </CardContent>
 
-                  {/* Actions Bar */}
-                  <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+                {/* Actions Bar: outside the scrolling answer area, so a long answer scrolls inside the card and never runs under the buttons. */}
+                <div className="shrink-0 border-t border-white/5 p-4 sm:px-5 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        variant="outline"
+                        className="bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-9 px-3"
+                        onClick={() => goToOffset(-1)}
+                        disabled={currentIndex <= 0}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                      </Button>
+                      <span className="text-[11px] text-gray-500 tabular-nums">
+                        {currentIndex + 1} / {orderedQuestions.length}
+                      </span>
+                      <Button
+                        variant="outline"
+                        className="bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-9 px-3"
+                        onClick={() => goToOffset(1)}
+                        disabled={currentIndex < 0 || currentIndex >= orderedQuestions.length - 1}
+                      >
+                        Next <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  <div className="flex items-center justify-between">
                     <p className="text-[11px] text-gray-500 hidden sm:block">
                       Saving locks manual grades from AI overwrites.
                     </p>
-                    <div className="flex items-center gap-2 ml-auto">
+                    {/* On phones the two buttons share the row equally (Save Grade fills it when there is no Evaluate button). */}
+                    <div className="flex w-full items-center gap-2 sm:w-auto sm:ml-auto">
                       {exam?.aiEvaluation !== false && hasWrittenQuestions && (
                         <Button
                           variant="outline"
-                          className="bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-9 px-3"
+                          className="flex-1 sm:flex-none bg-transparent border-white/10 text-white hover:bg-white/5 text-xs h-9 px-3"
                           onClick={handleEvaluateWithAi}
                           disabled={evaluatingAi || savingGrade}
                           title="Re-runs AI evaluation for every written answer in this submission that you haven't graded yourself"
                         >
                           <Bot className="mr-1.5 h-3.5 w-3.5 text-orange-400" />
-                          {evaluatingAi ? "Evaluating..." : "Evaluate written answers with AI"}
+                          {evaluatingAi ? "Evaluating..." : "Evaluate with AI"}
                         </Button>
                       )}
                       <Button
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-9 px-5 shadow-lg shadow-emerald-900/30"
+                        className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-9 px-5 shadow-lg shadow-emerald-900/30"
                         onClick={handleSaveGrade}
                         disabled={savingGrade || evaluatingAi}
                       >
@@ -607,7 +643,7 @@ export default function ResultsPage() {
                       </Button>
                     </div>
                   </div>
-                </CardContent>
+                </div>
               </Card>
             )}
           </div>

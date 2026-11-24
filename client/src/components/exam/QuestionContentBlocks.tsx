@@ -103,7 +103,7 @@ function TableBlock({ headers, rows, s }: { headers?: TableCellValue[]; rows?: T
               {headers.map((h, i) => {
                 const { text, colSpan } = cellParts(h);
                 return (
-                  <th key={i} colSpan={colSpan} className={`${s.cell} text-left font-semibold text-white border-b border-white/10 ${i === headers.length - 1 ? "" : "border-r"} ${colSpan ? "text-center" : ""}`}>
+                  <th key={i} colSpan={colSpan} className={`${s.cell} text-center font-semibold text-white border-b border-white/10 ${i === headers.length - 1 ? "" : "border-r"}`}>
                     {text}
                   </th>
                 );
@@ -113,7 +113,7 @@ function TableBlock({ headers, rows, s }: { headers?: TableCellValue[]; rows?: T
         )}
         <tbody>
           {(rows || []).map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 1 ? "bg-white/[0.02]" : undefined}>
+            <tr key={ri}>
               {row.map((cell, ci) => {
                 const { text, colSpan, rowSpan } = cellParts(cell);
                 return (

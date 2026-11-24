@@ -253,7 +253,7 @@ export default function ExamsPage() {
                         type="button"
                         onClick={() => handleTogglePublish(e.id, (e as any).status)}
                         title={(e as any).status === "PUBLISHED" ? "Click to move back to Draft" : "Click to publish"}
-                        className={`font-medium underline decoration-dotted underline-offset-4 cursor-pointer transition-colors ${
+                        className={`font-medium underline underline-offset-4 cursor-pointer transition-colors ${
                           (e as any).status === "PUBLISHED" ? "text-emerald-400 hover:text-emerald-300" : "text-amber-400 hover:text-amber-300"
                         }`}
                       >

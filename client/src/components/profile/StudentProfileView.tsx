@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import {
-  GraduationCap, ClipboardCheck, FileText, Mail, Phone, ArrowRight, Loader2, TrendingUp,
+  GraduationCap, ClipboardCheck, FileText, Mail, Phone, ArrowRight, ArrowLeft, Loader2, TrendingUp,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
@@ -52,6 +52,7 @@ interface Profile {
 export function StudentProfileView() {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const studentId = (params.studentId as string) || (params.id as string);
   const returnTo = encodeURIComponent(pathname || "");
   const [loading, setLoading] = useState(true);
@@ -71,8 +72,31 @@ export function StudentProfileView() {
     })();
   }, [studentId]);
 
+  // Back to wherever the profile was opened from (a classroom's students, an organisation...). Opened straight from a link,
+  // there is nothing to go back to, so it goes to the dashboard of the portal it is in (/teacher, /manager, /system_admin).
+  const goBack = () => {
+    if (window.history.length > 1) router.back();
+    else router.push(`/${pathname?.split("/")[1] || ""}`);
+  };
+
+  const backButton = (
+    <button
+      onClick={goBack}
+      className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+    >
+      <ArrowLeft className="h-4 w-4" /> Back
+    </button>
+  );
+
   if (loading) return <div className="p-4 sm:p-6 md:p-10 text-white text-center flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading student profile...</div>;
-  if (!profile) return <div className="p-4 sm:p-6 md:p-10 text-white text-center">Student profile not found</div>;
+  if (!profile) {
+    return (
+      <div className="p-4 sm:p-6 md:p-10">
+        {backButton}
+        <p className="text-white text-center">Student profile not found</p>
+      </div>
+    );
+  }
 
   const { student, stats } = profile;
   const examPct = stats.maxExamMarks > 0 ? Math.round((stats.totalExamScore / stats.maxExamMarks) * 100) : 0;
@@ -80,6 +104,8 @@ export function StudentProfileView() {
 
   return (
     <div className="p-4 sm:p-6 md:p-10 h-full overflow-y-auto custom-scrollbar">
+      {backButton}
+
       {/* Student header */}
       <Card className="bg-gradient-to-br from-[#1a1a1f] to-[#0f0f11] border-white/10 mb-6">
         <CardContent className="pt-6 flex flex-col sm:flex-row items-center sm:items-center gap-5">

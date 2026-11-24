@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import { eq, and, lt, sql, ilike, or, isNull, asc, desc, count } from "drizzle-orm";
+import { eq, and, lt, sql, ilike, or, isNull, asc, desc, count, inArray } from "drizzle-orm";
 import db from "../../common/db/index.js";
-import { classrooms, classroomTeachers, classroomStudents, classroomInvites, groupStudents, users, organisations } from "../../common/db/schema.js";
+import { classrooms, classroomTeachers, classroomStudents, classroomInvites, groups, groupStudents, users, organisations } from "../../common/db/schema.js";
 import { ApiError } from "../../common/utils/ApiError.js";
 import { toPage, type PageParams } from "../../common/utils/pagination.js";
 import { PermissionService } from "../../common/permissions/index.js";
@@ -162,6 +162,31 @@ const removeTeacher = async (classroomId: string, teacherIdToRemove: string, req
     );
 };
 
+// ── Remove a student (any co-teacher, a manager of the organisation, or a system admin) ──
+// The student's row is marked "left" rather than deleted: their past submissions and marks stay, and every place that checks
+// membership only counts active students, so they lose access to the classroom at once. They also leave its groups, so a
+// student who joins again later starts with no groups.
+const removeStudent = async (classroomId: string, studentId: string, requester: Requester) => {
+    if (requester.role !== "system_admin") await assertCanManageClassroom(requester, classroomId);
+
+    await db.transaction(async (tx) => {
+        const [removed] = await tx.update(classroomStudents)
+            .set({ status: "left", leftAt: new Date() })
+            .where(and(
+                eq(classroomStudents.classroomId, classroomId),
+                eq(classroomStudents.studentId, studentId),
+                eq(classroomStudents.status, "active"),
+            ))
+            .returning();
+        if (!removed) throw ApiError.notFound("This student is not in the classroom");
+
+        await tx.delete(groupStudents).where(and(
+            eq(groupStudents.studentId, studentId),
+            inArray(groupStudents.groupId, tx.select({ id: groups.id }).from(groups).where(eq(groups.classroomId, classroomId))),
+        ));
+    });
+};
+
 // ── List Teachers ────────────────────────────────────────────────────────────
 const listTeachers = async (classroomId: string, requester: Requester, search?: string) => {
     await assertCanManageClassroom(requester, classroomId);
@@ -257,6 +282,28 @@ const inviteStudent = async (classroomId: string, data: InviteStudentDto, reques
 };
 
 // ── Join Classroom (student) ─────────────────────────────────────────────────
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// Puts a student in a classroom. A student who was removed earlier gets their old row back (active again, with the new join
+// details), so the roster never lists the same student twice.
+const addMembership = async (tx: Tx, values: { classroomId: string; studentId: string; joinedWithCode: string; joinedVia: "code" | "invite" }) => {
+    const [previous] = await tx.select({ id: classroomStudents.id }).from(classroomStudents)
+        .where(and(eq(classroomStudents.classroomId, values.classroomId), eq(classroomStudents.studentId, values.studentId), eq(classroomStudents.status, "left")))
+        .orderBy(desc(classroomStudents.enrolledAt))
+        .limit(1);
+
+    if (previous) {
+        const [restored] = await tx.update(classroomStudents)
+            .set({ status: "active", enrolledAt: new Date(), leftAt: null, joinedWithCode: values.joinedWithCode, joinedVia: values.joinedVia })
+            .where(eq(classroomStudents.id, previous.id))
+            .returning();
+        return restored;
+    }
+
+    const [membership] = await tx.insert(classroomStudents).values(values).returning();
+    return membership;
+};
+
 // Accepts either a per-student invite code or the classroom's shared join code.
 const joinClassroomByCode = async (code: string, studentId: string, studentEmail: string) => {
     const [invite] = await db.select().from(classroomInvites).where(eq(classroomInvites.code, code));
@@ -299,12 +346,12 @@ const joinClassroomByCode = async (code: string, studentId: string, studentEmail
 
             if (!consumedInvite) throw ApiError.badRequest("This invite has already been used");
 
-            const [membership] = await tx.insert(classroomStudents).values({
+            const membership = await addMembership(tx, {
                 classroomId: invite.classroomId,
                 studentId,
                 joinedWithCode: code,
                 joinedVia: "invite",
-            }).returning();
+            });
 
             if (!membership) throw ApiError.internal("Failed to join classroom");
 
@@ -345,12 +392,12 @@ const joinClassroomByCode = async (code: string, studentId: string, studentEmail
 
         if (!updatedClassroom) throw ApiError.badRequest("This join code has reached its usage limit");
 
-        const [membership] = await tx.insert(classroomStudents).values({
+        const membership = await addMembership(tx, {
             classroomId: classroom.id,
             studentId,
             joinedWithCode: code,
             joinedVia: "code",
-        }).returning();
+        });
 
         if (!membership) throw ApiError.internal("Failed to join classroom");
 
@@ -563,6 +610,7 @@ export {
     deleteClassroom,
     addTeacher,
     removeTeacher,
+    removeStudent,
     listTeachers,
     inviteStudent,
     regenerateJoinCode,

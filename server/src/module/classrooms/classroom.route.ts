@@ -28,6 +28,8 @@ router.get("/:id/teachers", authenticate, authorize("teacher", "manager"), contr
 router.post("/:id/teachers", authenticate, authorize("teacher", "manager"), validate(addTeacherSchema), controller.addTeacher);
 router.delete("/:id/teachers/:teacherId", authenticate, authorize("teacher", "manager"), controller.removeTeacher);
 
+router.delete("/:id/students/:studentId", authenticate, authorize("teacher", "manager", "system_admin"), controller.removeStudent);
+
 router.post("/:id/invite", authenticate, authorize("teacher", "manager"), validate(inviteStudentSchema), controller.inviteStudent);
 
 router.post("/:id/join-code/regenerate", authenticate, authorize("teacher", "manager"), validate(regenerateJoinCodeSchema), controller.regenerateJoinCode);

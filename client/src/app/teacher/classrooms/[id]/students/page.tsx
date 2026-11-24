@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
 import { Pagination } from "@/components/common/Pagination";
 import { getClassroomRosterService } from "../../classroom.service";
+import { RemoveStudentButton } from "@/components/classroom/RemoveStudentButton";
 
 interface RosterEntry {
   studentId: string;
@@ -106,12 +107,23 @@ export default function StudentsPage() {
                       {s.status}
                     </span>
                   </div>
-                  <Link
-                    href={userRole === "manager" ? `/manager/student-profile/${s.studentId}` : `/teacher/student-profile/${s.studentId}`}
-                    className="mt-3 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#0a0a0c] text-gray-300 hover:text-white hover:border-orange-500/40 text-xs font-semibold py-2 transition-all"
-                  >
-                    <Eye className="h-3.5 w-3.5" /> View Profile
-                  </Link>
+                  <div className="mt-3 flex gap-2">
+                    <Link
+                      href={userRole === "manager" ? `/manager/student-profile/${s.studentId}` : `/teacher/student-profile/${s.studentId}`}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-[#0a0a0c] text-gray-300 hover:text-white hover:border-orange-500/40 text-xs font-semibold py-2 transition-all"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> View Profile
+                    </Link>
+                    {s.status === "active" && (
+                      <RemoveStudentButton
+                        classroomId={classroomId}
+                        studentId={s.studentId}
+                        studentName={s.name}
+                        onRemoved={() => loadRoster(debouncedSearch, page)}
+                        className="h-auto py-2 text-xs rounded-lg"
+                      />
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

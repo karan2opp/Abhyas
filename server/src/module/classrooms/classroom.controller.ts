@@ -38,6 +38,11 @@ export const removeTeacher = async (req: Request, res: Response) => {
     return ApiResponse.ok(res, "Teacher removed from classroom", null);
 };
 
+export const removeStudent = async (req: Request, res: Response) => {
+    await classroomService.removeStudent(req.params.id as string, req.params.studentId as string, toRequester(req));
+    return ApiResponse.ok(res, "Student removed from classroom", null);
+};
+
 export const listTeachers = async (req: Request, res: Response) => {
     const result = await classroomService.listTeachers(req.params.id as string, toRequester(req), req.query.search as string | undefined);
     return ApiResponse.ok(res, "Classroom teachers", result);

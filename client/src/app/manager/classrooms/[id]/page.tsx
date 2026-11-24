@@ -24,6 +24,7 @@ import { getClassroomService } from "../../../teacher/classrooms/classroom.servi
 import { listExamsForClassroomService, deleteExamService } from "../exam.service";
 import { formatDate, formatDateTime } from "@/lib/date";
 import JoinHistory from "@/components/classroom/JoinHistory";
+import { RemoveStudentButton } from "@/components/classroom/RemoveStudentButton";
 import { Pagination } from "@/components/common/Pagination";
 
 interface Classroom {
@@ -518,16 +519,24 @@ export default function ManagerClassroomDetailPage() {
             ) : (
               <div className="flex flex-col gap-2">
                 {roster.map((s) => (
-                  <div key={s.studentId} className="flex items-center justify-between p-4 bg-[#0f0f11] border border-white/5 rounded-xl">
-                    <div>
-                      <p className="text-white font-semibold text-sm">{s.name}</p>
-                      <p className="text-gray-500 text-xs">{s.email}</p>
+                  <div key={s.studentId} className="flex flex-wrap items-center justify-between gap-3 p-4 bg-[#0f0f11] border border-white/5 rounded-xl">
+                    <div className="min-w-0">
+                      <p className="text-white font-semibold text-sm truncate">{s.name}</p>
+                      <p className="text-gray-500 text-xs truncate">{s.email}</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.status === "active" ? "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30" : "bg-zinc-800 text-white/70 border border-zinc-700"}`}>
                         {s.status}
                       </span>
                       <span className="text-gray-500 text-xs">Joined {formatDate(s.enrolledAt)}</span>
+                      {s.status === "active" && (
+                        <RemoveStudentButton
+                          classroomId={classroomId}
+                          studentId={s.studentId}
+                          studentName={s.name}
+                          onRemoved={() => loadRoster(debouncedStudentSearch, rosterPage)}
+                        />
+                      )}
                     </div>
                   </div>
                 ))}

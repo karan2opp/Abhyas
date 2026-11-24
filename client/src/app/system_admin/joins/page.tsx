@@ -36,7 +36,7 @@ export default function SystemAdminJoinsPage() {
       <Card className="bg-[#0f0f11] border-white/5">
         <CardContent>
           {/* A new search is a new list, so it starts again from the first page. */}
-          <PagedJoinRows key={debouncedSearch} load={load} showClassroom />
+          <PagedJoinRows key={debouncedSearch} load={load} showClassroom removable />
         </CardContent>
       </Card>
     </div>

@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils";
 
 export type CreationMode = "ai" | "pyq" | "source";
 
-export const MODES: { id: CreationMode; label: string; description: string; icon: React.ElementType; available: boolean }[] = [
+// "From Source" is not offered yet on the live site (a production build); it still shows while developing.
+const SOURCE_MODE_ENABLED = process.env.NODE_ENV !== "production";
+
+const ALL_MODES: { id: CreationMode; label: string; description: string; icon: React.ElementType; available: boolean }[] = [
   {
     id: "ai",
     label: "AI Generated Questions",
@@ -29,6 +32,8 @@ export const MODES: { id: CreationMode; label: string; description: string; icon
     available: true,
   },
 ];
+
+export const MODES = ALL_MODES.filter((m) => m.id !== "source" || SOURCE_MODE_ENABLED);
 
 export const STEPS: Record<CreationMode, string[]> = {
   ai: ["Details", "Topics", "Preferences", "Subtopics", "Review", "Publish"],
@@ -221,8 +226,8 @@ export function WizardHeader({
   );
 }
 
-// When `onManual` is given, a fourth option lets the teacher write sections and questions by hand instead of using one of
-// the three ways of building them. The new-exam page doesn't offer it; an existing exam does.
+// When `onManual` is given, a last option lets the teacher write sections and questions by hand instead of using one of
+// the ways of building them. Both the new-exam page and an existing exam offer it.
 export function ModePicker({
   selected,
   onSelect,

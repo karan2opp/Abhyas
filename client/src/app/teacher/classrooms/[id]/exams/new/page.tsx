@@ -49,7 +49,7 @@ function NewExamBuilderContent() {
   // Opened from a group's page: the exam is created for that group.
   const groupIdParam = searchParams.get("groupId") || "";
   const router = useRouter();
-  const { resetStore, isAiMode } = useExamBuilderStore();
+  const { resetStore, isAiMode, setIsAddingSection } = useExamBuilderStore();
   const [isMounted, setIsMounted] = useState(false);
 
   const [mode, setMode] = useState<CreationMode | null>(null);
@@ -141,10 +141,10 @@ function NewExamBuilderContent() {
     [sections]
   );
 
-  // The first pick creates the draft; picking again later (after going back) reuses it.
-  const handlePickMode = async (picked: CreationMode) => {
+  // The first pick creates the draft; picking again later (after going back) reuses it. `onReady` runs once the draft exists.
+  const startDraft = async (onReady: () => void) => {
     if (examId) {
-      setMode(picked);
+      onReady();
       return;
     }
     setIsCreating(true);
@@ -162,13 +162,24 @@ function NewExamBuilderContent() {
       const newExam = data.data || data;
       setExamId(newExam.id || newExam._id);
       if (newExam.joinCode) setJoinCode(newExam.joinCode);
-      setMode(picked);
+      onReady();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err.message || "Failed to start a new exam");
     } finally {
       setIsCreating(false);
     }
   };
+
+  const handlePickMode = (picked: CreationMode) => startDraft(() => setMode(picked));
+
+  // Writing the questions by hand skips the generation steps: it goes straight to the question list, with the form for the
+  // first section already open.
+  const handlePickManual = () =>
+    startDraft(() => {
+      setMode(null);
+      setPhase("review");
+      setIsAddingSection(true);
+    });
 
   const goToReview = () => setPhase("review");
 
@@ -280,7 +291,7 @@ function NewExamBuilderContent() {
               <Loader2 className="h-4 w-4 animate-spin" /> Starting your exam...
             </div>
           ) : (
-            <ModePicker selected={null} onSelect={(m) => void handlePickMode(m)} />
+            <ModePicker selected={null} onSelect={(m) => void handlePickMode(m)} onManual={() => void handlePickManual()} />
           )}
         </div>
       }

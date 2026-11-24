@@ -383,7 +383,7 @@ function SectionItem({ examId, canEditTopics, sourceDocumentIds, section, index,
   return (
     <Card className="bg-[#0f0f11]/80 border-white/10 shadow-xl overflow-hidden transition-all duration-300">
       <div className="bg-[#18181b] px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 border-b border-white/5">
-        <div className="flex-1 flex items-center gap-4">
+        <div className="min-w-0 flex-1 flex items-center gap-2 sm:gap-4">
           <Button 
             variant="ghost" 
             size="icon" 
@@ -392,7 +392,6 @@ function SectionItem({ examId, canEditTopics, sourceDocumentIds, section, index,
           >
             {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
           </Button>
-          <span className="text-orange-400 font-bold bg-orange-500/10 px-2.5 py-1 rounded">S{index + 1}</span>
           {isEditing ? (
             <div className="flex items-center gap-2 w-full max-w-sm">
               <Input autoFocus value={title} onChange={e => setTitle(e.target.value)} className="text-white placeholder:text-zinc-400 h-9" onKeyDown={(e) => e.key === "Enter" && handleUpdate()} />
@@ -400,10 +399,10 @@ function SectionItem({ examId, canEditTopics, sourceDocumentIds, section, index,
               <Button size="icon" variant="ghost" onClick={() => setIsEditing(false)} className="text-red-400 hover:text-red-300 hover:bg-red-400/10 h-9 w-9"><X className="h-4 w-4" /></Button>
             </div>
           ) : (
-            <h4 className="text-lg font-bold text-white tracking-wide">{section.title}</h4>
+            <h4 className="min-w-0 break-words text-base sm:text-lg font-bold text-white tracking-wide">{section.title}</h4>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           {!isEditing && (
             <Button size="sm" variant="outline" onClick={() => setIsEditing(true)} className="bg-transparent border-white/15 text-white hover:bg-white/10 h-8 px-3 text-xs font-semibold">
               Edit
@@ -473,33 +472,26 @@ function QuestionItem({ question, index, refresh, onEdit }: { question: any, ind
         Q{index + 1}
       </div>
 
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <Button size="sm" variant="outline" className="bg-[#14151f] border-white/15 text-white hover:bg-white/10 h-8 px-3 text-xs font-semibold" onClick={onEdit}>
-          Edit
-        </Button>
-        <Button size="sm" variant="outline" className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 h-8 px-3 text-xs font-semibold" onClick={handleDelete}>
-          Delete
-        </Button>
-      </div>
-      
       <div className="pt-4">
-        <div className="flex items-center gap-2 mb-4">
-          <span className={cn(
-            "px-2.5 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider",
-            question.type === 'mcq' ? "bg-orange-500/10 text-orange-400 border border-orange-500/30" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-          )}>
-            {question.type === 'mcq' ? 'Multiple Choice' : 'Descriptive'}
-          </span>
-          <span className="border border-white/10 bg-white/5 px-2.5 py-1 rounded-md text-gray-300 text-[10px] font-bold">Marks: {question.marks || 1}</span>
-          {question.topic && (
-            <span className="min-w-0 truncate text-[11px] text-gray-500">
-              {question.topic}
-              {question.subtopic ? ` › ${question.subtopic}` : ""}
-            </span>
-          )}
+        {/* Marks, Edit and Delete: on phones a row of their own above the badges; from sm up they sit in the card's top-right corner. */}
+        <div className="mb-3 flex items-center justify-end gap-2 sm:absolute sm:right-4 sm:top-4 sm:mb-0">
+          <span className="flex h-8 items-center whitespace-nowrap rounded-md border border-white/10 bg-white/5 px-2.5 text-[10px] font-bold text-gray-300">Marks: {question.marks || 1}</span>
+          <Button size="sm" variant="outline" className="bg-[#14151f] border-white/15 text-white hover:bg-white/10 h-8 px-3 text-xs font-semibold" onClick={onEdit}>
+            Edit
+          </Button>
+          <Button size="sm" variant="outline" className="bg-transparent border-red-500/20 text-red-400 hover:bg-red-500/10 h-8 px-3 text-xs font-semibold" onClick={handleDelete}>
+            Delete
+          </Button>
         </div>
+        {/* No type badge: the type is obvious from whether the question has options. */}
+        {question.topic && (
+          <p className="mb-4 min-w-0 truncate text-[11px] text-gray-500">
+            {question.topic}
+            {question.subtopic ? ` › ${question.subtopic}` : ""}
+          </p>
+        )}
 
-        <div className="text-white text-[15px] leading-relaxed mb-4 sm:mb-6 font-medium prose prose-invert max-w-none pr-16">
+        <div className="text-white text-[15px] leading-relaxed mb-4 sm:mb-6 font-medium prose prose-invert max-w-none sm:pr-16">
           <ReactMarkdown 
             remarkPlugins={MATH_REMARK_PLUGINS}
             rehypePlugins={MATH_REHYPE_PLUGINS}

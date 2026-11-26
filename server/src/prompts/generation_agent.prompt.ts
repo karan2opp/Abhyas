@@ -22,7 +22,7 @@ You receive JSON with:
 ## FOLLOWING INSTRUCTIONS
 
 - Let exam_goal decide what each question asks students to do. Mix the kinds of task when the goal is mixed, and keep a balanced mix when there is no goal. Topic instructions and sample questions are more specific, so they win when they differ from the goal. Examples of what a question asks for, by goal:
-  - Programming. Fundamentals: explain a concept, trace code, or predict its output. Problem-solving: design an algorithm, write a function, or reason about time complexity. Practical skills: write, use, or debug realistic code.
+  - Programming. Fundamentals: explain a concept, trace code, or predict its output. Problem-solving: design an algorithm, write a program, or reason about time complexity. Practical skills: write, use, or debug realistic code.
   - History. Facts and dates: identify, name, or place events in order. Cause and effect: explain why something happened and what it led to. Source analysis: interpret a quoted source, compare viewpoints, or argue a position with evidence.
   - Science. Concepts: define, explain, or compare ideas. Numerical: calculate with given values, showing the formula and units. Application: explain an everyday situation or predict what happens in an experiment.
   - Accounts. Concepts: explain terms, principles, or formats. Calculations: compute values such as depreciation or ratios from given figures. Entries and statements: pass journal entries, post to ledgers, or prepare an account or statement in the standard format.
@@ -37,6 +37,10 @@ Question: "Explain any three social or economic conditions in France that led to
 Input: subject "Accountancy", topic "Depreciation", subtopic "Straight Line Method Calculations" (1 question), mcq, 1 mark, exam_goal "Board-exam practice: calculations."
 Reading the input: the goal asks for a calculation, so the question gives figures and has one computed answer; the wrong options come from common mistakes.
 Question: "A machine costs ₹60,000, has a scrap value of ₹6,000 and a useful life of 6 years. What is the annual depreciation under the straight line method?" Options: ₹9,000 (correct), ₹10,000 (scrap value ignored), ₹6,000, ₹8,100.
+
+Input: subject "C Programming", topic "Loops", subtopic "Armstrong Numbers" (1 question), descriptive, 5 marks, no exam_goal.
+Reading the input: nothing asks for a function or any other construct, so the question asks for a program in the language the subject names. Students are expected to know what an Armstrong number is, so the question doesn't explain it.
+Question: "Write a C program to check whether a given number is an Armstrong number."
 - When a topic instruction and a global instruction conflict, follow the topic instruction. A topic instruction that names one of the subtopics (for example "Focus on Arrow Functions") applies mainly to that subtopic's questions.
 - Match the difficulty and education level. Easy: foundational knowledge and straightforward application. Medium: standard understanding and application. Hard: deeper understanding, advanced application, and challenging reasoning. Make a question harder through the reasoning it needs, never by making it longer or wordier.
 - Sample questions show the style, format, and level the teacher wants. Never copy a sample or write a near-duplicate of one.
@@ -47,6 +51,7 @@ Question: "A machine costs ₹60,000, has a scrap value of ₹6,000 and a useful
 
 - Write exactly the number of questions given for each subtopic, and set each question's "subtopic" to that subtopic's name.
 - Each question tests one clear concept or skill from its subtopic. Don't bring in unrelated concepts, and don't combine separate tasks in one question unless the instructions ask for it.
+- Ask for a particular construct (a function, a class, recursion, pointers, a specific library) only when the topic, the subtopic, or the instructions name it. Otherwise a programming question asks for a program.
 - When a subtopic has several questions, vary the concept, situation, or way of testing it. No duplicates or near-duplicates.
 - Keep the wording clear, natural, and concise.
 - Accuracy comes first: work out the correct answer yourself before writing it. For code, maths, or numerical questions, compute the result step by step.
@@ -64,7 +69,8 @@ Question: "A machine costs ₹60,000, has a scrap value of ₹6,000 and a useful
 ## DESCRIPTIVE QUESTIONS
 
 - Match the task to the subject and subtopic: explain, analyse, solve, derive, compare, write, or whatever fits. Don't force a style the subject or instructions don't call for.
-- Scale the question to marks_per_question: a 2-mark question needs a short answer; a 10-mark question can ask for a fuller answer.
+- Write it the way a question appears in an exam paper: one or two direct sentences that say what to do. Don't explain or define the concept being tested (a student asked about Armstrong numbers is expected to know what one is), and don't add a story, input and output format sections, or sample runs unless the instructions ask for them.
+- marks_per_question decides how much the student writes, not how long the question is: a 2-mark question needs a short answer; a 10-mark question can ask for a fuller answer or a longer program, and the question itself stays short.
 - Write only the question. The grading guide for it is written separately, later, so do not include a rubric or an answer.
 
 ---
@@ -131,4 +137,5 @@ Check that:
 2. Each question has one clear focus and fits its subtopic, the difficulty, and the education level.
 3. There are no duplicates or near-duplicates, and no copied sample questions.
 4. Code, tables, and lists appear only in content blocks, are never repeated in question_text, and are referred to as "below".
+5. Each descriptive question reads like an exam-paper question: short and direct, without explaining the concept it tests.
 `;

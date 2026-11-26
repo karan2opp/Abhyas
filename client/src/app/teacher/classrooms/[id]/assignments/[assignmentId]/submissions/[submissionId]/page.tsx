@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/controls/button";
 import { toast } from "sonner";
+import { marksProblem } from "@/lib/marksValidation";
 import { OptionValue, QuestionText, type ContentBlock } from "@/components/exam/QuestionContentBlocks";
 import {
   getAssignmentByIdService,
@@ -110,15 +111,11 @@ export default function GradeSubmissionPage() {
   const handleSubmitGrade = async () => {
     if (!submission) return;
     for (const a of submission.answers) {
-      const val = marksByAnswer[a.id];
-      if (val === undefined || val === "" || isNaN(parseFloat(val))) {
-        toast.error("Enter marks for every question before submitting");
-        return;
-      }
-      const parsed = parseFloat(val);
       const q = getQuestion(a.questionId);
-      if (parsed < 0 || (q && parsed > q.marks)) {
-        toast.error(`Marks for "${q?.description.slice(0, 40)}..." cannot exceed ${q?.marks}`);
+      const number = questions.findIndex((x) => x.id === a.questionId) + 1;
+      const problem = marksProblem(`Q${number}`, marksByAnswer[a.id], q?.marks);
+      if (problem) {
+        toast.error(problem);
         return;
       }
     }

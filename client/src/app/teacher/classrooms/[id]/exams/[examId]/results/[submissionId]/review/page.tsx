@@ -8,6 +8,7 @@ import { ArrowLeft, Check, X, Bot, User, MessageSquare, ChevronLeft, ChevronRigh
 import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
 import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from "../../../../../../../exams/exam.service";
 import { toast } from "sonner";
+import { marksProblem } from "@/lib/marksValidation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
@@ -174,15 +175,13 @@ export default function SubmissionReviewPage() {
   const handleSaveGrade = async () => {
     if (!submission) return;
     for (const a of submission.answers) {
-      const val = marksByAnswer[a.id];
-      if (val === undefined || val === "" || isNaN(parseFloat(val))) {
-        toast.error("Enter marks for every question before saving");
-        return;
-      }
-      const parsed = parseFloat(val);
       const question = findQuestionInSections(exam?.sections || [], a.questionId)?.question;
-      if (parsed < 0 || (question && parsed > question.marks)) {
-        toast.error(`Marks for question ${question?.description?.slice(0, 40)}... cannot exceed ${question?.marks}`);
+      const number = orderedQuestions.findIndex((entry) => entry.question.id === a.questionId) + 1;
+      const problem = marksProblem(`Q${number}`, marksByAnswer[a.id], question?.marks);
+      if (problem) {
+        toast.error(problem);
+        // Take the teacher to the question that needs fixing.
+        goToQuestion(a.questionId);
         return;
       }
     }

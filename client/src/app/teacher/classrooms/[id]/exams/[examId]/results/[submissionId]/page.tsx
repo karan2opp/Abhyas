@@ -8,6 +8,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Check, X, Bot, User, MessageSquar
 import { getSubmissionByIdService, getExamForSubmissionService } from "@/app/student/student.service";
 import { gradeExamSubmissionService, evaluateExamSubmissionWithAiService } from "../../../../../../exams/exam.service";
 import { toast } from "sonner";
+import { marksProblem } from "@/lib/marksValidation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import { normalizeCodeBlocks } from "@/lib/markdown";
@@ -133,14 +134,17 @@ export default function ResultsPage() {
     if (!submission) return;
     for (const a of submission.answers) {
       const q = findQuestion(a.questionId);
-      const val = marksByAnswer[a.id];
-      if (val === undefined || val === "" || isNaN(parseFloat(val))) {
-        toast.error("Enter marks for every question before saving");
-        return;
-      }
-      const parsed = parseFloat(val);
-      if (parsed < 0 || (q && parsed > q.marks)) {
-        toast.error(`Marks for "${q?.description?.slice(0, 40)}..." cannot exceed ${q?.marks}`);
+      const section = (exam?.sections || []).find((s: any) => s.questions?.some((sq: any) => sq.id === a.questionId));
+      const number = (section?.questions?.findIndex((sq: any) => sq.id === a.questionId) ?? 0) + 1;
+      const label = (exam?.sections?.length ?? 0) > 1 ? `Q${number} in ${section?.title}` : `Q${number}`;
+      const problem = marksProblem(label, marksByAnswer[a.id], q?.marks);
+      if (problem) {
+        toast.error(problem);
+        // Take the teacher to the question that needs fixing.
+        if (section) {
+          setSelectedSectionId(section.id);
+          setSelectedQuestionId(a.questionId);
+        }
         return;
       }
     }

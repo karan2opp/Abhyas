@@ -11,6 +11,7 @@ import { bindUsageContext } from "../../common/agent/usage_context.js";
 import { examUsageContext } from "../ai_usage/ai_usage.service.js";
 import { assertQuota } from "../billing/usage.service.js";
 import { alreadyCheckedGate, organisationGradeGate } from "../billing/grading_gate.js";
+import { roundMarks, sumMarks } from "../../common/utils/marks.js";
 
 type Requester = { id: string; role: string; organisationId: string | null };
 
@@ -164,7 +165,7 @@ const rubricsArePending = async (examId: string): Promise<boolean> => {
 // Adds up a submission's marks and marks it as done.
 const finishSubmission = async (submissionId: string) => {
     const allAnswers = await db.select().from(answers).where(eq(answers.submissionId, submissionId));
-    const totalScore = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+    const totalScore = sumMarks(allAnswers);
 
     const [updated] = await db.update(submissions)
         .set({ status: "submitted", score: totalScore, updatedAt: new Date() })
@@ -372,7 +373,7 @@ const submitExam =async (submissionId: string, studentId: string, mode: string) 
     const [updated] = await db.update(submissions)
         .set({
             status: queueEvaluation ? "evaluating" : "submitted",
-            score: totalScore,
+            score: roundMarks(totalScore),
             submittedAt: new Date(),
             updatedAt: new Date(),
         })
@@ -413,15 +414,16 @@ const gradeExamSubmission = async (submissionId: string, data: GradeExamSubmissi
 
             const [question] = await tx.select().from(questions).where(eq(questions.id, answerRow.questionId));
             if (!question) throw ApiError.notFound("Question not found");
-            if (graded.marksAwarded > question.marks) {
-                throw ApiError.badRequest(`Marks awarded (${graded.marksAwarded}) cannot exceed this question's max marks (${question.marks})`);
+            const marksAwarded = roundMarks(graded.marksAwarded);
+            if (marksAwarded > question.marks) {
+                throw ApiError.badRequest(`Marks awarded (${marksAwarded}) cannot exceed this question's max marks (${question.marks})`);
             }
 
             await tx.update(answers)
                 .set({
-                    marksAwarded: graded.marksAwarded,
+                    marksAwarded,
                     feedback: graded.feedback ?? null,
-                    isCorrect: graded.marksAwarded === question.marks,
+                    isCorrect: marksAwarded === question.marks,
                     evaluatedBy: "teacher",
                     updatedAt: new Date(),
                 })
@@ -429,7 +431,7 @@ const gradeExamSubmission = async (submissionId: string, data: GradeExamSubmissi
         }
 
         const allAnswers = await tx.select().from(answers).where(eq(answers.submissionId, submissionId));
-        const totalScore = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+        const totalScore = sumMarks(allAnswers);
 
         const [updated] = await tx.update(submissions)
             .set({

@@ -9,6 +9,7 @@ import { getExamByIdService, getExamSubmissionsService } from "../../../../../ex
 import { formatDateTime } from "@/lib/date";
 import { Pagination } from "@/components/common/Pagination";
 import { pageCount } from "@/lib/page";
+import { formatMarks } from "@/lib/formatMarks";
 
 export default function ExamResultsPage() {
   const params = useParams();
@@ -95,7 +96,7 @@ export default function ExamResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
-              {averageScore.toFixed(1)} <span className="text-sm text-gray-500 font-normal">/ {exam?.totalMarks || 100}</span>
+              {formatMarks(averageScore)} <span className="text-sm text-gray-500 font-normal">/ {exam?.totalMarks || 100}</span>
             </div>
           </CardContent>
         </Card>
@@ -106,7 +107,7 @@ export default function ExamResultsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
-              {highestScore} <span className="text-sm text-gray-500 font-normal">/ {exam?.totalMarks || 100}</span>
+              {formatMarks(highestScore)} <span className="text-sm text-gray-500 font-normal">/ {exam?.totalMarks || 100}</span>
             </div>
           </CardContent>
         </Card>
@@ -147,7 +148,7 @@ export default function ExamResultsPage() {
                         {row.submission.status === "inprogress" && <span className="px-2 py-1 bg-orange-500/10 text-orange-400 rounded text-xs font-bold uppercase tracking-wider border border-orange-500/30">In Progress</span>}
                       </td>
                       <td className="px-6 py-4 font-bold text-white">
-                        {row.submission.score !== null ? row.submission.score : "-"}
+                        {row.submission.score !== null ? formatMarks(row.submission.score) : "-"}
                       </td>
                       <td className="px-6 py-4 text-gray-500">
                         {row.submission.submittedAt

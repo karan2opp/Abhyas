@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/controls/input";
 import { formatDateTime } from "@/lib/date";
 import { Pagination } from "@/components/common/Pagination";
 import { pageCount } from "@/lib/page";
+import { formatMarks } from "@/lib/formatMarks";
 
 export function LeaderboardView({
   examId,
@@ -187,7 +188,7 @@ export function LeaderboardView({
                     {entry.rank}{entry.rank === 1 ? "st" : entry.rank === 2 ? "nd" : "rd"} Rank
                   </div>
                   <div className="mt-auto text-xl font-black text-white">
-                    {entry.score} <span className="text-xs text-gray-500 font-normal">pts</span>
+                    {formatMarks(entry.score)} <span className="text-xs text-gray-500 font-normal">pts</span>
                   </div>
                 </div>
               );
@@ -206,7 +207,7 @@ export function LeaderboardView({
               <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm">
                 <span className="font-semibold text-orange-300">Your place</span>
                 <span className="font-bold text-white">
-                  #{me.rank} <span className="text-gray-400 font-normal">· {me.score} pts</span>
+                  #{me.rank} <span className="text-gray-400 font-normal">· {formatMarks(me.score)} pts</span>
                 </span>
               </div>
             )}
@@ -268,7 +269,7 @@ export function LeaderboardView({
                                 ></div>
                               </div>
                               <span className="font-bold text-white text-lg">
-                                {entry.score}
+                                {formatMarks(entry.score)}
                               </span>
                             </div>
                           </td>

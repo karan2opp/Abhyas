@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { joinExamService, getMySubmissionsService, verifyJoinCodeService } from "./student.service";
 import { formatDateTime } from "@/lib/date";
 import { UpcomingExams } from "./UpcomingExams";
+import { formatMarks } from "@/lib/formatMarks";
 
 export default function StudentDashboard() {
   const [joinCode, setJoinCode] = useState("");
@@ -207,7 +208,7 @@ export default function StudentDashboard() {
                       </div>
                       
                       <div className="text-[14px] font-bold text-emerald-400 w-[80px] text-center whitespace-nowrap shrink-0">
-                        {isCompleted ? `${submission.score ?? 0} / ${exam.totalMarks}` : '- / -'}
+                        {isCompleted ? `${formatMarks(submission.score)} / ${exam.totalMarks}` : '- / -'}
                       </div>
                       
                       <div className="flex items-center gap-2 sm:gap-3">

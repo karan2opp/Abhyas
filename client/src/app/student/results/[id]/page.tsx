@@ -14,6 +14,7 @@ import { normalizeCodeBlocks } from "@/lib/markdown";
 import { MATH_REMARK_PLUGINS, MATH_REHYPE_PLUGINS } from "@/lib/markdownMath";
 import { ContentBlocksView, OptionValue, MarkdownCode } from "@/components/exam/QuestionContentBlocks";
 import { ResultNavigator, OpenQuestionsButton } from "@/components/exam/ResultNavigator";
+import { formatMarks } from "@/lib/formatMarks";
 
 export default function ResultsPage() {
   const params = useParams();
@@ -305,7 +306,7 @@ export default function ResultsPage() {
             </Link>
             <div className={`flex h-8 items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap px-2.5 sm:px-3 sm:h-auto sm:py-1.5 rounded-xl border ${borderClass} ${bgClass} text-xs font-bold`}>
               <span className="text-gray-400 font-normal"><span className="hidden sm:inline">Your </span>Marks:</span>
-              <span className={colorClass}>{score} / {totalMarks} ({percentage}%)</span>
+              <span className={colorClass}>{formatMarks(score)} / {totalMarks} ({percentage}%)</span>
             </div>
             <span className="flex h-8 items-center justify-center text-[11px] sm:text-xs px-2 sm:px-2.5 sm:h-auto sm:py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase tracking-wider">
               {submission.status}
@@ -385,7 +386,7 @@ export default function ResultsPage() {
                           ? (selectedAnswer?.marksAwarded >= selectedQuestion.marks ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : selectedAnswer?.marksAwarded > 0 ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
                           : (selectedAnswer?.isCorrect ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')
                       }`}>
-                        {selectedAnswer?.marksAwarded ?? 0} / {selectedQuestion.marks} Marks
+                        {formatMarks(selectedAnswer?.marksAwarded)} / {selectedQuestion.marks} Marks
                       </div>
                     </div>
                   </div>

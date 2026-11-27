@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/display/card";
 import { UserAvatar } from "@/components/common/UserAvatar";
 import { toast } from "sonner";
 import { getAssignmentByIdService, getSubmissionsForAssignmentService } from "../../../../../assignments/assignment.service";
+import { formatMarks } from "@/lib/formatMarks";
 
 const PAGE_SIZE = 10;
 
@@ -163,7 +164,7 @@ export default function AssignmentSubmissionsPage() {
                   <div className="flex items-center gap-3 shrink-0">
                     {statusBadge(s)}
                     {s.totalMarksAwarded !== null && (
-                      <span className="text-emerald-400 text-sm font-bold">{s.totalMarksAwarded}/{totalMarks}</span>
+                      <span className="text-emerald-400 text-sm font-bold">{formatMarks(s.totalMarksAwarded)}/{totalMarks}</span>
                     )}
                     <ChevronRight className="h-5 w-5 text-gray-500" />
                   </div>

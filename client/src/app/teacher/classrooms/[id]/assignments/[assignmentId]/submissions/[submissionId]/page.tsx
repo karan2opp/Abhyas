@@ -15,6 +15,7 @@ import {
   gradeSubmissionService,
 } from "../../../../../../assignments/assignment.service";
 import { formatDateTime } from "@/lib/date";
+import { formatMarks } from "@/lib/formatMarks";
 
 interface Answer {
   id: string;
@@ -186,7 +187,7 @@ export default function GradeSubmissionPage() {
           {submission.status === "graded" && (
             <div className="bg-[#161b28] border border-white/10 rounded-lg p-4">
               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Total Marks</p>
-              <p className="text-sm font-semibold text-emerald-400">{submission.totalMarksAwarded}/{totalMarks}</p>
+              <p className="text-sm font-semibold text-emerald-400">{formatMarks(submission.totalMarksAwarded)}/{totalMarks}</p>
             </div>
           )}
         </div>
@@ -221,7 +222,7 @@ export default function GradeSubmissionPage() {
                         </div>
                       );
                     })}
-                    <p className="text-xs text-gray-500 mt-1">Auto-scored: {a.marksAwarded ?? 0} / {q.marks}</p>
+                    <p className="text-xs text-gray-500 mt-1">Auto-scored: {formatMarks(a.marksAwarded)} / {q.marks}</p>
                   </div>
                 ) : (
                   <div className="w-full bg-[#161b28] border border-white/10 rounded-lg px-5 py-4 mb-3 min-h-[120px]">

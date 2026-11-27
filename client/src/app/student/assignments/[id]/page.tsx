@@ -16,6 +16,7 @@ import {
 import { formatDateTime } from "@/lib/date";
 import { SUBMISSION_CLOSED_MESSAGE, TestTakingScreen, type TestQuestion } from "@/components/exam/TestTakingScreen";
 import { OptionValue, QuestionText } from "@/components/exam/QuestionContentBlocks";
+import { formatMarks } from "@/lib/formatMarks";
 
 interface Assignment {
   id: string;
@@ -218,7 +219,7 @@ export default function StudentAssignmentPage() {
             <div>
               <dt className="text-xs text-zinc-500">Your marks</dt>
               <dd className="mt-0.5 text-sm font-semibold text-emerald-400">
-                {submission.totalMarksAwarded}/{assignment.totalMarks}
+                {formatMarks(submission.totalMarksAwarded)}/{assignment.totalMarks}
               </dd>
             </div>
           )}
@@ -269,7 +270,7 @@ export default function StudentAssignmentPage() {
                 )}
                 {answer?.marksAwarded !== null && answer?.marksAwarded !== undefined && submission?.status === "graded" && (
                   <p className="mt-2 text-xs font-semibold text-emerald-400">
-                    Marks: {answer.marksAwarded}/{q.marks}
+                    Marks: {formatMarks(answer.marksAwarded)}/{q.marks}
                   </p>
                 )}
                 {answer?.feedback && <p className="mt-1 text-xs italic text-gray-400">{answer.feedback}</p>}

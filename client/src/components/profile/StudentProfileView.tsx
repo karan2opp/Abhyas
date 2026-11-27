@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/display/card";
 import { toast } from "sonner";
 import api from "@/utils/axios";
 import { formatDate } from "@/lib/date";
+import { formatMarks } from "@/lib/formatMarks";
 
 interface ExamRow {
   submissionId: string;
@@ -184,7 +185,7 @@ export function StudentProfileView() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{e.examTitle}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {e.status === "inprogress" ? "In Progress" : `Score: ${e.score ?? 0} / ${e.totalMarks} (${pct}%)`}
+                      {e.status === "inprogress" ? "In Progress" : `Score: ${formatMarks(e.score)} / ${e.totalMarks} (${pct}%)`}
                       {e.submittedAt ? ` • ${formatDate(e.submittedAt)}` : ""}
                     </p>
                   </div>

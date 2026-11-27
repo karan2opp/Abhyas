@@ -6,6 +6,7 @@ import { env } from "../../env.js";
 import { runGuardrail, samplingFor } from "./agents/evalAgent.js";
 import { getEvaluationPrompt } from "../../prompts/evaluation_agent.prompt.js";
 import type { QuestionContentBlock } from "../questions/question.schema.js";
+import { roundMarks } from "../../common/utils/marks.js";
 
 const ScoreSchema = z.object({ name: z.string(), score: z.coerce.number() });
 
@@ -173,7 +174,7 @@ const evaluateSingleAnswer = async (
             if (typeof marksAwarded !== "number" || !Number.isFinite(marksAwarded)) {
                 throw new Error("The grader's reply had no scores");
             }
-            marksAwarded = Math.min(answer.maxMarks, Math.max(0, marksAwarded));
+            marksAwarded = roundMarks(Math.min(answer.maxMarks, Math.max(0, marksAwarded)));
 
             let feedbackString: string | null = null;
             if (typeof feedback === "string") {

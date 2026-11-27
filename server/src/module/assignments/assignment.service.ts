@@ -27,6 +27,7 @@ import { enqueueEvaluation } from "../../common/queue/queues.js";
 import { scheduleAssignmentRubrics } from "../rubrics/rubric.service.js";
 import { bindUsageContext } from "../../common/agent/usage_context.js";
 import { assignmentUsageContext } from "../ai_usage/ai_usage.service.js";
+import { roundMarks, sumMarks } from "../../common/utils/marks.js";
 import type {
     CreateSeriesDto,
     UpdateSeriesDto,
@@ -1011,7 +1012,7 @@ const buildAssignmentTextAnswers = async (submissionId: string): Promise<TextAns
 // Adds up the marks and marks the submission as done.
 const finishAssignmentSubmission = async (submissionId: string) => {
     const allAnswers = await db.select().from(assignmentAnswers).where(eq(assignmentAnswers.submissionId, submissionId));
-    const totalMarksAwarded = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+    const totalMarksAwarded = sumMarks(allAnswers);
 
     await db.update(assignmentSubmissions)
         .set({ status: "submitted", totalMarksAwarded, updatedAt: new Date() })
@@ -1207,17 +1208,18 @@ const gradeSubmission = async (submissionId: string, data: GradeAssignmentSubmis
 
             const [question] = await tx.select().from(assignmentQuestions).where(eq(assignmentQuestions.id, answerRow.questionId));
             if (!question) throw ApiError.notFound("Question not found");
-            if (graded.marksAwarded > question.marks) {
-                throw ApiError.badRequest(`Marks awarded (${graded.marksAwarded}) cannot exceed this question's max marks (${question.marks})`);
+            const marksAwarded = roundMarks(graded.marksAwarded);
+            if (marksAwarded > question.marks) {
+                throw ApiError.badRequest(`Marks awarded (${marksAwarded}) cannot exceed this question's max marks (${question.marks})`);
             }
 
             await tx.update(assignmentAnswers)
-                .set({ marksAwarded: graded.marksAwarded, feedback: graded.feedback ?? null, updatedAt: new Date() })
+                .set({ marksAwarded, feedback: graded.feedback ?? null, updatedAt: new Date() })
                 .where(and(eq(assignmentAnswers.id, graded.answerId), eq(assignmentAnswers.submissionId, submissionId)));
         }
 
         const allAnswers = await tx.select().from(assignmentAnswers).where(eq(assignmentAnswers.submissionId, submissionId));
-        const totalMarksAwarded = allAnswers.reduce((sum, a) => sum + (a.marksAwarded ?? 0), 0);
+        const totalMarksAwarded = sumMarks(allAnswers);
 
         const [graded] = await tx.update(assignmentSubmissions)
             .set({

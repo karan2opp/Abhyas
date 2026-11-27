@@ -9,6 +9,7 @@ import { getMyExamsService, startScopedExamService } from "../../../student.serv
 import { ExamSchedule } from "@/components/exam/ExamSchedule";
 import { Pagination } from "@/components/common/Pagination";
 import { ExamActionButton } from "../../../ExamActionButton";
+import { formatMarks } from "@/lib/formatMarks";
 
 interface ExamEntry {
   id: string;
@@ -92,7 +93,7 @@ export default function StudentClassroomExamsPage() {
     if (!sub) return { label: "Not Attempted", cls: "bg-zinc-800/60 text-zinc-400 border-zinc-700" };
     if (sub.status === "inprogress") return { label: "In Progress", cls: "bg-amber-500/10 text-amber-300 border-amber-500/30" };
     if (sub.status === "evaluating") return { label: "Evaluating", cls: "bg-orange-500/10 text-orange-300 border-orange-500/30" };
-    return { label: `Submitted · ${sub.score ?? 0}/${exam.totalMarks}`, cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" };
+    return { label: `Submitted · ${formatMarks(sub.score)}/${exam.totalMarks}`, cls: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" };
   };
 
   const tabs: { key: CategoryKey; label: string; count: number }[] = [

@@ -104,6 +104,19 @@ function ExamTimer({ endTime, onTimeUp }: { endTime: number; onTimeUp: () => voi
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// What the server says once an attempt can't change any more ("is already submitted", "has already been submitted",
+// "already evaluating", "already been graded").
+const ALREADY_CLOSED = /already (been )?(submitted|evaluating|graded)/i;
+
+// An answer that could not be saved, and why: the request never reached the server (network), the attempt is already
+// submitted (closed), or the server refused it for another reason (its message).
+type SaveFailure = { questionId: string; network: boolean; closed: boolean; message: string };
+
+const describeSaveFailure = (questionId: string, err: any): SaveFailure => {
+  const message: string = err?.response?.data?.message ?? "";
+  return { questionId, network: !err?.response, closed: ALREADY_CLOSED.test(message), message };
+};
+
 export function TestTakingScreen({
   kind,
   title,
@@ -208,9 +221,11 @@ export function TestTakingScreen({
   const dirtyRef = useRef<Set<string>>(new Set());
   const pendingSubmitRef = useRef(false);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const syncPromiseRef = useRef<Promise<boolean> | null>(null);
-  const runSyncRef = useRef<() => Promise<boolean>>(async () => true);
-  const submitRef = useRef<() => Promise<void>>(async () => {});
+  const syncPromiseRef = useRef<Promise<SaveFailure[]> | null>(null);
+  const runSyncRef = useRef<() => Promise<SaveFailure[]>>(async () => []);
+  const submitRef = useRef<(options?: { timeUp?: boolean }) => Promise<void>>(async () => {});
+  const alreadySubmittedRef = useRef<() => void>(() => {});
+  const closedHandledRef = useRef(false);
 
   // The answers from the server, then anything kept on this device while offline on top (not yet sent).
   useEffect(() => {
@@ -243,10 +258,11 @@ export function TestTakingScreen({
     const handleOnline = () => {
       setIsOnline(true);
       toast.success("Internet connection restored. Syncing your answers...");
-      runSyncRef.current().then((ok) => {
-        if (ok && pendingSubmitRef.current) {
+      runSyncRef.current().then(() => {
+        // The time ran out while offline: submit now, whether or not every answer could be saved.
+        if (pendingSubmitRef.current) {
           pendingSubmitRef.current = false;
-          submitRef.current();
+          submitRef.current({ timeUp: true });
         }
       });
     };
@@ -267,7 +283,9 @@ export function TestTakingScreen({
     if (!isOnline || isPastDue || preview) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     syncTimerRef.current = setTimeout(() => {
-      runSyncRef.current();
+      runSyncRef.current().then((failures) => {
+        if (failures.some((f) => f.closed)) alreadySubmittedRef.current();
+      });
     }, 3000);
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -289,8 +307,8 @@ export function TestTakingScreen({
       toast.error("Time is up! You need internet to submit. It will be submitted automatically when the connection returns.");
       return;
     }
-    toast.info(`Time is up! Submitting your ${noun} automatically.`);
-    await submitFinal();
+    toast.info("Time's up. Saving your answers and submitting...");
+    await submitFinal({ timeUp: true });
   };
 
   const handleOptionChange = (questionId: string, optionId: string) => {
@@ -312,15 +330,16 @@ export function TestTakingScreen({
   };
 
   // ── Sync helpers ────────────────────────────────────────────────────────
-  // Sends every locally-dirty answer to the server. Returns true only if all dirty answers were saved successfully (or
-  // there were none to save).
-  const syncDirtyAnswers = async (): Promise<boolean> => {
+  // Sends every locally-dirty answer to the server and returns the ones that couldn't be saved (none: all saved). One
+  // refused answer doesn't stop the others being sent; once the attempt turns out to be submitted already, nothing more
+  // can be saved, so it stops there.
+  const syncDirtyAnswers = async (): Promise<SaveFailure[]> => {
     const dirtyIds = Array.from(dirtyRef.current);
-    if (dirtyIds.length === 0) return true;
-    if (!navigator.onLine) return false;
+    if (dirtyIds.length === 0) return [];
+    if (!navigator.onLine) return dirtyIds.map((questionId) => ({ questionId, network: true, closed: false, message: "" }));
 
     setIsSyncing(true);
-    let allOk = true;
+    const failures: SaveFailure[] = [];
     try {
       for (const qid of dirtyIds) {
         const q = questions.find((fq) => fq.id === qid);
@@ -330,19 +349,44 @@ export function TestTakingScreen({
           if (q.type === "mcq") setSavedAnswers((prev) => ({ ...prev, [qid]: answersRef.current[qid] ?? [] }));
           else setSavedTextAnswers((prev) => ({ ...prev, [qid]: textAnswersRef.current[qid] ?? "" }));
           dirtyRef.current.delete(qid);
-        } catch {
-          allOk = false;
-          break;
+        } catch (err) {
+          const failure = describeSaveFailure(qid, err);
+          failures.push(failure);
+          if (failure.closed) break;
         }
       }
     } finally {
       setIsSyncing(false);
     }
-    return allOk;
+    return failures;
+  };
+
+  // "Q3, Q7": the questions some failed saves belong to, numbered as in the navigator.
+  const questionNumbers = (failures: SaveFailure[]) =>
+    failures.map((f) => `Q${(questions.find((q) => q.id === f.questionId)?.globalIndex ?? 0) + 1}`).join(", ");
+
+  // Why answers weren't saved, in words: the server's own reason when it refused one, and the connection only when the
+  // request never reached the server.
+  const saveFailureMessage = (failures: SaveFailure[]) => {
+    const refused = failures.find((f) => !f.network);
+    if (refused) return `${questionNumbers([refused])} couldn't be saved: ${refused.message || "the server refused it"}.`;
+    return `${questionNumbers(failures)} couldn't be saved because the connection dropped. Check your connection and try again.`;
+  };
+
+  // The server already has this attempt as submitted: the time ran out (it submits expired attempts itself) or it was
+  // submitted in another tab. Nothing more can be saved, so the student is taken on instead of being left on the screen.
+  const handleAlreadySubmitted = () => {
+    if (closedHandledRef.current) return;
+    closedHandledRef.current = true;
+    clearLocalSnapshot(storageId);
+    dirtyRef.current.clear();
+    toast.info(`Your ${noun} has already been submitted.`);
+    setConfirmingSubmit(false);
+    (onAlreadySubmitted ?? onSubmitted)();
   };
 
   // Runs a single sync at a time; concurrent callers share the same attempt.
-  const runSync = (): Promise<boolean> => {
+  const runSync = (): Promise<SaveFailure[]> => {
     if (syncPromiseRef.current) return syncPromiseRef.current;
     const p = syncDirtyAnswers().finally(() => {
       syncPromiseRef.current = null;
@@ -407,7 +451,10 @@ export function TestTakingScreen({
     }
   };
 
-  const submitFinal = async () => {
+  // Saves whatever isn't saved yet, then submits. Before the time is up, an answer that can't be saved stops the submit and
+  // the student is told which one and why. Once the time is up the student can't change anything any more, so it submits
+  // anyway with what the server has, and says which answers didn't make it.
+  const submitFinal = async ({ timeUp = false }: { timeUp?: boolean } = {}) => {
     if (!navigator.onLine) {
       toast.error(`You need internet to submit your ${noun}. Please wait for the connection to come back and try again.`);
       return;
@@ -415,9 +462,10 @@ export function TestTakingScreen({
 
     setIsSubmitting(true);
     try {
-      const synced = await runSync();
-      if (!synced) {
-        toast.error("Could not save your latest answers. Check your connection and try again.");
+      const failures = await runSync();
+      if (failures.some((f) => f.closed)) return handleAlreadySubmitted();
+      if (failures.length > 0 && !timeUp) {
+        toast.error(saveFailureMessage(failures));
         setIsSubmitting(false);
         return;
       }
@@ -425,17 +473,13 @@ export function TestTakingScreen({
       await submit();
       clearLocalSnapshot(storageId);
       dirtyRef.current.clear();
-      toast.success(`${Noun} submitted successfully!`);
+      if (failures.length > 0) toast.warning(`${Noun} submitted. ${questionNumbers(failures)} couldn't be saved in time, so the last saved version was submitted.`);
+      else toast.success(`${Noun} submitted successfully!`);
       setConfirmingSubmit(false);
       onSubmitted();
     } catch (err: any) {
-      const message = err.response?.data?.message || `Failed to submit ${noun}`;
-      if (/already submitted/i.test(message) && onAlreadySubmitted) {
-        clearLocalSnapshot(storageId);
-        toast.info(`This ${noun} was already submitted.`);
-        onAlreadySubmitted();
-        return;
-      }
+      const message = err.response?.data?.message || (err.response ? `Failed to submit ${noun}` : `Couldn't reach the server to submit your ${noun}. Check your connection and try again.`);
+      if (ALREADY_CLOSED.test(message)) return handleAlreadySubmitted();
       toast.error(message);
       setIsSubmitting(false);
     }
@@ -445,6 +489,7 @@ export function TestTakingScreen({
   useEffect(() => {
     runSyncRef.current = runSync;
     submitRef.current = submitFinal;
+    alreadySubmittedRef.current = handleAlreadySubmitted;
   });
 
   const handleSubmitClick = () => {
@@ -459,6 +504,9 @@ export function TestTakingScreen({
   const isQuestionAnswered = (q: TestQuestion) =>
     q.type === "mcq" ? (savedAnswers[q.id]?.length ?? 0) > 0 : (savedTextAnswers[q.id] ?? "").trim() !== "";
   const answeredCount = questions.filter(isQuestionAnswered).length;
+  // What the student has given, saved yet or not: the submit check counts these as answered, since submitting saves them.
+  const hasAnswerOnScreen = (q: TestQuestion) =>
+    q.type === "mcq" ? (answers[q.id]?.length ?? 0) > 0 : (textAnswers[q.id] ?? "").trim() !== "";
 
   if (!hasAcceptedInstructions) {
     return (
@@ -924,7 +972,8 @@ export function TestTakingScreen({
         noun={noun}
         canChangeLater={kind === "assignment"}
         total={questions.length}
-        unanswered={questions.filter((q) => !isQuestionAnswered(q)).map((q) => q.globalIndex)}
+        unanswered={questions.filter((q) => !hasAnswerOnScreen(q)).map((q) => q.globalIndex)}
+        unsaved={questions.filter((q) => dirtyRef.current.has(q.id)).map((q) => q.globalIndex)}
         submitting={isSubmitting}
         onGoTo={(index) => {
           setCurrentIndex(index);
@@ -936,9 +985,29 @@ export function TestTakingScreen({
   );
 }
 
+// Buttons for a list of questions ("Q3", "Q7"); each one goes back to its question.
+function QuestionLinks({ indexes, disabled, onGoTo }: { indexes: number[]; disabled: boolean; onGoTo: (index: number) => void }) {
+  return (
+    <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
+      {indexes.map((index) => (
+        <button
+          key={index}
+          type="button"
+          onClick={() => onGoTo(index)}
+          disabled={disabled}
+          className="h-9 min-w-9 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 text-sm font-bold tabular-nums text-amber-200 transition-colors hover:bg-amber-500/20 disabled:opacity-40"
+        >
+          Q{index + 1}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /**
- * The last check before submitting: how much is answered, the unanswered questions (each one a shortcut back to it), and
- * what happens afterwards (an exam can't be changed; an assignment can, until its due date).
+ * The last check before submitting: how much is answered, the unanswered questions and the answers with changes not saved
+ * yet (each one a shortcut back to it), and what happens afterwards (an exam can't be changed; an assignment can, until
+ * its due date). Submitting saves the unsaved changes first.
  */
 function SubmitDialog({
   open,
@@ -947,6 +1016,7 @@ function SubmitDialog({
   canChangeLater,
   total,
   unanswered,
+  unsaved,
   submitting,
   onGoTo,
   onSubmit,
@@ -958,6 +1028,8 @@ function SubmitDialog({
   total: number;
   // Positions (0-based) of the questions with no answer, numbered as in the navigator.
   unanswered: number[];
+  // Positions of the questions whose latest changes aren't saved on the server yet.
+  unsaved: number[];
   submitting: boolean;
   onGoTo: (index: number) => void;
   onSubmit: () => void;
@@ -1001,31 +1073,33 @@ function SubmitDialog({
                 {unanswered.length === 1 ? "1 question has" : `${unanswered.length} questions have`} no answer and will get 0 marks. Tap one to go back to it.
               </span>
             </p>
-            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-              {unanswered.map((index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => onGoTo(index)}
-                  disabled={submitting}
-                  className="h-9 min-w-9 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 text-sm font-bold tabular-nums text-amber-200 transition-colors hover:bg-amber-500/20 disabled:opacity-40"
-                >
-                  Q{index + 1}
-                </button>
-              ))}
-            </div>
+            <QuestionLinks indexes={unanswered} disabled={submitting} onGoTo={onGoTo} />
+          </div>
+        )}
+
+        {unsaved.length > 0 && (
+          <div className="space-y-2">
+            <p className="flex items-start gap-2 text-sm text-amber-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {unsaved.length === 1 ? "1 answer has" : `${unsaved.length} answers have`} changes that aren't saved yet. They'll be saved when you submit. Tap one to check it first.
+              </span>
+            </p>
+            <QuestionLinks indexes={unsaved} disabled={submitting} onGoTo={onGoTo} />
           </div>
         )}
 
         <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting} className="text-gray-300 hover:bg-white/5 hover:text-white">
-            Keep working
+            Back to {noun}
           </Button>
           <Button type="button" onClick={onSubmit} disabled={submitting} className="bg-orange-600 font-semibold text-white hover:bg-orange-700">
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
               </>
+            ) : unsaved.length > 0 ? (
+              "Save and submit"
             ) : (
               `Submit ${noun}`
             )}

@@ -93,6 +93,12 @@ const submitAnswer = async (input: CreateAnswerDto, userId: string) => {
         optionIds: selectedOptions || [],
     });
 
+    // An emptied answer (text deleted, or every option unticked) clears the saved one: the question counts as unanswered.
+    if ((selectedOptions ?? []).length === 0 && !textAnswer?.trim()) {
+        await db.delete(answers).where(and(eq(answers.submissionId, submissionId), eq(answers.questionId, questionId)));
+        return { data: null, isCorrect: null, marksAwarded: 0 };
+    }
+
     // ── Evaluate correctness (MCQ only) ──────────────────────────
     let isCorrect: boolean | null = null;
     let marksAwarded: number = 0;

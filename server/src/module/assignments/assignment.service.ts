@@ -888,6 +888,14 @@ const saveAnswer = async (data: SaveAssignmentAnswerDto, studentId: string) => {
     if (!question) throw ApiError.notFound("Question not found");
     if (question.assignmentId !== submission.assignmentId) throw ApiError.badRequest("Question does not belong to this assignment");
 
+    // An emptied answer (text deleted, or every option unticked) clears the saved one: the question counts as unanswered.
+    if ((data.options ?? []).length === 0 && !data.textAnswer?.trim()) {
+        await db.delete(assignmentAnswers).where(
+            and(eq(assignmentAnswers.submissionId, data.submissionId), eq(assignmentAnswers.questionId, data.questionId))
+        );
+        return null;
+    }
+
     // MCQ correctness is deterministic (not AI-graded); descriptive answers are
     // left ungraded (marksAwarded null) until the teacher reviews them manually.
     let marksAwarded: number | null = null;

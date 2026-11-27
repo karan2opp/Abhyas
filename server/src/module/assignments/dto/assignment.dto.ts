@@ -131,8 +131,9 @@ export const saveAssignmentAnswerSchema = z.object({
 }).refine(data => {
     const hasOptions = data.options !== undefined && data.options.length > 0;
     const hasTextAnswer = data.textAnswer !== undefined && data.textAnswer.trim().length > 0;
-    return (hasOptions || hasTextAnswer) && !(hasOptions && hasTextAnswer);
-}, { message: "Provide either options or textAnswer, but not both" });
+    // Neither one is allowed: the student emptied the answer, and the saved one is cleared.
+    return !(hasOptions && hasTextAnswer);
+}, { message: "Provide either options or textAnswer, not both" });
 
 export type SaveAssignmentAnswerDto = z.infer<typeof saveAssignmentAnswerSchema>;
 
